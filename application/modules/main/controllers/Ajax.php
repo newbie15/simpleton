@@ -157,6 +157,51 @@ class Ajax extends CI_Controller {
 
     }
 
+
+    public function rekap_harian(){
+        $tgl = date('Y-m-d');
+        $query = $this->db->query("
+            SELECT penjualan.nota,karyawan.npk,karyawan.nama,karyawan.bagian,stok.barcode,stok.nama as item,penjualan.harga,penjualan.qty,penjualan.jumlah
+            FROM penjualan,stok,karyawan
+            WHERE penjualan.kode = stok.barcode AND
+            karyawan.npk = penjualan.id_karyawan AND
+            penjualan.tgl LIKE '%$tgl%' 
+            ORDER BY penjualan.id ASC
+        ");
+
+        // echo "
+        //     SELECT penjualan.nota,karyawan.npk,karyawan.nama,karyawan.bagian,stok.barcode,stok.nama,penjualan.harga,penjualan.qty,penjualan.jumlah
+        //     FROM penjualan,stok,karyawan
+        //     WHERE penjualan.kode = stok.barcode AND
+        //     karyawan.npk = penjualan.id_karyawan AND
+        //     penjualan.tgl LIKE '%tgl%' 
+        //     ORDER BY penjualan.id ASC
+
+        // ";
+        foreach ($query->result() as $row)
+        {
+        //     $nama = substr($row->nama,0,7)."...";
+        //     $harga = ($row->harga)/1000;
+        //     $jumlah = number_format($row->jumlah,0,",",".");
+            echo "
+        <tr>
+            <td>$row->nota</td>
+            <td>$row->npk</td>
+            <td>$row->nama</td>
+            <td>$row->bagian</td>
+            <td>$row->barcode</td>
+            <td>$row->item</td>
+            <td>$row->harga</td>
+            <td>$row->qty</td>
+            <td>$row->jumlah</td>
+        </tr>";
+            // echo $row->nama;
+            // echo ":";
+            // echo $row->harga;
+            // echo "<br>";
+            // print_r($row);
+        }
+    }
     // SELECT sum(jumlah) AS total FROM penjualan WHERE MONTH(tgl) = 9
     // SELECT CAST(tgl AS DATE) AS DATE, sum(jumlah) as summ FROM penjualan GROUP BY CAST(tgl AS DATE) ORDER BY 1
 }

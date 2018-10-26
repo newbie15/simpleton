@@ -217,10 +217,11 @@ class Examples extends CI_Controller {
 	}
 	public function rekap_penjualan(){
 		$data['js_file'] = [
-			base_url("assets/flot/jquery.flot.min.js"),			
+			// base_url("assets/flot/jquery.flot.min.js"),			
 			base_url("assets/kasir/rekap.js"),			
-
 		];
+
+
 
 
 	$data['output'] = '
@@ -228,10 +229,11 @@ class Examples extends CI_Controller {
 		<h3>Rekap Penjualan</h3>
 	</div>
 
+
 	<div id="exTab2" class="container">	
 		<ul class="nav nav-tabs">
 			<li class="active">
-        <a href="#1" data-toggle="tab">Harian</a>
+        		<a href="#1" data-toggle="tab">Harian</a>
 			</li>
 			<li>
 				<a href="#2" data-toggle="tab">Mingguan</a>
@@ -246,8 +248,32 @@ class Examples extends CI_Controller {
 
 		<div class="tab-content ">
 			<div class="tab-pane active" id="1">
+
+
+
 				<h3>Standard tab panel created on bootstrap using nav-tabs</h3>
 				<div id="placeholder1" style="width: 720px;height: 300px;"></div>
+				<div>
+				<table>
+					<thead>
+						<tr>
+							<th>nota</th>
+							<th>npk</th>
+							<th>nama</th>
+							<th>bagian</th>
+							<th>barcode</th>
+							<th>item</th>
+							<th>harga</th>
+							<th>qty</th>
+							<th>jumlah</th>
+						</tr>
+					</thead>
+					<tbody id="harian>
+					
+					</tbody>
+				</table>
+
+				</div>
 			</div>
 			<div class="tab-pane" id="2">
 				<h3>Notice the gap between the content and tab after applying a background color</h3>
