@@ -21,6 +21,7 @@ class Ajax extends CI_Controller {
         // echo "<h1>Welcome to the world of Codeigniter</h1>";//Just an example to ensure that we get into the function
         // die();
     }
+    
     public function barcode($kode)
     {
         $this->db->select('*');
@@ -34,6 +35,22 @@ class Ajax extends CI_Controller {
             echo $row->nama;
             echo ":";
             echo $row->harga;
+        }
+    }
+
+    public function kartu($kode)
+    {
+        $this->db->select('*');
+        $this->db->from('karyawan');
+        $this->db->where('npk', $kode); 
+        
+        $query = $this->db->get();
+
+        foreach ($query->result() as $row)
+        {
+            echo $row->nama;
+            echo ":";
+            echo $row->bagian;
         }
     }
 
