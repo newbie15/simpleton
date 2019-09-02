@@ -4,12 +4,64 @@ var dx = [
 
 $(document).ready(function(){
     
+    var limit;
+    var totl;
+    var show;
+
+    function check_limit_belanja(n){
+        $("#limit").load("http://localhost/simpleton/index.php/main/ajax/limit_belanja/" + n);
+
+        setTimeout(function(){
+            var lb = parseInt($("#limit_belanja").html());
+            var l = parseInt($("#limit").html());
+
+            if(l>lb){
+                alert("belanja anda telah melebihi limit bulanan\n silahkan berbelanja bulan depan");
+                location.reload();
+            }
+        },2000);
+    }
+
+
     function updatettl(){
         var total = 0;
         dx.forEach(element => {
             total += element[2] * element[3];
         });
         $("#ttx").html("Total Rp " + total.toLocaleString());
+        totl = total;
+    }
+
+    function checklimit(){
+        var lb = parseInt($("#limit_belanja").html());
+        var l = parseInt($("#limit").html());
+
+        lb = lb || 0;
+        l = l || 0;
+
+        var b = (l+totl);
+
+        console.log("lb :",lb);
+        console.log("l :",l);
+        console.log("totl :",totl);
+        console.log("b :",b);
+
+        if(b>lb){
+            if(show){
+                alert("total belanja anda akan melebihi limit bulanan\nmohon kurangi jumlah belanja anda kali ini");
+                $("#ttx").css("color","red");
+            }
+            show = false;
+        }else{
+            show = true;
+            $("#ttx").css("color","black");
+        }
+
+    }
+
+    function updatescroll(){
+        var el = document.getElementById("scrll");
+        el.scrollTop = el.scrollHeight;
     }
 
     var options1 = {
@@ -83,6 +135,7 @@ $(document).ready(function(){
                         console.log(dx);
                         $('#my').jexcel('setData', dx, true);
                         updatettl();
+                        checklimit();
                     } else {
                         console.log("tidak ketemu");
                     }
@@ -96,6 +149,7 @@ $(document).ready(function(){
         }else{
 
         }
+        updatescroll();
     }
 
     $("#npk").keypress(function(e){
@@ -114,9 +168,11 @@ $(document).ready(function(){
                     var nama = data[0];
                     var alamat = data[1];
                     var limit_belanja = data[2];
+                    limit = limit_belanja;
                     $("#nkaryawan").html(nama);
                     $("#akaryawan").html(alamat);
                     $("#limit_belanja").html(limit_belanja);
+                    check_limit_belanja($("#npk").val());
                 }else{
                     console.log("tidak ketemu");
                 }
@@ -126,6 +182,7 @@ $(document).ready(function(){
             }
         });
         }
+
     });
     
     $("#barcode").keypress(function(e){
@@ -176,6 +233,7 @@ $(document).ready(function(){
     $('#my').jexcel('updateSettings', {
         cells: function (cell, col, row) {
             updatettl();
+            checklimit();
             if (col < 1) {
                 // value = $('#my').jexcel('getValue', $(cell));
                 // console.log(value);
