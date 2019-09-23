@@ -9,3 +9,4 @@
 <li <?php if(isset($m_ustok)) { ?>class = "active" <?php } ?>><a href='<?php echo site_url('main/examples/update_data')?>'><i class="fa fa-circle-o"></i> <span>Update Data</a></span></li>
 <li <?php if(isset($m_ustok)) { ?>class = "active" <?php } ?>><a href='<?php echo site_url('main/examples/rekap_penjualan')?>'><i class="fa fa-circle-o"></i> <span>Rekap Penjualan</a></span></li>
 
+<li <?php if(isset($m_tiket)) { ?>class = "active" <?php } ?>><a href='<?php echo site_url('main/examples/tiket')?>'><i class="fa fa-circle-o"></i> <span>Tiket Travel</a></span></li>
