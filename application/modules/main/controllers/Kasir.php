@@ -170,8 +170,9 @@ class Kasir extends CI_Controller {
 				$v2 = str_replace("'","`",$value['B']); // nama
 				$v3 = $value['C']; // jumlah
 				$v4 = $value['D']; // harga
-
-				$this->db->query("INSERT INTO `simpleton`.`stok` (`id`, `barcode`, `nama`, `jumlah`, `harga`) VALUES (NULL, '$v1', '$v2', '$v3', '$v4');");
+				$v5 = $value['E']; // distributor		
+				$this->db->query("INSERT INTO `simpleton`.`stok` (`id`, `barcode`, `nama`, `jumlah`, `harga`, `distributor`) VALUES (NULL, '$v1', '$v2', '$v3', '$v4', '$v5');");
+				// $this->db->query("INSERT INTO `simpleton`.`stok` (`id`, `barcode`, `nama`, `jumlah`, `harga`) VALUES (NULL, '$v1', '$v2', '$v3', '$v4');");
 			}
 
 			if ($this->db->trans_status() === FALSE)
