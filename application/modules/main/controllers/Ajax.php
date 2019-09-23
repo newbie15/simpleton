@@ -114,6 +114,39 @@ class Ajax extends CI_Controller {
         }
     }
 
+    public function limit_belanja(){
+        $tahun = date('y');		
+        $npk = $this->uri->segment(4);		
+        // $bulan = date('-m-');
+        $bulan = date('m');		
+        $tgl = date('d');
+        $startdate = null;
+
+        if($tgl>21){
+            $startdate = date('y-m-')."21 00:00:00";
+        }else{
+            $lastmonth = null;
+            if(date('n')==1){
+                $lastmonth = 12;
+            }else{
+                $lastmonth = date('n')-1;
+            }
+            $startdate = date('y-').$lastmonth."-21 00:00:00";
+        }
+
+        $this->db->select('SUM(jumlah) as jumlah');		
+        $this->db->from('penjualan');		
+        $this->db->where('id_karyawan', $npk);
+        $this->db->where('tgl >', $startdate);
+        // $this->db->where('tgl <', $npk);
+        // $this->db->like('tgl', $bulan); 		
+        $query = $this->db->get();		
+        foreach ($query->result() as $row)		
+        {		
+            echo $row->jumlah;		
+        }		
+    }
+
     public function upload_excel_karyawan(){
         if(isset($_POST) == true){
             //generate unique file name
