@@ -123,7 +123,7 @@ class Ajax extends CI_Controller {
         $startdate = null;
 
         if($tgl>21){
-            $startdate = date('y-m-')."21 00:00:00";
+            $startdate = date('Y-m-')."21 00:00:00";
         }else{
             $lastmonth = null;
             if(date('n')==1){
@@ -131,7 +131,10 @@ class Ajax extends CI_Controller {
             }else{
                 $lastmonth = date('n')-1;
             }
-            $startdate = date('y-').$lastmonth."-21 00:00:00";
+            if($lastmonth<10){
+                $lastmonth = "0".$lastmonth;
+            }
+            $startdate = date('Y-').$lastmonth."-21 00:00:00";
         }
 
         $this->db->select('SUM(jumlah) as jumlah');		
