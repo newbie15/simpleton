@@ -30,7 +30,7 @@ $(document).ready(function(){
             method: "GET",
             url: "http://localhost/simpleton/index.php/main/ajax/jadwal_belanja/" + n,
         }).done(function (msg) {
-            alert("Data Saved: " + msg);
+            // alert("Data Saved: " + msg);
             setTimeout(function () {
                 if (msg != "ok") {
                     alert("jadwal belanja anda adalah mulai tgl 1 sampai 20, selain jadwal silahkan berbelanja secara cash");

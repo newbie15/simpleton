@@ -132,10 +132,14 @@ class Ajax extends CI_Controller {
         $datediff = $now - $your_date;
 
         $days = round($datediff / (60 * 60 * 24));
-        if($days > 90){
+        if($days > 91){
             echo "ok";
         }else{
-            echo "nok";
+            if(date('j')<21){
+                echo "ok";
+            }else{
+                echo "nok";
+            }
         }
 
     }
