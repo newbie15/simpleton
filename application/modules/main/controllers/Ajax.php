@@ -113,6 +113,32 @@ class Ajax extends CI_Controller {
             echo json_encode($response);
         }
     }
+    public function jadwal_belanja(){
+        $npk = $this->uri->segment(4);
+
+        $this->db->select('join_date');		
+        $this->db->from('karyawan');		
+        $this->db->where('npk', $npk);
+
+        $tgl = null;
+        $query = $this->db->get();		
+        foreach ($query->result() as $row)		
+        {		
+            $tgl = $row->join_date;		
+        }
+        
+        $now = time(); // or your date as well
+        $your_date = strtotime($tgl);
+        $datediff = $now - $your_date;
+
+        $days = round($datediff / (60 * 60 * 24));
+        if($days > 90){
+            echo "ok";
+        }else{
+            echo "nok";
+        }
+
+    }
 
     public function limit_belanja(){
         $tahun = date('y');		

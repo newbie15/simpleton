@@ -22,6 +22,25 @@ $(document).ready(function(){
         },2000);
     }
 
+    function check_jadwal_belanja(n) {
+        // $("#limit").load("http://localhost/simpleton/index.php/main/ajax/jadwal_belanja/" + n);
+
+
+        $.ajax({
+            method: "GET",
+            url: "http://localhost/simpleton/index.php/main/ajax/jadwal_belanja/" + n,
+        }).done(function (msg) {
+            alert("Data Saved: " + msg);
+            setTimeout(function () {
+                if (msg != "ok") {
+                    alert("jadwal belanja anda adalah mulai tgl 1 sampai 20, selain jadwal silahkan berbelanja secara cash");
+                    location.reload();
+                }
+            }, 2000);
+        });
+
+    }
+
 
     function updatettl(){
         var total = 0;
@@ -173,6 +192,7 @@ $(document).ready(function(){
                     $("#akaryawan").html(alamat);
                     $("#limit_belanja").html(limit_belanja);
                     check_limit_belanja($("#npk").val());
+                    check_jadwal_belanja($("#npk").val());
                 }else{
                     console.log("tidak ketemu");
                 }
