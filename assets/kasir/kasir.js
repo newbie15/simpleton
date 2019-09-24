@@ -23,9 +23,6 @@ $(document).ready(function(){
     }
 
     function check_jadwal_belanja(n) {
-        // $("#limit").load("http://localhost/simpleton/index.php/main/ajax/jadwal_belanja/" + n);
-
-
         $.ajax({
             method: "GET",
             url: "http://localhost/simpleton/index.php/main/ajax/jadwal_belanja/" + n,
@@ -38,7 +35,6 @@ $(document).ready(function(){
                 }
             }, 2000);
         });
-
     }
 
 

@@ -111,6 +111,7 @@ class Kasir extends CI_Controller {
 	}
 
 	public function excel($file){
+		date_default_timezone_set("Asia/Jakarta");
 		// $file = $_POST['filename'];
 		// $this->load->helper('file');
 		// $this->load->library('excel_reader');
@@ -141,18 +142,27 @@ class Kasir extends CI_Controller {
 		
 		//get only the Cell Collection
 		$cell_collection = $objPHPExcel->getActiveSheet()->getCellCollection();
+
+		$data_value = null;
 		
+		// print_r($cell_collection);
 		//extract to a PHP readable array format
 		foreach ($cell_collection as $cell) {
 				$column = $objPHPExcel->getActiveSheet()->getCell($cell)->getColumn();
 				$row = $objPHPExcel->getActiveSheet()->getCell($cell)->getRow();
-				$data_value = $objPHPExcel->getActiveSheet()->getCell($cell)->getValue();
-		
+
+				if($column != 'E'){
+					$data_value = $objPHPExcel->getActiveSheet()->getCell($cell)->getValue();
+				}else{
+					$dateTimeObject = PHPExcel_Shared_Date::ExcelToPHPObject($objPHPExcel->getActiveSheet()->getCell($cell)->getValue());
+					$data_value = $dateTimeObject->format('Y-m-d');
+				}
+
 				//The header will/should be in row 1 only. of course, this can be modified to suit your need.
 				if ($row == 1) {
-						$header[$row][$column] = $data_value;
+					$header[$row][$column] = $data_value;
 				} else {
-						$arr_data[$row][$column] = $data_value;
+					$arr_data[$row][$column] = $data_value;
 				}
 		}
 		
@@ -187,16 +197,18 @@ class Kasir extends CI_Controller {
 		}else if($file == "karyawan"){
 			$this->db->trans_begin();
 			$this->db->query("TRUNCATE TABLE `karyawan`");
-			
+			// print_r($data['values']);
 			foreach ($data['values'] as $key => $value) {
-				print_r( $value );
-				$v1 = $value['A']; // barcode
+				// print_r( $value );
+				$v1 = $value['A']; // NPK
 				// $this->db->escape(
 				$v2 = str_replace("'","`", $value['B']); // nama
-				$v3 = $value['C']; // jumlah
-				// $v4 = $value['D']; // harga
+				$v3 = $value['C']; // bagian
+				$v4 = $value['D']; // limit
+				@$v5 = $value['E']; // join_date
 
-				$this->db->query("INSERT INTO `simpleton`.`karyawan` (`id`, `npk`, `nama`, `bagian`) VALUES (NULL, '$v1', '$v2', '$v3');");
+				// echo "INSERT INTO `simpleton`.`karyawan` (`id`, `npk`, `nama`, `bagian`,`limit_belanja`, `join_date`) VALUES (NULL, '$v1', '$v2', '$v3', '$v4','$v5');\n";
+				$this->db->query("INSERT INTO `simpleton`.`karyawan` (`id`, `npk`, `nama`, `bagian`,`limit_belanja`, `join_date`) VALUES (NULL, '$v1', '$v2', '$v3', '$v4','$v5');");
 			}
 
 			if ($this->db->trans_status() === FALSE)
