@@ -167,36 +167,50 @@ $(document).ready(function(){
         updatescroll();
     }
 
+    var sttime = null;
     $("#npk").keypress(function(e){
+        if(sttime==null){
+            sttime =performance.now();
+        }
         if(e.which==13 && $(this).val()!=""){
             var t = $(this).val();
             console.log(t);
             var x = t.split("-");
             $(this).val(x[1]);
+            stotime = performance.now();
 
-        $.ajax({
-            url: 'http://localhost/simpleton/index.php/main/ajax/karyawan/' + $(this).val(),
-            // dataType: 'json',
-            success: function( resp ) {
-                if(resp!=""){
-                    var data = resp.split(":");
-                    var nama = data[0];
-                    var alamat = data[1];
-                    var limit_belanja = data[2];
-                    limit = limit_belanja;
-                    $("#nkaryawan").html(nama);
-                    $("#akaryawan").html(alamat);
-                    $("#limit_belanja").html(limit_belanja);
-                    check_limit_belanja($("#npk").val());
-                    check_jadwal_belanja($("#npk").val());
-                }else{
-                    console.log("tidak ketemu");
+            $.ajax({
+                url: 'http://localhost/simpleton/index.php/main/ajax/karyawan/' + $(this).val(),
+                // dataType: 'json',
+                success: function( resp ) {
+                    if(resp!=""){
+                        var data = resp.split(":");
+                        var nama = data[0];
+                        var alamat = data[1];
+                        var limit_belanja = data[2];
+                        limit = limit_belanja;
+                        $("#nkaryawan").html(nama);
+                        $("#akaryawan").html(alamat);
+                        $("#limit_belanja").html(limit_belanja);
+                        check_limit_belanja($("#npk").val());
+                        check_jadwal_belanja($("#npk").val());
+                    }else{
+                        console.log("tidak ketemu");
+                    }
+                },
+                error: function( req, status, err ) {
+                console.log( 'something went wrong', status, err );
                 }
-            },
-            error: function( req, status, err ) {
-            console.log( 'something went wrong', status, err );
+            });
+
+            console.log(stotime-sttime);
+
+
+            if ((stotime - sttime)>1000 && x[1] != '1'){
+                alert("hanya bisa berbelanja menggunakan kartu");
+                location.reload();
             }
-        });
+            sttime = null;
         }
 
     });
