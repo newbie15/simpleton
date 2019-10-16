@@ -239,7 +239,7 @@ class Examples extends CI_Controller {
                   <th>nama barang</th>
                   <th>harga</th>
                   <th>kuantiti</th>
-									<th>jumlah</th>
+				  <th>jumlah</th>
 									
                 </tr>
               </thead>
@@ -267,11 +267,26 @@ class Examples extends CI_Controller {
 		$this->load->view('welcome_message', $data);
 	}
 	public function rekap_penjualan(){
+		$data['css_file'] = [
+			// base_url("assets/datatables/css/jquery.dataTables.min.css"),
+			base_url("assets/jexcel/css/jexcel.css"),
+			base_url("assets/jexcel/css/jsuites.css"),
+			// base_url("assets/easyautocomplete/easy-autocomplete.min.css"),			
+		];
 		$data['js_file'] = [
 			// base_url("assets/flot/jquery.flot.min.js"),			
 			base_url("assets/kasir/rekap.js"),			
+			base_url("assets/jexcel/js/jexcel.js"),
+			base_url("assets/jexcel/js/jsuites.js"),
+			base_url("assets/papaparse/papaparse.min.js"),			
 		];
 
+		// $crud = new grocery_CRUD();
+
+		// $crud->like('tgl',date('Y-m-d'));
+		// $crud->set_table('penjualan');
+
+		// $output = $crud->render();
 
 
 
@@ -284,53 +299,30 @@ class Examples extends CI_Controller {
 	<div id="exTab2" class="container">	
 		<ul class="nav nav-tabs">
 			<li class="active">
-        		<a href="#1" data-toggle="tab">Harian</a>
+        		<a id="h" href="#" data-toggle="tab">Harian</a>
 			</li>
 			<li>
-				<a href="#2" data-toggle="tab">Mingguan</a>
+				<a id="m" href="#" data-toggle="tab">Mingguan</a>
 			</li>
 			<li>
-				<a href="#3" data-toggle="tab">Bulanan</a>
+				<a id="b" href="#" data-toggle="tab">Bulanan</a>
 			</li>
 			<li>
-				<a href="#4" data-toggle="tab">Tahunan</a>
+				<a id="t" href="#" data-toggle="tab">Tahunan</a>
 			</li>
 		</ul>
 
 		<div class="tab-content ">
-			<div class="tab-pane active" id="1">
-
-
-
-				<h3>Standard tab panel created on bootstrap using nav-tabs</h3>
-				<div id="placeholder1" style="width: 720px;height: 300px;"></div>
-				<div>
-				<table>
-					<thead>
-						<tr>
-							<th>nota</th>
-							<th>npk</th>
-							<th>nama</th>
-							<th>bagian</th>
-							<th>barcode</th>
-							<th>item</th>
-							<th>harga</th>
-							<th>qty</th>
-							<th>jumlah</th>
-						</tr>
-					</thead>
-					<tbody id="harian>
-					
-					</tbody>
-				</table>
-
-				</div>
+			<div id="harian">
+				<br>Tanggal : <input type="date" name="tanggal" id="tanggal"/>
+				<button id="download-csv-harian">Download</button>
+				<div id="harian-sheet"></div>
 			</div>
-			<div class="tab-pane" id="2">
+			<div id="mingguan">
 				<h3>Notice the gap between the content and tab after applying a background color</h3>
 				<div id="placeholder2" style="width: 720px;height: 300px;"></div>
 			</div>
-			<div class="tab-pane" id="3">
+			<div id="bulanan">
 			<br/>
 				Tampilkan data bulan
 				<select id="bulanan">
@@ -352,7 +344,7 @@ class Examples extends CI_Controller {
 				<h3>add clearfix to tab-content (see the css)</h3>
 				<div id="placeholder3" style="width: 720px;height: 300px;"></div>
 			</div>
-			<div class="tab-pane" id="4">
+			<div id="tahunan">
 				<h3>add clearfix to tab-content (see the css)</h3>
 				<div id="placeholder4" style="width: 720px;height: 300px;"></div>
 			</div>
