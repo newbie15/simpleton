@@ -179,6 +179,79 @@ class Examples extends CI_Controller {
 
 	}
 
+	public function kamera(){
+		$data['css_file'] = [
+			// base_url("assets/datatables/css/jquery.dataTables.min.css"),
+			// base_url("assets/jexcel/css/jquery.jexcel.css"),
+			// base_url("assets/jexcel/css/jquery.jcalendar.css"),
+			base_url("assets/easyautocomplete/easy-autocomplete.min.css"),			
+		];
+
+		$data['js_file'] = [
+			// base_url('assets/adminlte/plugins/jQuery/jQuery-2.1.4.min.js'),
+			// base_url("assets/datatables/js/jquery.dataTables.min.js"),
+			// base_url("assets/jexcel/js/jquery.jexcel.js"),
+			// base_url("assets/jexcel/js/jquery.jcalendar.js"),
+			// base_url("assets/jexcel/js/excel-formula.min.js"),			
+			// base_url("assets/jexcel/js/numeral.min.js"),			
+			base_url("assets/easyautocomplete/jquery.easy-autocomplete.min.js"),			
+			base_url("assets/kamera/kamera.js"),			
+		];
+
+		$data['output'] = '
+		<main role="main" class="col-md-9 ml-sm-auto col-lg-10 px-4"><div class="chartjs-size-monitor" style="position: absolute; left: 0px; top: 0px; right: 0px; bottom: 0px; overflow: hidden; pointer-events: none; visibility: hidden; z-index: -1;"><div class="chartjs-size-monitor-expand" style="position:absolute;left:0;top:0;right:0;bottom:0;overflow:hidden;pointer-events:none;visibility:hidden;z-index:-1;"><div style="position:absolute;width:1000000px;height:1000000px;left:0;top:0"></div></div><div class="chartjs-size-monitor-shrink" style="position:absolute;left:0;top:0;right:0;bottom:0;overflow:hidden;pointer-events:none;visibility:hidden;z-index:-1;"><div style="position:absolute;width:200%;height:200%;left:0; top:0"></div></div></div>
+		  <h3>Ambil Foto Anggota Koperasi</h3>
+          <table style="text-align: left; width: 100%;" border="0" cellpadding="1" cellspacing="1">
+            <tbody>
+            <tr>
+              <td style="vertical-align: middle;">NPK</td>
+              <td style="vertical-align: top;"><input type="text" name="npk" id="npk" placeholder="npk"/></td>
+            </tr>
+			</tbody>
+          </table>
+		  <br>
+		  
+				<div style="
+					height: 325px;
+					width: 47%;
+					overflow: auto;
+					border: 1px solid #666;
+					background-color: #ccc;
+					padding: 8px;
+					margin-right: 10px;
+					float: left;
+				">
+					<video autoplay="true" id="videoElement" style="
+						height: 100%;
+						width: 100%;
+						overflow: auto;
+						border: 1px solid #666;
+						background-color: #ccc;
+						padding: 8px;
+						margin-right: 10px;
+						float: left;
+					">
+					</video>
+				</div>
+				<div style="
+					height: 325px;
+					width: 47%;
+					overflow: auto;
+					border: 1px solid #666;
+					background-color: #ccc;
+					padding: 8px;
+				">
+					<div id="my"></div>				
+				</div>
+				<br>
+				<button id="checkout" class="btn btn-info">Cetak [ F9 ]</button>
+			</main>
+				
+		';
+		$this->load->view('welcome_message', $data);
+
+	}
+
 	public function penjualan(){
 		// $data['judul_besar'] = 'Simpleton';
 		// $data['judul_kecil'] = 'Version 1.0.0';
