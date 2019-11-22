@@ -92,6 +92,8 @@ class Kamera extends CI_Controller {
 			</main>
 				
 		';
+		$data['m_foto'] = TRUE;
+
 		$this->load->view('welcome_message', $data);
 		// $data = "";
 		// $this->load->view('kamera', $data);

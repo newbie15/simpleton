@@ -93,6 +93,8 @@ class Examples extends CI_Controller {
 		// $output->m_ustok = TRUE;
 
 		// $this->_example_output($output);
+		$data['m_update'] = TRUE;
+
 		$this->load->view('welcome_message', $data);
 	}
 
@@ -175,6 +177,8 @@ class Examples extends CI_Controller {
 				</main>
 				
 		';
+		$data['m_kartu'] = TRUE;
+
 		$this->load->view('welcome_message', $data);
 
 	}
@@ -248,6 +252,7 @@ class Examples extends CI_Controller {
 			</main>
 				
 		';
+		$data['m_foto'] = TRUE;
 		$this->load->view('welcome_message', $data);
 
 	}
@@ -428,6 +433,8 @@ class Examples extends CI_Controller {
 
 	</div>
 	';
+
+	$data['m_rekap'] = TRUE;
 
 	$this->load->view('welcome_message', $data);
 	}
