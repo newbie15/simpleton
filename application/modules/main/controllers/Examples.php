@@ -349,10 +349,11 @@ class Examples extends CI_Controller {
 			// base_url("assets/datatables/css/jquery.dataTables.min.css"),
 			base_url("assets/jexcel/css/jexcel.css"),
 			base_url("assets/jexcel/css/jsuites.css"),
-			// base_url("assets/easyautocomplete/easy-autocomplete.min.css"),			
+			base_url("assets/easyautocomplete/easy-autocomplete.min.css"),			
 		];
 		$data['js_file'] = [
 			// base_url("assets/flot/jquery.flot.min.js"),			
+			base_url("assets/easyautocomplete/jquery.easy-autocomplete.min.js"),			
 			base_url("assets/kasir/rekap.js"),			
 			base_url("assets/jexcel/js/jexcel.js"),
 			base_url("assets/jexcel/js/jsuites.js"),
@@ -380,7 +381,7 @@ class Examples extends CI_Controller {
         		<a id="h" href="#" data-toggle="tab">Harian</a>
 			</li>
 			<li>
-				<a id="m" href="#" data-toggle="tab">Mingguan</a>
+				<a id="m" href="#" data-toggle="tab">Perorangan</a>
 			</li>
 			<li>
 				<a id="b" href="#" data-toggle="tab">Bulanan</a>
@@ -397,8 +398,25 @@ class Examples extends CI_Controller {
 				<div id="harian-sheet"></div>
 			</div>
 			<div id="mingguan">
-				<h3>Notice the gap between the content and tab after applying a background color</h3>
-				<div id="placeholder2" style="width: 720px;height: 300px;"></div>
+				<br>
+				<div class="easy-autocomplete" style="width: 196px; float: left"><input type="text" name="npk" id="npk" placeholder="npk" autocomplete="off"><div class="easy-autocomplete-container" id="eac-container-npk"><ul></ul></div></div>
+				Bulan : 
+				<select id="bulan">
+					<option value="1">januari</option>
+					<option value="2">februari</option>
+					<option value="3">maret</option>
+					<option value="4">april</option>
+					<option value="5">mei</option>
+					<option value="6">juni</option>
+					<option value="7">juli</option>
+					<option value="8">agustus</option>
+					<option value="9">september</option>
+					<option value="10">oktober</option>
+					<option value="11">november</option>
+					<option value="12">desember</option>
+				</select>
+				<button id="download-csv-harian">Download</button>
+				<div id="perorangan-sheet"></div>
 			</div>
 			<div id="bulanan">
 			<br/>

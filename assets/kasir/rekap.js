@@ -14,6 +14,30 @@ $(document).ready(function () {
     // $.plot("#placeholder2", [d2]); 
     // $.plot("#placeholder3", [d3]); 
 
+    var options1 = {
+        url: "http://localhost/simpleton/index.php/main/ajax/karyawan_list",
+        getValue: "nama",
+        list: {
+            match: {
+                enabled: true
+            }
+        }
+    };
+    // var options2 = {
+    //     url: "http://localhost/simpleton/index.php/main/ajax/produk_list",
+    //     getValue: "produk",
+    //     requestDelay: 500,
+    //     list: {
+    //         match: {
+    //             enabled: true
+    //         }
+    //     }
+    // };
+
+    $("#npk").easyAutocomplete(options1);
+    // $("#barcode").easyAutocomplete(options2);
+
+
     // init here
     $("#harian").show();
     $("#mingguan").hide();
@@ -89,6 +113,28 @@ $(document).ready(function () {
                 { type: 'text', width: 75 },
             ]
         });        
+    }
+
+    function ajax_perorangan_refresh() {
+        $("#perorangan-sheet").html("");
+
+        jexcel(document.getElementById('perorangan-sheet'), {
+            csv: 'http://localhost/simpleton/index.php/main/ajax/data_perorangan/' + $("#bulan").val() +"/"+ $("#npk").val(),
+            csvHeaders: true,
+            search: true,
+            pagination: 10,
+            columns: [
+                { type: 'text', width: 100 },
+                { type: 'text', width: 100 },
+                { type: 'text', width: 200 },
+                { type: 'text', width: 100 },
+                { type: 'text', width: 100 },
+                { type: 'text', width: 250 },
+                { type: 'text', width: 50 },
+                { type: 'text', width: 25 },
+                { type: 'text', width: 75 },
+            ]
+        });
     }
 
     function download_file_harian() {
