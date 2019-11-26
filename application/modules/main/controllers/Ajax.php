@@ -80,6 +80,14 @@ class Ajax extends CI_Controller {
         echo(json_encode($query->result()));
     }
 
+    public function kodebooking_list()
+    {
+        $this->db->select('concat(maskapai,"-",kode_booking) as nama');
+        $this->db->from('penjualan_tiket_pesawat');
+        $query = $this->db->get();
+        echo(json_encode($query->result()));
+    }
+    
     public function produk_list()
     {
         $this->db->select('concat(nama,"-",barcode) as produk');
@@ -334,6 +342,79 @@ class Ajax extends CI_Controller {
             // print_r($row);
         }
     }
+
+    public function rekap_perorangan(){
+        $tgl = $this->uri->segment(4);
+        $npk = $this->uri->segment(5);
+
+        $startdate = null;
+        $startm = null;
+        $starty = null;
+        $stopdate = null;
+        $stopy = null;
+
+        if($tgl="1"){
+            $y = date('Y');
+            $starty = $y - 1;
+            $stopy = $y;
+            $startm = '12';
+            $startdate = $starty."-".$startm."-21";
+            $stopdate = $stopy."-".$tgl."-20";
+        }else{
+            $y = date('Y');
+            $starty = $y;
+            $stopy = $y;
+            $startm = $tgl - 1;
+            $startdate = $starty."-".$startm."-21";
+            $stopdate = $stopy."-".$tgl."-20";
+        }
+
+        $query = $this->db->query("
+            SELECT penjualan.nota,karyawan.npk,karyawan.nama,karyawan.bagian,stok.barcode,stok.nama as item,penjualan.harga,penjualan.qty,penjualan.jumlah
+            FROM penjualan,stok,karyawan
+            WHERE penjualan.kode = stok.barcode AND
+            karyawan.npk = penjualan.id_karyawan AND
+            karyawan.npk = '$npk' AND
+            penjualan.tgl >= '%$startdate%' AND 
+            penjualan.tgl <= '%$stopdate%' 
+            ORDER BY penjualan.id ASC
+        ");
+
+        if($this->uri->segment(6)=="d"){
+            header('Content-Type: aplication/vnd-ms-excel; charset=utf-8');
+            header('Content-Disposition: attachment; filename=data_harian_'.$tgl.'.xls');
+            echo "nota\tnpk\tnama\tbagian\tbarcode\titem\tharga\tqty\tjumlah\n";
+
+            foreach ($query->result() as $row)
+            {
+                echo $row->nota; echo "\t";
+                echo $row->npk; echo "\t";
+                echo $row->nama; echo "\t";
+                echo $row->bagian; echo "\t";
+                echo $row->barcode; echo "\t";
+                echo $row->item; echo "\t";
+                echo $row->harga; echo "\t";
+                echo $row->qty; echo "\t";
+                echo $row->jumlah; echo "\n";
+            }
+        }else{
+            echo "nota,npk,nama,bagian,barcode,item,harga,qty,jumlah\n";
+
+            foreach ($query->result() as $row)
+            {
+                echo $row->nota; echo ",";
+                echo $row->npk; echo ",";
+                echo $row->nama; echo ",";
+                echo $row->bagian; echo ",";
+                echo $row->barcode; echo ",";
+                echo $row->item; echo ",";
+                echo $row->harga; echo ",";
+                echo $row->qty; echo ",";
+                echo $row->jumlah; echo "\n";
+            }
+        }
+    }
+
     // SELECT sum(jumlah) AS total FROM penjualan WHERE MONTH(tgl) = 9
     // SELECT CAST(tgl AS DATE) AS DATE, sum(jumlah) as summ FROM penjualan GROUP BY CAST(tgl AS DATE) ORDER BY 1
 }

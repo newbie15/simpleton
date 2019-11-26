@@ -12,4 +12,4 @@
 <li <?php if(isset($m_update)) { ?>class = "active" <?php } ?>><a href='<?php echo site_url('main/examples/update_data')?>'><i class="fa fa-upload"></i> <span>Update Data</a></span></li>
 <li <?php if(isset($m_rekap)) { ?>class = "active" <?php } ?>><a href='<?php echo site_url('main/examples/rekap_penjualan')?>'><i class="fa fa-line-chart"></i> <span>Rekap Penjualan</a></span></li>
 
-<li <?php if(isset($m_tiket)) { ?>class = "active" <?php } ?>><a href='<?php echo site_url('main/examples/tiket')?>'><i class="fa fa-plane"></i> <span>Tiket Travel</a></span></li>
+<li <?php if(isset($m_tiket)) { ?>class = "active" <?php } ?>><a href='<?php echo site_url('main/tiket')?>'><i class="fa fa-plane"></i> <span>Tiket Travel</a></span></li>
