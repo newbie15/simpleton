@@ -286,8 +286,9 @@ class Examples extends CI_Controller {
             <tbody>
             <tr>
               <td style="vertical-align: middle;">NPK</td>
-              <td style="vertical-align: top;"><input type="text" name="npk" id="npk" placeholder="npk"/></td>
+              <td style="vertical-align: top;" width="250px"><input type="text" name="npk" id="npk" placeholder="npk"/></td>
 			  <td style="vertical-align: middle;">Limit Belanja : <span id="limit_belanja"></span><br/>Belanja Bulan ini : <span id="limit"></span></td>
+			  <td style="vertical-align: middle;" rowspan="4" width="250px" align="center"><img id="foto_karyawan" style="width:150px;height:150px;"></td>
             </tr>
             <tr>
               <td style="vertical-align: top;">Nama<br></td>

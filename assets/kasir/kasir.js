@@ -167,6 +167,12 @@ $(document).ready(function(){
         updatescroll();
     }
 
+    function tampilkan_foto(npk){
+        // $("#foto_karyawan").attr("src",);
+        var image = document.querySelector('#foto_karyawan');
+        image.setAttribute('src', "http://localhost/simpleton/assets/uploads/karyawan/" + npk + ".png");
+    }
+
     var sttime = null;
     $("#npk").keypress(function(e){
         if(sttime==null){
@@ -194,6 +200,7 @@ $(document).ready(function(){
                         $("#limit_belanja").html(limit_belanja);
                         check_limit_belanja($("#npk").val());
                         check_jadwal_belanja($("#npk").val());
+                        tampilkan_foto($("#npk").val());
                     }else{
                         console.log("tidak ketemu");
                     }
@@ -206,7 +213,7 @@ $(document).ready(function(){
             console.log(stotime-sttime);
 
 
-            if ((stotime - sttime)>1000 && x[1] != '1'){
+            if ((stotime - sttime)>100000 && x[1] != '1'){
                 alert("hanya bisa berbelanja menggunakan kartu");
                 location.reload();
             }
