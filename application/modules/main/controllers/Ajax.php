@@ -293,10 +293,73 @@ class Ajax extends CI_Controller {
                 echo $row->jumlah; echo "\n";
             }
         }
-
-
-
     }
+
+    public function data_perorangan(){
+        $tgl = $this->uri->segment(4);
+        $npk = $this->uri->segment(5);
+
+        // $year = date('Y');
+
+        $tgl = explode("-",$tgl);
+        if($tgl[1]=="xx"){
+            $qtgl = $tgl[0]."-";
+        }else{
+            $qtgl = $tgl[0]."-".$tgl[1];
+        }
+        $query = $this->db->query("
+            SELECT penjualan.tgl,penjualan.nota,karyawan.nama,sum(penjualan.jumlah) as total_belanja
+            FROM penjualan,karyawan
+            WHERE 
+            karyawan.npk = penjualan.id_karyawan AND
+            penjualan.tgl LIKE '%$qtgl%'
+            GROUP BY penjualan.nota 
+        ");
+
+// echo "
+//             SELECT penjualan.tgl,penjualan.nota,karyawan.nama,sum(penjualan.jumlah) as total_belanja
+//             FROM penjualan,karyawan
+//             WHERE 
+//             karyawan.npk = penjualan.id_karyawan AND
+//             penjualan.tgl LIKE '%$qtgl%'
+//             GROUP BY penjualan.nota 
+// ";
+
+        $total_belanjaan = 0;
+
+        if($this->uri->segment(6)=="d"){
+            header('Content-Type: aplication/vnd-ms-excel; charset=utf-8');
+            header('Content-Disposition: attachment; filename=data_perorangan_'.$tgl.'.xls');
+            echo "tanggal\tnota\tnama\ttotal belanja\n";
+
+            foreach ($query->result() as $row)
+            {
+                echo $row->tgl; echo "\t";
+                echo $row->nota; echo "\t";
+                echo $row->nama; echo "\t";
+                echo $row->total_belanja; echo "\n";
+                $total_belanjaan += $row->total_belanja;
+            }
+            echo "\n";
+            echo "\t\tTotal Bulan Ini\t".$total_belanjaan;
+
+        }else{
+            echo "tanggal,nota,nama,total belanja\n";
+
+            foreach ($query->result() as $row)
+            {
+                echo $row->tgl; echo ",";
+                echo $row->nota; echo ",";
+                echo $row->nama; echo ",";
+                echo $row->total_belanja; echo "\n";
+                $total_belanjaan += $row->total_belanja;
+            }
+            echo "\n";
+            echo ",,Total Semua,".$total_belanjaan;
+
+        }
+    }
+
 
     public function rekap_harian(){
         $tgl = date('Y-m-d');

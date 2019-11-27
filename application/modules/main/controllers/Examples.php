@@ -399,23 +399,34 @@ class Examples extends CI_Controller {
 			</div>
 			<div id="mingguan">
 				<br>
-				<div class="easy-autocomplete" style="width: 196px; float: left"><input type="text" name="npk" id="npk" placeholder="npk" autocomplete="off"><div class="easy-autocomplete-container" id="eac-container-npk"><ul></ul></div></div>
+				<div class="easy-autocomplete" style="width: 196px; float: left">
+					<input type="text" name="npk" id="npk" placeholder="npk" autocomplete="off">
+				</div>
+				<br>
+				Tahun :
+				<select id="tahun_perorangan">
+					<option>tahun</option>
+				</select>
 				Bulan : 
-				<select id="bulan">
-					<option value="1">januari</option>
-					<option value="2">februari</option>
-					<option value="3">maret</option>
-					<option value="4">april</option>
-					<option value="5">mei</option>
-					<option value="6">juni</option>
-					<option value="7">juli</option>
-					<option value="8">agustus</option>
-					<option value="9">september</option>
+				<select id="bulan_perorangan">
+					<option value="xx">-- ALL --</option>
+					<option value="01">januari</option>
+					<option value="02">februari</option>
+					<option value="03">maret</option>
+					<option value="04">april</option>
+					<option value="05">mei</option>
+					<option value="06">juni</option>
+					<option value="07">juli</option>
+					<option value="08">agustus</option>
+					<option value="09">september</option>
 					<option value="10">oktober</option>
 					<option value="11">november</option>
 					<option value="12">desember</option>
 				</select>
 				<button id="download-csv-harian">Download</button>
+
+				<br>
+
 				<div id="perorangan-sheet"></div>
 			</div>
 			<div id="bulanan">

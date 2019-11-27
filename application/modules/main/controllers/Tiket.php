@@ -59,8 +59,8 @@ class Tiket extends CI_Controller {
         <h4>Daftar Penumpang</h4>
         <div id="daftar-penumpang"></div>
         <br>
-        <button id="simpan">Simpan</button>
-        <button id="cetak">[F9] Cetak</button>
+        <button id="simpan" class="btn btn-success">Simpan</button>
+        <button id="cetak" class="btn btn-info">[F9] Cetak</button>
 
 				
 		';
