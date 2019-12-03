@@ -360,6 +360,55 @@ class Ajax extends CI_Controller {
         }
     }
 
+    public function data_bulanan(){
+        $tgl = $this->uri->segment(4);
+
+        $query = $this->db->query("
+            SELECT karyawan.npk,karyawan.nama,karyawan.bagian,sum(penjualan.jumlah) as jumlah
+            FROM penjualan,karyawan
+            WHERE
+            karyawan.npk = penjualan.id_karyawan
+            GROUP BY karyawan.npk
+            ORDER BY karyawan.bagian
+        ");
+
+        // penjualan.tgl LIKE '%$tgl%' 
+
+
+        if($this->uri->segment(5)=="d"){
+            header('Content-Type: aplication/vnd-ms-excel; charset=utf-8');
+            header('Content-Disposition: attachment; filename=data_harian_'.$tgl.'.xls');
+            echo "nota\tnpk\tnama\tbagian\tbarcode\titem\tharga\tqty\tjumlah\n";
+
+            foreach ($query->result() as $row)
+            {
+                echo $row->nota; echo "\t";
+                echo $row->npk; echo "\t";
+                echo $row->nama; echo "\t";
+                echo $row->bagian; echo "\t";
+                echo $row->barcode; echo "\t";
+                echo $row->item; echo "\t";
+                echo $row->harga; echo "\t";
+                echo $row->qty; echo "\t";
+                echo $row->jumlah; echo "\n";
+            }
+        }else{
+            echo "npk,nama,bagian,jumlah\n";
+
+            foreach ($query->result() as $row)
+            {
+                // echo $row->nota; echo ",";
+                echo $row->npk; echo ",";
+                echo $row->nama; echo ",";
+                echo $row->bagian; echo ",";
+                // echo $row->barcode; echo ",";
+                // echo $row->item; echo ",";
+                // echo $row->harga; echo ",";
+                // echo $row->qty; echo ",";
+                echo $row->jumlah; echo "\n";
+            }
+        }
+    }
 
     public function rekap_harian(){
         $tgl = date('Y-m-d');

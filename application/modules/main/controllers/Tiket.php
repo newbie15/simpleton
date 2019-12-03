@@ -80,18 +80,21 @@ class Tiket extends CI_Controller {
 		$data_json2 = $_REQUEST['data_2'];
         $data1 = json_decode($data_json1);
         $data2 = json_decode($data_json2);
-        
-        print_r($data1);
-        print_r($data2);
 
+		$data1[0][3] = str_replace(" 00:00:00","",$data1[0][3]);
+
+        print_r($data1);
+		print_r($data2);
+		
 		// foreach ($data as $key => $value) {
 		// 	// $this->db->insert
 			$data = array(
 				'kode_booking' => $data1[0][0],
-				'tanggal' => $data1[0][1]." ".$data1[0][2].":00",
-				'nama_kontak' => $data1[0][3],
-				'no_telp' => $data1[0][4],
-				'email' => $data1[0][5],
+				'tanggal_keberangkatan' => $data1[0][1]." ".$data1[0][2].":00",
+				'tanggal_kedatangan' => $data1[0][3]." ".$data1[0][4].":00",
+				// 'nama_kontak' => $data1[0][3],
+				// 'no_telp' => $data1[0][4],
+				'flight_number' => $data1[0][5],
 				'asal' => $data2[0][0],
 				'tujuan' => $data2[0][1],
 				'maskapai' => $data2[0][2],
@@ -148,7 +151,7 @@ class Tiket extends CI_Controller {
         // echo $npk = $this->uri->segment(1);
 		@$kodebooking = $_REQUEST['kode_booking'];
 
-		@$query = $this->db->query("SELECT `kode_booking`,`tanggal`,`nama_kontak`,`no_telp`,`email`,`asal`,`tujuan`,`maskapai`,`fasilitas` 
+		@$query = $this->db->query("SELECT `kode_booking`,`tanggal_keberangkatan`,`tanggal_kedatangan`,`flight_number`,`asal`,`tujuan`,`maskapai`,`fasilitas` 
         FROM `penjualan_tiket_pesawat` WHERE 
         kode_booking = '$kodebooking'
         ");
@@ -157,13 +160,14 @@ class Tiket extends CI_Controller {
 		$d = [];
 		foreach ($query->result() as $row)
 		{
-            $t = explode(" ",$row->tanggal);
+            $t1 = explode(" ",$row->tanggal_keberangkatan);
+            $t2 = explode(" ",$row->tanggal_kedatangan);
 			$d[$i][0] = $row->kode_booking;
-			$d[$i][1] = $t[0];
-			$d[$i][2] = substr($t[1],0,5);
-			$d[$i][3] = $row->nama_kontak;
-			$d[$i][4] = $row->no_telp;
-			$d[$i][5] = $row->email;
+			$d[$i][1] = $t1[0];
+			$d[$i][2] = substr($t1[1],0,5);
+			$d[$i][3] = $t2[0];
+			$d[$i][4] = substr($t2[1],0,5);
+			$d[$i][5] = $row->flight_number;
 			$d[$i][6] = $row->asal;
 			$d[$i][7] = $row->tujuan;
 			$d[$i][8] = $row->maskapai;
@@ -171,5 +175,73 @@ class Tiket extends CI_Controller {
 		}
 		echo json_encode($d);
 
-    }
+	}
+	
+	public function cetak(){
+        $kodebooking = $this->uri->segment(4);
+
+		@$query = $this->db->query("SELECT `kode_booking`,`tanggal_keberangkatan`,`tanggal_kedatangan`,`flight_number`,`asal`,`tujuan`,`maskapai`,`fasilitas` 
+        FROM `penjualan_tiket_pesawat` WHERE 
+        kode_booking = '$kodebooking'
+        ");
+
+		$i = 0;
+		$d = [];
+		foreach ($query->result() as $row)
+		{
+            $t1 = explode(" ",$row->tanggal_keberangkatan);
+            $t2 = explode(" ",$row->tanggal_kedatangan);
+			$d[$i][0] = $row->kode_booking;
+			$d[$i][1] = $t1[0];
+			$d[$i][2] = substr($t1[1],0,5);
+			$d[$i][3] = $t2[0];
+			$d[$i][4] = substr($t2[1],0,5);
+			$d[$i][5] = $row->flight_number;
+			$d[$i][6] = $row->asal;
+			$d[$i][7] = $row->tujuan;
+			$d[$i][8] = $row->maskapai;
+			$d[$i++][9] = $row->fasilitas;
+		}
+
+		//Our YYYY-MM-DD date string.
+		$date = $d[0][1];
+		$date1 = $d[0][3];
+
+		//Convert the date string into a unix timestamp.
+		$unixTimestamp = strtotime($date);
+		$unixTimestamp1 = strtotime($date1);
+
+		//Get the day of the week using PHP's date function.
+		$dayOfWeek = date("N", $unixTimestamp);
+		$dayOfWeek1 = date("N", $unixTimestamp1);
+
+		//Print out the day that our date fell on.
+		$hari_indonesia = ["Senin","Selasa","Rabu","Kamis","Jumat","Sabtu","Minggu"];
+		// echo $date . ' fell on a ' . $dayOfWeek;
+		$data["hari"] = $hari_indonesia[$dayOfWeek-1];
+		$data["hari1"] = $hari_indonesia[$dayOfWeek1-1];
+
+
+
+
+		@$query = $this->db->query("SELECT `nama`,`no_ktp`,`no_telepon`,`harga` 
+        FROM `penumpang_tiket_pesawat` WHERE 
+        kode_booking = '$kodebooking'
+        ");
+
+		$i = 0;
+		$p = [];
+		foreach ($query->result() as $row)
+		{
+			$p[$i][0] = $row->nama;
+			$p[$i][1] = $row->no_ktp;
+			$p[$i][2] = $row->no_telepon;
+			$p[$i++][3] = $row->harga;
+		}
+		$data['pesawat'] = $d;
+		$data['penumpang'] = $p;
+
+		$this->load->view('cetak_tiket_pesawat', $data);
+
+	}
 }

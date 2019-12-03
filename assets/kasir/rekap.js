@@ -1,14 +1,14 @@
 $(document).ready(function () {
-    var d1 = [];
-    for (var i = 0; i < 14; i += 0.5) {
-        d1.push([i, Math.sin(i)]);
-    }
+    // var d1 = [];
+    // for (var i = 0; i < 14; i += 0.5) {
+    //     d1.push([i, Math.sin(i)]);
+    // }
 
-    var d2 = [[0, 3], [4, 8], [8, 5], [9, 13]];
+    // var d2 = [[0, 3], [4, 8], [8, 5], [9, 13]];
 
-    // A null signifies separate line segments
+    // // A null signifies separate line segments
 
-    var d3 = [[0, 12], [7, 12], null, [7, 2.5], [12, 2.5]];
+    // var d3 = [[0, 12], [7, 12], null, [7, 2.5], [12, 2.5]];
 
     // $.plot("#placeholder1", [d1]); 
     // $.plot("#placeholder2", [d2]); 
@@ -23,19 +23,8 @@ $(document).ready(function () {
             }
         }
     };
-    // var options2 = {
-    //     url: "http://localhost/simpleton/index.php/main/ajax/produk_list",
-    //     getValue: "produk",
-    //     requestDelay: 500,
-    //     list: {
-    //         match: {
-    //             enabled: true
-    //         }
-    //     }
-    // };
 
     $("#npk").easyAutocomplete(options1);
-    // $("#barcode").easyAutocomplete(options2);
 
     $("#npk").keypress(function (e) {
         if (e.which == 13 && $(this).val() != "") {
@@ -47,11 +36,7 @@ $(document).ready(function () {
             } else {
                 $(this).val(x[1]);
             }
-
-            // console.log("kode booking:", $(this).val());
-
             ajax_perorangan_refresh();
-
         }
     });
 
@@ -106,11 +91,13 @@ $(document).ready(function () {
         ajax_perorangan_refresh();
     });
 
+    $("#bulan_bulanan").change(function () {
+        ajax_bulanan_refresh();
+    });
 
     $("#download-csv-harian").click(function(){
         // download_file_harian();
         window.open("http://localhost/simpleton/index.php/main/ajax/data_harian/" + $("#tanggal").val() + "/d");
-
     });
 
 
@@ -128,6 +115,22 @@ $(document).ready(function () {
         ajax_perorangan_refresh();
     });
 
+    $("#tahun_bulanan").change(function () {
+        var syear = parseInt($(this).val());
+        var shtml = null; //"<option>"++"</option>"
+        var start_year = syear - 2;
+        var stop_year = syear + 2;
+        for (var i = start_year; i <= stop_year; i++) {
+            shtml += "<option>" + i + "</option>";
+        }
+        $(this).html(shtml);
+        $(this).val(syear.toString());
+
+        ajax_bulanan_refresh();
+    });
+
+
+
     var tgl = new Date();
     var y = tgl.getFullYear();
 
@@ -139,6 +142,21 @@ $(document).ready(function () {
     }
     $("#tahun_perorangan").html(shtml);
     $("#tahun_perorangan").val(y);
+
+    $("#tahun_bulanan").html(shtml);
+    $("#tahun_bulanan").val(y);
+
+    var m = tgl.getMonth() + 1;
+    var d = tgl.getDate();
+    if (m < 10) {
+        $("#bulan_perorangan").val("0" + m.toString());
+        // $("#bulan_bulanan").val("0" + m.toString());
+        // alert(d);
+    } else {
+        $("#bulan_perorangan").val(m.toString());
+        // $("#bulan_bulanan").val(m.toString());
+        // alert(d);
+    }
 
 
     function ajax_harian_refresh() {
@@ -170,17 +188,29 @@ $(document).ready(function () {
             csv: 'http://localhost/simpleton/index.php/main/ajax/data_perorangan/' + $("#tahun_perorangan").val() + "-" + $("#bulan_perorangan").val() + "/" + $("#npk").val(),
             csvHeaders: true,
             search: true,
-            pagination: 10,
+            pagination: 30,
             columns: [
                 { type: 'text', width: 200 },
                 { type: 'text', width: 200 },
                 { type: 'text', width: 250 },
                 { type: 'text', width: 100 },
-                // { type: 'text', width: 100 },
-                // { type: 'text', width: 250 },
-                // { type: 'text', width: 50 },
-                // { type: 'text', width: 25 },
-                // { type: 'text', width: 75 },
+            ]
+        });
+    }
+
+    function ajax_bulanan_refresh() {
+        $("#bulanan-sheet").html("");
+        console.log('http://localhost/simpleton/index.php/main/ajax/data_bulanan/' + $("#tahun_bulanan").val() + "-" + $("#bulan_bulanan").val() + "/" + $("#npk").val());
+        jexcel(document.getElementById('bulanan-sheet'), {
+            csv: 'http://localhost/simpleton/index.php/main/ajax/data_bulanan/' + $("#tahun_bulanan").val() + "-" + $("#bulan_bulanan").val() + "/" + $("#npk").val(),
+            csvHeaders: true,
+            search: true,
+            pagination: 30,
+            columns: [
+                { type: 'text', width: 200 },
+                { type: 'text', width: 200 },
+                { type: 'text', width: 250 },
+                { type: 'text', width: 100 },
             ]
         });
     }
@@ -193,4 +223,5 @@ $(document).ready(function () {
             }
         });
     }
+
 });

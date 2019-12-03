@@ -400,31 +400,44 @@ class Examples extends CI_Controller {
 			</div>
 			<div id="mingguan">
 				<br>
-				<div class="easy-autocomplete" style="width: 196px; float: left">
-					<input type="text" name="npk" id="npk" placeholder="npk" autocomplete="off">
-				</div>
+				<table>
+					<tr>
+						<td align="right">NPK&nbsp;&nbsp;</td>
+						<td>
+							<div class="easy-autocomplete" style="width: 196px; float: left">
+								<input type="text" name="npk" id="npk" placeholder="npk" autocomplete="off">
+							</div>						
+						</td>
+						<td>
+							&nbsp;&nbsp;
+							Tahun :
+							<select id="tahun_perorangan">
+								<option>tahun</option>
+							</select>
+							Bulan : 
+							<select id="bulan_perorangan">
+								<option value="xx">-- ALL --</option>
+								<option value="01">januari</option>
+								<option value="02">februari</option>
+								<option value="03">maret</option>
+								<option value="04">april</option>
+								<option value="05">mei</option>
+								<option value="06">juni</option>
+								<option value="07">juli</option>
+								<option value="08">agustus</option>
+								<option value="09">september</option>
+								<option value="10">oktober</option>
+								<option value="11">november</option>
+								<option value="12">desember</option>
+							</select>						
+						</td>
+						<td align="right">
+							&nbsp;&nbsp;
+							<button id="download-csv-harian">Download</button>						
+						</td>
+					</tr>
+				</table>
 				<br>
-				Tahun :
-				<select id="tahun_perorangan">
-					<option>tahun</option>
-				</select>
-				Bulan : 
-				<select id="bulan_perorangan">
-					<option value="xx">-- ALL --</option>
-					<option value="01">januari</option>
-					<option value="02">februari</option>
-					<option value="03">maret</option>
-					<option value="04">april</option>
-					<option value="05">mei</option>
-					<option value="06">juni</option>
-					<option value="07">juli</option>
-					<option value="08">agustus</option>
-					<option value="09">september</option>
-					<option value="10">oktober</option>
-					<option value="11">november</option>
-					<option value="12">desember</option>
-				</select>
-				<button id="download-csv-harian">Download</button>
 
 				<br>
 
@@ -432,25 +445,29 @@ class Examples extends CI_Controller {
 			</div>
 			<div id="bulanan">
 			<br/>
-				Tampilkan data bulan
-				<select id="bulanan">
-					<option value="1">januari</option>
-					<option value="2">februari</option>
-					<option value="3">maret</option>
-					<option value="4">april</option>
-					<option value="5">mei</option>
-					<option value="6">juni</option>
-					<option value="7">juli</option>
-					<option value="8">agustus</option>
-					<option value="9">september</option>
-					<option value="10">oktober</option>
-					<option value="11">november</option>
-					<option value="12">desember</option>
+				Tahun :
+				<select id="tahun_bulanan">
+					<option>tahun</option>
+				</select>
+				Bulan Pembukuan
+				<select id="bulan_bulanan">
+					<option value="xx">--pilih salah satu--</option>
+					<option value="01">17 desember - 20 januari</option>
+					<option value="02">21 januari - 20 februari</option>
+					<option value="03">21 februari - 20 maret</option>
+					<option value="04">21 maret - 20 april</option>
+					<option value="05">21 april - 20 mei</option>
+					<option value="06">21 mei - 20 juni</option>
+					<option value="07">21 juni - 20 juli</option>
+					<option value="08">21 juli - 20 agustus</option>
+					<option value="09">21 agustus - 20 september</option>
+					<option value="10">21 september - 20 oktober</option>
+					<option value="11">21 oktober - 20 november</option>
+					<option value="12">21 november - 16 desember</option>
 				</select>
 					
+				<div id="bulanan-sheet"></div>
 
-				<h3>add clearfix to tab-content (see the css)</h3>
-				<div id="placeholder3" style="width: 720px;height: 300px;"></div>
 			</div>
 			<div id="tahunan">
 				<h3>add clearfix to tab-content (see the css)</h3>
