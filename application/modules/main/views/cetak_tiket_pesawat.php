@@ -71,6 +71,8 @@ switch ($maskapai) {
     
   case 'NAM Air':
   # code...
+    $gambar = base_url("assets/tiket/img/NAM_Air.png");
+
     break;
 
   default:

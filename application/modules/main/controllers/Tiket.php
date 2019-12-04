@@ -60,7 +60,8 @@ class Tiket extends CI_Controller {
         <div id="daftar-penumpang"></div>
         <br>
         <button id="simpan" class="btn btn-success">Simpan</button>
-        <button id="cetak" class="btn btn-info">[F9] Cetak</button>
+        <button id="cetak" class="btn btn-info">[F9] Cetak Tiket</button>
+        <button id="receipt" class="btn btn-danger">Cetak Receipt</button>
 
 				
 		';
@@ -244,4 +245,72 @@ class Tiket extends CI_Controller {
 		$this->load->view('cetak_tiket_pesawat', $data);
 
 	}
+
+	public function receipt(){
+        $kodebooking = $this->uri->segment(4);
+
+		@$query = $this->db->query("SELECT `kode_booking`,`tanggal_keberangkatan`,`tanggal_kedatangan`,`flight_number`,`asal`,`tujuan`,`maskapai`,`fasilitas` 
+        FROM `penjualan_tiket_pesawat` WHERE 
+        kode_booking = '$kodebooking'
+        ");
+
+		$i = 0;
+		$d = [];
+		foreach ($query->result() as $row)
+		{
+            $t1 = explode(" ",$row->tanggal_keberangkatan);
+            $t2 = explode(" ",$row->tanggal_kedatangan);
+			$d[$i][0] = $row->kode_booking;
+			$d[$i][1] = $t1[0];
+			$d[$i][2] = substr($t1[1],0,5);
+			$d[$i][3] = $t2[0];
+			$d[$i][4] = substr($t2[1],0,5);
+			$d[$i][5] = $row->flight_number;
+			$d[$i][6] = $row->asal;
+			$d[$i][7] = $row->tujuan;
+			$d[$i][8] = $row->maskapai;
+			$d[$i++][9] = $row->fasilitas;
+		}
+
+		//Our YYYY-MM-DD date string.
+		$date = $d[0][1];
+		$date1 = $d[0][3];
+
+		//Convert the date string into a unix timestamp.
+		$unixTimestamp = strtotime($date);
+		$unixTimestamp1 = strtotime($date1);
+
+		//Get the day of the week using PHP's date function.
+		$dayOfWeek = date("N", $unixTimestamp);
+		$dayOfWeek1 = date("N", $unixTimestamp1);
+
+		//Print out the day that our date fell on.
+		$hari_indonesia = ["Senin","Selasa","Rabu","Kamis","Jumat","Sabtu","Minggu"];
+		// echo $date . ' fell on a ' . $dayOfWeek;
+		$data["hari"] = $hari_indonesia[$dayOfWeek-1];
+		$data["hari1"] = $hari_indonesia[$dayOfWeek1-1];
+
+
+
+
+		@$query = $this->db->query("SELECT `nama`,`no_ktp`,`no_telepon`,`harga` 
+        FROM `penumpang_tiket_pesawat` WHERE 
+        kode_booking = '$kodebooking'
+        ");
+
+		$i = 0;
+		$p = [];
+		foreach ($query->result() as $row)
+		{
+			$p[$i][0] = $row->nama;
+			$p[$i][1] = $row->no_ktp;
+			$p[$i][2] = $row->no_telepon;
+			$p[$i++][3] = $row->harga;
+		}
+		$data['pesawat'] = $d;
+		$data['penumpang'] = $p;
+
+		$this->load->view('cetak_receipt_pesawat', $data);
+
+	}	
 }
