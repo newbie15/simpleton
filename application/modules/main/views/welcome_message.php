@@ -66,9 +66,9 @@
         <section class="sidebar">
           <ul class="sidebar-menu">
             <?php $this->load->view('main_menu', '', FALSE); ?>
-            <?php //if($this->ion_auth->logged_in()) { ?>
-            <?php //$this->load->view('admin_menu', '', FALSE); ?>
-            <?php //} ?>
+            <?php if($this->ion_auth->logged_in()) { ?>
+            <?php $this->load->view('admin_menu', '', FALSE); ?>
+            <?php } ?>
           </ul>
         </section>
         <!-- /.sidebar -->
