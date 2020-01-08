@@ -35,6 +35,7 @@ class Tiket extends CI_Controller {
 			// base_url("assets/jexcel/js/excel-formula.min.js"),			
 			base_url("assets/jexcel/js/numeral.min.js"),			
             base_url("assets/easyautocomplete/jquery.easy-autocomplete.min.js"),	
+			base_url("assets/kasir/config.js"),			
 			base_url("assets/tiket/tiket.js"),			
 		];
 
