@@ -6,7 +6,7 @@ $(document).ready(function(){
 
 
     var options1 = {
-        url: "http://localhost/simpleton/index.php/main/ajax/kodebooking_list",
+        url: BASE_URL + "index.php/main/ajax/kodebooking_list",
         getValue: "nama",
         list: {
             match: {
@@ -42,7 +42,7 @@ $(document).ready(function(){
     function refresh_penumpang() {
         $.ajax({
             method: "POST",
-            url: "http://localhost/simpleton/index.php/main/tiket/load_penumpang",
+            url: BASE_URL + "index.php/main/tiket/load_penumpang",
             data: {
                 kode_booking: $("#kodebooking").val(),
             }
