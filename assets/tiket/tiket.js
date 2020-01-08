@@ -78,7 +78,7 @@ $(document).ready(function(){
     function refresh() {
         $.ajax({
             method: "POST",
-            url: "http://localhost/simpleton/index.php/main/tiket/load_tiket",
+            url: BASE_URL + "index.php/main/tiket/load_tiket",
             data: {
                 kode_booking: $("#kodebooking").val(),
             }
@@ -196,7 +196,7 @@ $(document).ready(function(){
 
         $.ajax({
             method: "POST",
-            url: "http://localhost/simpleton/index.php/main/tiket/simpan_tiket",
+            url: BASE_URL + "index.php/main/tiket/simpan_tiket",
             success: sukses,
             data: {
                 data_1: JSON.stringify(data_a),
@@ -211,7 +211,7 @@ $(document).ready(function(){
 
         $.ajax({
             method: "POST",
-            url: "http://localhost/simpleton/index.php/main/tiket/simpan_penumpang",
+            url: BASE_URL + "index.php/main/tiket/simpan_penumpang",
             success: sukses,
             data: {
                 data_penumpang: JSON.stringify(data_c),
@@ -225,11 +225,11 @@ $(document).ready(function(){
     });
 
     function cetak_tiket(bookcode){
-        var newWindow = window.open('http://localhost/simpleton/index.php/main/tiket/cetak/'+bookcode, 'targetWindow', 'toolbar=no,location = no,status = no, menubar = no, scrollbars = yes, resizable = yes, width = 1024, height = 500');
+        var newWindow = window.open(BASE_URL + 'index.php/main/tiket/cetak/'+bookcode, 'targetWindow', 'toolbar=no,location = no,status = no, menubar = no, scrollbars = yes, resizable = yes, width = 1024, height = 500');
     }
 
     function receipt_tiket(bookcode) {
-        var newWindow = window.open('http://localhost/simpleton/index.php/main/tiket/receipt/' + bookcode, 'targetWindow', 'toolbar=no,location = no,status = no, menubar = no, scrollbars = yes, resizable = yes, width = 1024, height = 500');
+        var newWindow = window.open(BASE_URL + 'index.php/main/tiket/receipt/' + bookcode, 'targetWindow', 'toolbar=no,location = no,status = no, menubar = no, scrollbars = yes, resizable = yes, width = 1024, height = 500');
     }
 
 
