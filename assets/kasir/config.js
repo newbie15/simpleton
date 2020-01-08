@@ -14,7 +14,7 @@ var BASE_URL = "";
 if (DEBUG == 2) {
     var BASE_URL = "http://167.99.64.44/simpleton/";
 }else if(DEBUG==1){
-    var BASE_URL = "http://localhost/ananti/";
+    var BASE_URL = "http://localhost/simpleton/";
 }else{
     var BASE_URL = "http://10.23.3.101/MDP/";
 }
