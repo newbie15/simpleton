@@ -75,6 +75,12 @@ switch ($maskapai) {
 
     break;
 
+  case 'Trans Nusa':
+  # code...
+    $gambar = base_url("assets/tiket/img/trans_nusa.png");
+
+    break;
+
   default:
     # code...
     break;
