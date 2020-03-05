@@ -57,7 +57,7 @@ $(document).ready(function(){
                 colHeaders: [
                     // 'Station',
                     'Nama',
-                    'No Ktp',
+                    'No Tiket',
                     'No telepon',
                     'Harga',
                 ],

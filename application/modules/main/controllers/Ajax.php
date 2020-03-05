@@ -164,15 +164,24 @@ class Ajax extends CI_Controller {
             $startdate = date('Y-m-')."21 00:00:00";
         }else{
             $lastmonth = null;
+            $y = null;
+
             if(date('n')==1){
                 $lastmonth = 12;
+                $y = date('Y')-1;
             }else{
                 $lastmonth = date('n')-1;
             }
+
             if($lastmonth<10){
                 $lastmonth = "0".$lastmonth;
             }
-            $startdate = date('Y-').$lastmonth."-21 00:00:00";
+
+            if($y==null){
+                $startdate = date('Y-').$lastmonth."-21 00:00:00";
+            }else{
+                $startdate = $y.'-'.$lastmonth."-16 00:00:00";
+            }
         }
 
         $this->db->select('SUM(jumlah) as jumlah');		
