@@ -78,6 +78,7 @@ class Kasir extends CI_Controller {
 		$kode = $_REQUEST['kode'];
 		$kurangstok = $_REQUEST['kurangstok'];
 		$nota = $_REQUEST['no'];
+		$ppn = $_REQUEST['pajak'];
 
 
 		$data = array(
@@ -89,6 +90,7 @@ class Kasir extends CI_Controller {
 			'harga' => $harga,
 			'qty' => $kurangstok,
 			'jumlah' => $jumlah,
+			'ppn' => $ppn,
 		);
 
 		$this->db->insert('penjualan', $data);
@@ -151,11 +153,16 @@ class Kasir extends CI_Controller {
 				$column = $objPHPExcel->getActiveSheet()->getCell($cell)->getColumn();
 				$row = $objPHPExcel->getActiveSheet()->getCell($cell)->getRow();
 
-				if($column != 'E'){
+
+				if($fe != 'karyawan.xls'){
 					$data_value = $objPHPExcel->getActiveSheet()->getCell($cell)->getValue();
 				}else{
-					$dateTimeObject = PHPExcel_Shared_Date::ExcelToPHPObject($objPHPExcel->getActiveSheet()->getCell($cell)->getValue());
-					$data_value = $dateTimeObject->format('Y-m-d');
+					if ($column == 'E') {
+						$dateTimeObject = PHPExcel_Shared_Date::ExcelToPHPObject($objPHPExcel->getActiveSheet()->getCell($cell)->getValue());
+						$data_value = $dateTimeObject->format('Y-m-d');
+					}else{
+						$data_value = $objPHPExcel->getActiveSheet()->getCell($cell)->getValue();
+					}
 				}
 
 				//The header will/should be in row 1 only. of course, this can be modified to suit your need.
@@ -180,8 +187,9 @@ class Kasir extends CI_Controller {
 				$v2 = str_replace("'","`",$value['B']); // nama
 				$v3 = $value['C']; // jumlah
 				$v4 = $value['D']; // harga
-				$v5 = $value['E']; // distributor		
-				$this->db->query("INSERT INTO `simpleton`.`stok` (`id`, `barcode`, `nama`, `jumlah`, `harga`, `distributor`) VALUES (NULL, '$v1', '$v2', '$v3', '$v4', '$v5');");
+				$v5 = $value['E']; // distributor	
+				$v6 = $value['F'];	
+				$this->db->query("INSERT INTO `simpleton`.`stok` (`id`, `barcode`, `nama`, `jumlah`, `harga`, `distributor`,`ppn`) VALUES (NULL, '$v1', '$v2', '$v3', '$v4', '$v5', '$v6');");
 				// $this->db->query("INSERT INTO `simpleton`.`stok` (`id`, `barcode`, `nama`, `jumlah`, `harga`) VALUES (NULL, '$v1', '$v2', '$v3', '$v4');");
 			}
 
