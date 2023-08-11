@@ -204,12 +204,33 @@ class Examples extends CI_Controller {
 		$data['output'] = '
 		<main role="main" class="col-md-9 ml-sm-auto col-lg-10 px-4"><div class="chartjs-size-monitor" style="position: absolute; left: 0px; top: 0px; right: 0px; bottom: 0px; overflow: hidden; pointer-events: none; visibility: hidden; z-index: -1;"><div class="chartjs-size-monitor-expand" style="position:absolute;left:0;top:0;right:0;bottom:0;overflow:hidden;pointer-events:none;visibility:hidden;z-index:-1;"><div style="position:absolute;width:1000000px;height:1000000px;left:0;top:0"></div></div><div class="chartjs-size-monitor-shrink" style="position:absolute;left:0;top:0;right:0;bottom:0;overflow:hidden;pointer-events:none;visibility:hidden;z-index:-1;"><div style="position:absolute;width:200%;height:200%;left:0; top:0"></div></div></div>
 		  <br>
-          <table style="text-align: left; width: 100%;" border="0" cellpadding="1" cellspacing="1">
+          <table style="text-align: left; width: 100%;" border="0" cellpadding="1" cellspacing="2">
             <tbody>
             <tr>
+              <td style="vertical-align: middle;">Kasir</td>
+              <td style="vertical-align: top;">
+			  	<select style="
+				  border-color: #ccc;
+				  border-radius: 4px;
+				  border-style: solid;
+				  border-width: 1px;
+				  box-shadow: 0 1px 2px rgba(0,0,0,0.1) inset;
+				  color: #555;
+				  float: none;
+				  padding: 6px 12px" id="nkasir" name="nkasir">
+					<option value="belum">Belum bisa dipakai</option>
+					<option value="volvo">Volvo</option>
+					<option value="saab">Saab</option>
+					<option value="fiat">Fiat</option>
+					<option value="audi">Audi</option>
+				</select>
+			  </td>
+			  <td style="vertical-align: middle;">Limit Belanja : <span id="limit_belanja"></span></td>
+            </tr>
+			<tr>
               <td style="vertical-align: middle;">NPK</td>
               <td style="vertical-align: top;"><input type="text" name="npk" id="npk" placeholder="npk"/></td>
-			  <td style="vertical-align: middle;">Limit Belanja : <span id="limit_belanja"></span><br/>Belanja Bulan ini : <span id="limit"></span></td>
+			  <td style="vertical-align: middle;">Belanja Bulan ini : <span id="limit"></span></td>
             </tr>
             <tr>
               <td style="vertical-align: top;">Nama<br></td>

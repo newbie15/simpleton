@@ -266,6 +266,8 @@ $(document).ready(function(){
             var nota = $("#npk").val()+"-"+epoch;
             var i = j.length;
             var k = 0;
+            var nama_kasir = "KMS";
+            nama_kasir = $("#nkasir").val();
             j.forEach(element => {
                 res = element[1].substr(0, 10);
                 total += element[2] * element[3];
@@ -275,7 +277,7 @@ $(document).ready(function(){
                     url: BASE_URL+"index.php/main/kasir/checkout",
                     data: {
                         no : nota,
-                        id_user: "KMS",
+                        id_user: nama_kasir,
                         id_karyawan: $("#npk").val(),
                         tgl: n,
                         nama: res,
@@ -297,6 +299,7 @@ $(document).ready(function(){
                         newWindow.akar = $("#akaryawan").html();
                         newWindow.tgl = n;
                         newWindow.no = nota;
+                        newWindow.nkasir = nama_kasir;
                     }
                     // console.log(i + " " + k);
                 });

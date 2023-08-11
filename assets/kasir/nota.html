@@ -12,6 +12,8 @@
     </tr>
     <tr><td colspan="4" rowspan="1">&nbsp;</td></tr>
     <tr><td colspan="4" rowspan="1" align="right">Tanggal : <span id="tglx"></span></td></tr>
+    <tr><td colspan="4" rowspan="1" align="right">Kasir   : <span id="nama_kasir"></span></td></tr>
+    <tr><td colspan="4" rowspan="1" align="right">No Nota : <span id="no_nota"></span></td></tr>
     <tr>
       <td colspan="4" rowspan="1" style="vertical-align: top;">
         <span id="nkar">Fajar</span>
@@ -80,12 +82,16 @@ Rp 65.100<br>
     // window.print();
     
 
-    $("#npk").html(window.npk);    
-    $("#nkar").html(window.nkar);    
-    $("#akar").html(window.akar); 
-    $("#tgl").html(window.tgl);
+    $("#npk").html(window.npk);    // npk karyawan
+    $("#nkar").html(window.nkar);  // nama karyawan  
+    $("#akar").html(window.akar); // asal karyawan 
+    $("#tgl").html(window.tgl); // tanggal transaksi
     var nota = window.no; 
     
+    $("#no_nota").html(nota); // no nota
+    $("#nama_kasir").html(window.nkasir); // nama kasir
+
+
     data = window.pass_data;
     // alert();
     var shtml = "";
