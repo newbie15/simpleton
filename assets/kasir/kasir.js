@@ -267,7 +267,7 @@ $(document).ready(function(){
             var i = j.length;
             var k = 0;
             var nama_kasir = "KMS";
-            nama_kasir = $("#nkasir").val();
+            //nama_kasir = $("#nkasir").val();
             j.forEach(element => {
                 res = element[1].substr(0, 10);
                 total += element[2] * element[3];
