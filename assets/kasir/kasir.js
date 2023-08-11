@@ -4,16 +4,77 @@ var dx = [
 
 $(document).ready(function(){
     
+    var limit;
+    var totl;
+    var show;
+
+    var url = window.location.href;
+    console.log(url);
+
+    var x = url.split("/");
+    console.log(x);
+
+    var BASE_URL = x[0]+"//"+x[2]+"/"+x[3]+"/"; // "http://10.23.3.101/MDP/";
+    console.log(BASE_URL);
+
+    function check_limit_belanja(n){
+        $("#limit").load(BASE_URL+"index.php/main/ajax/limit_belanja/" + n);
+
+        setTimeout(function(){
+            var lb = parseInt($("#limit_belanja").html());
+            var l = parseInt($("#limit").html());
+
+            if(l>lb){
+                alert("belanja anda telah melebihi limit bulanan\n silahkan berbelanja bulan depan");
+                location.reload();
+            }
+        },2000);
+    }
+
+
     function updatettl(){
         var total = 0;
         dx.forEach(element => {
             total += element[2] * element[3];
         });
         $("#ttx").html("Total Rp " + total.toLocaleString());
+        totl = total;
+    }
+
+    function checklimit(){
+        var lb = parseInt($("#limit_belanja").html());
+        var l = parseInt($("#limit").html());
+
+        lb = lb || 0;
+        l = l || 0;
+
+        var b = (l+totl);
+
+        console.log("lb :",lb);
+        console.log("l :",l);
+        console.log("totl :",totl);
+        console.log("b :",b);
+
+        if(b>lb){
+            if(show){
+                alert("total belanja anda akan melebihi limit bulanan\nmohon kurangi jumlah belanja anda kali ini");
+                $("#ttx").css("color","red");
+            }
+            show = false;
+        }else{
+            show = true;
+            $("#ttx").css("color","black");
+        }
+
+    }
+
+    function updatescroll(){
+        var el = document.getElementById("scrll");
+        el.scrollTop = el.scrollHeight;
     }
 
     var options1 = {
-        url: "http://localhost/simpleton/index.php/main/ajax/karyawan_list",
+        url: BASE_URL+"index.php/main/ajax/karyawan_list",
         getValue: "nama",
         list: {
             match: {
@@ -22,7 +83,7 @@ $(document).ready(function(){
         }
     };
     var options2 = {
-        url: "http://localhost/simpleton/index.php/main/ajax/produk_list",
+        url: BASE_URL+"index.php/main/ajax/produk_list",
         getValue: "produk",
         requestDelay: 500,
         list: {
@@ -56,7 +117,7 @@ $(document).ready(function(){
         });
         if(sama==0){
             $.ajax({
-                url: 'http://localhost/simpleton/index.php/main/ajax/barcode/' + kode,
+                url: BASE_URL+'index.php/main/ajax/barcode/' + kode,
                 // dataType: 'json',
                 success: function (resp) {
                     // $( '#target').html( resp.people[0].name );
@@ -83,6 +144,7 @@ $(document).ready(function(){
                         console.log(dx);
                         $('#my').jexcel('setData', dx, true);
                         updatettl();
+                        checklimit();
                     } else {
                         console.log("tidak ketemu");
                     }
@@ -96,6 +158,7 @@ $(document).ready(function(){
         }else{
 
         }
+        updatescroll();
     }
 
     $("#npk").keypress(function(e){
@@ -106,7 +169,7 @@ $(document).ready(function(){
             $(this).val(x[1]);
 
         $.ajax({
-            url: 'http://localhost/simpleton/index.php/main/ajax/karyawan/' + $(this).val(),
+            url: BASE_URL+'index.php/main/ajax/karyawan/' + $(this).val(),
             // dataType: 'json',
             success: function( resp ) {
                 if(resp!=""){
@@ -114,9 +177,11 @@ $(document).ready(function(){
                     var nama = data[0];
                     var alamat = data[1];
                     var limit_belanja = data[2];
+                    limit = limit_belanja;
                     $("#nkaryawan").html(nama);
                     $("#akaryawan").html(alamat);
                     $("#limit_belanja").html(limit_belanja);
+                    check_limit_belanja($("#npk").val());
                 }else{
                     console.log("tidak ketemu");
                 }
@@ -126,6 +191,7 @@ $(document).ready(function(){
             }
         });
         }
+
     });
     
     $("#barcode").keypress(function(e){
@@ -176,6 +242,7 @@ $(document).ready(function(){
     $('#my').jexcel('updateSettings', {
         cells: function (cell, col, row) {
             updatettl();
+            checklimit();
             if (col < 1) {
                 // value = $('#my').jexcel('getValue', $(cell));
                 // console.log(value);
@@ -205,7 +272,7 @@ $(document).ready(function(){
 
                 $.ajax({
                     method: "POST",
-                    url: "http://localhost/simpleton/index.php/main/kasir/checkout",
+                    url: BASE_URL+"index.php/main/kasir/checkout",
                     data: {
                         no : nota,
                         id_user: "KMS",
@@ -221,7 +288,7 @@ $(document).ready(function(){
                     console.log("Data Saved: " + msg);
                     k++;
                     if(k==i){
-                        var newWindow = window.open('http://localhost/simpleton/assets/kasir/nota.html', 'targetWindow', 'toolbar=no,location = no,status = no, menubar = no, scrollbars = yes, resizable = yes, width = 250, height = 500');
+                        var newWindow = window.open(BASE_URL+'assets/kasir/nota.html', 'targetWindow', 'toolbar=no,location = no,status = no, menubar = no, scrollbars = yes, resizable = yes, width = 250, height = 500');
 
                         // Access it using its variable
                         newWindow.pass_data = j;

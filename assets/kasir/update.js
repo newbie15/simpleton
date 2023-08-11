@@ -1,10 +1,22 @@
 $(document).ready(function(){
     
+    var url = window.location.href;
+    console.log(url);
+
+    var x = url.split("/");
+    console.log(x);
+
+    var BASE_URL = x[0]+"//"+x[2]+"/"+x[3]+"/"; // "http://10.23.3.101/MDP/";
+    console.log(BASE_URL);
+
+
     function parse(fl) {
         $.ajax({
-            url: 'http://localhost/simpleton/index.php/main/kasir/excel/' + fl,
+            url: BASE_URL+'index.php/main/kasir/excel/' + fl,
             // dataType: 'json',
             success: function (resp) {
+        $("#dropBox").html(event.target.value + " uploading...");
+
                 $("#dropBox").html("Parsing Data is in progress.");
                 console.log(resp);
                 $("#dropBox").html("Data Source is being updated");
@@ -18,11 +30,13 @@ $(document).ready(function(){
 
     function delete_parse(f){
         $.ajax({
-            url: 'http://localhost/simpleton/index.php/main/kasir/delete_excel/' + f,
+            url: BASE_URL+'index.php/main/kasir/delete_excel/' + f,
             // dataType: 'json',
             success: function (resp) {
                 console.log(resp);
-                $("#dropBox").html("Data Source is updated");
+                $("#dropBox").html("");
+                $("#dropBox1").html("");
+                alert("Data Source is updated");
             },
             error: function (req, status, err) {
                 console.log('something went wrong', status, err);
@@ -32,7 +46,13 @@ $(document).ready(function(){
 
     function fileUpload(event,part) {
         //notify user about the file upload status
-        $("#dropBox").html(event.target.value + " uploading...");
+        if (part == "stok") {
+            $("#dropBox").html(event.target.value + " uploading...");
+        
+        }else{
+            $("#dropBox1").html(event.target.value + " uploading...");
+
+        }
 
         //get selected file
         files = event.target.files;
@@ -51,23 +71,37 @@ $(document).ready(function(){
 
             //post file data for upload
             if(part=="stok"){
-                xhr.open('POST', 'http://localhost/simpleton/index.php/main/ajax/upload_excel', true);
+                xhr.open('POST', BASE_URL+'index.php/main/ajax/upload_excel', true);
             }else if(part=="karyawan"){
-                xhr.open('POST', 'http://localhost/simpleton/index.php/main/ajax/upload_excel_karyawan', true);
+                xhr.open('POST', BASE_URL+'index.php/main/ajax/upload_excel_karyawan', true);
             }
-            // xhr.open('POST', 'http://localhost/simpleton/index.php/main/ajax/upload_excel', true);
+            // xhr.open('POST', BASE_URL+'index.php/main/ajax/upload_excel', true);
             xhr.send(data);
             xhr.onload = function () {
                 //get response and show the uploading status
                 var response = JSON.parse(xhr.responseText);
                 if (xhr.status === 200 && response.status == 'ok') {
-                    $("#dropBox").html("File has been uploaded successfully. Parsing is in progress.");
+                    if(part=="stok"){
+                        $("#dropBox").html("File has been uploaded successfully. Parsing is in progress.");
+                    }else{
+                        $("#dropBox1").html("File has been uploaded successfully. Parsing is in progress.");
+                    }
                     // alert(file.name);
                     parse(part);
                 } else if (response.status == 'type_err') {
-                    $("#dropBox").html("Please choose another file. Click to upload another.");
+                    if (part == "stok") { 
+                        $("#dropBox").html("Please choose another file. Click to upload another.");
+                    } else { 
+                        $("#dropBox1").html("Please choose another file. Click to upload another.");
+                    }
+
                 } else {
-                    $("#dropBox").html("Some problem occured, please try again.");
+                    if (part == "stok") {
+                        $("#dropBox").html("Some problem occured, please try again.");
+                    } else { 
+                        $("#dropBox1").html("Some problem occured, please try again.");
+                    }
+
                 }
             };
         }

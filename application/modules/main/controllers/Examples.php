@@ -126,6 +126,59 @@ class Examples extends CI_Controller {
 		$this->_example_output($output);
 
 	}
+
+	public function kartu(){
+		$data['css_file'] = [
+			base_url("assets/datatables/css/jquery.dataTables.min.css"),
+			base_url("assets/jexcel/css/jquery.jexcel.css"),
+			base_url("assets/jexcel/css/jquery.jcalendar.css"),
+			base_url("assets/easyautocomplete/easy-autocomplete.min.css"),			
+		];
+
+		$data['js_file'] = [
+			// base_url('assets/adminlte/plugins/jQuery/jQuery-2.1.4.min.js'),
+			base_url("assets/datatables/js/jquery.dataTables.min.js"),
+			base_url("assets/jexcel/js/jquery.jexcel.js"),
+			base_url("assets/jexcel/js/jquery.jcalendar.js"),
+			base_url("assets/jexcel/js/excel-formula.min.js"),			
+			base_url("assets/jexcel/js/numeral.min.js"),			
+			base_url("assets/easyautocomplete/jquery.easy-autocomplete.min.js"),			
+			base_url("assets/kartu/kartu.js"),			
+		];
+
+		$data['output'] = '
+		<main role="main" class="col-md-9 ml-sm-auto col-lg-10 px-4"><div class="chartjs-size-monitor" style="position: absolute; left: 0px; top: 0px; right: 0px; bottom: 0px; overflow: hidden; pointer-events: none; visibility: hidden; z-index: -1;"><div class="chartjs-size-monitor-expand" style="position:absolute;left:0;top:0;right:0;bottom:0;overflow:hidden;pointer-events:none;visibility:hidden;z-index:-1;"><div style="position:absolute;width:1000000px;height:1000000px;left:0;top:0"></div></div><div class="chartjs-size-monitor-shrink" style="position:absolute;left:0;top:0;right:0;bottom:0;overflow:hidden;pointer-events:none;visibility:hidden;z-index:-1;"><div style="position:absolute;width:200%;height:200%;left:0; top:0"></div></div></div>
+		  <h3>Kartu Anggota</h3>
+          <br>
+          <table style="text-align: left; width: 100%;" border="0" cellpadding="1" cellspacing="1">
+            <tbody>
+            <tr>
+              <td style="vertical-align: middle;">NPK</td>
+              <td style="vertical-align: top;"><input type="text" name="npk" id="npk" placeholder="npk"/></td>
+            </tr>
+
+			</tbody>
+          </table>
+          <br>
+					<div style="
+						height: 325px;
+						width: 100%;
+						overflow: auto;
+						border: 1px solid #666;
+						background-color: #ccc;
+						padding: 8px;
+					">
+						<div id="my"></div>				
+					</div>
+					<br>
+					<button id="checkout" class="btn btn-info">Cetak [ F9 ]</button>
+				</main>
+				
+		';
+		$this->load->view('welcome_message', $data);
+
+	}
+
 	public function penjualan(){
 		// $data['judul_besar'] = 'Simpleton';
 		// $data['judul_kecil'] = 'Version 1.0.0';
@@ -134,8 +187,7 @@ class Examples extends CI_Controller {
 			base_url("assets/datatables/css/jquery.dataTables.min.css"),
 			base_url("assets/jexcel/css/jquery.jexcel.css"),
 			base_url("assets/jexcel/css/jquery.jcalendar.css"),
-			base_url("assets/easyautocomplete/easy-autocomplete.min.css"),
-			
+			base_url("assets/easyautocomplete/easy-autocomplete.min.css"),			
 		];
 
 		$data['js_file'] = [
@@ -147,12 +199,11 @@ class Examples extends CI_Controller {
 			base_url("assets/jexcel/js/numeral.min.js"),			
 			base_url("assets/easyautocomplete/jquery.easy-autocomplete.min.js"),			
 			base_url("assets/kasir/kasir.js"),			
-
 		];
 
 		$data['output'] = '
 		<main role="main" class="col-md-9 ml-sm-auto col-lg-10 px-4"><div class="chartjs-size-monitor" style="position: absolute; left: 0px; top: 0px; right: 0px; bottom: 0px; overflow: hidden; pointer-events: none; visibility: hidden; z-index: -1;"><div class="chartjs-size-monitor-expand" style="position:absolute;left:0;top:0;right:0;bottom:0;overflow:hidden;pointer-events:none;visibility:hidden;z-index:-1;"><div style="position:absolute;width:1000000px;height:1000000px;left:0;top:0"></div></div><div class="chartjs-size-monitor-shrink" style="position:absolute;left:0;top:0;right:0;bottom:0;overflow:hidden;pointer-events:none;visibility:hidden;z-index:-1;"><div style="position:absolute;width:200%;height:200%;left:0; top:0"></div></div></div>
-          <br>
+		  <br>
           <table style="text-align: left; width: 100%;" border="0" cellpadding="1" cellspacing="1">
             <tbody>
             <tr>
@@ -217,10 +268,11 @@ class Examples extends CI_Controller {
 	}
 	public function rekap_penjualan(){
 		$data['js_file'] = [
-			base_url("assets/flot/jquery.flot.min.js"),			
+			// base_url("assets/flot/jquery.flot.min.js"),			
 			base_url("assets/kasir/rekap.js"),			
-
 		];
+
+
 
 
 	$data['output'] = '
@@ -228,10 +280,11 @@ class Examples extends CI_Controller {
 		<h3>Rekap Penjualan</h3>
 	</div>
 
+
 	<div id="exTab2" class="container">	
 		<ul class="nav nav-tabs">
 			<li class="active">
-        <a href="#1" data-toggle="tab">Harian</a>
+        		<a href="#1" data-toggle="tab">Harian</a>
 			</li>
 			<li>
 				<a href="#2" data-toggle="tab">Mingguan</a>
@@ -246,8 +299,32 @@ class Examples extends CI_Controller {
 
 		<div class="tab-content ">
 			<div class="tab-pane active" id="1">
+
+
+
 				<h3>Standard tab panel created on bootstrap using nav-tabs</h3>
 				<div id="placeholder1" style="width: 720px;height: 300px;"></div>
+				<div>
+				<table>
+					<thead>
+						<tr>
+							<th>nota</th>
+							<th>npk</th>
+							<th>nama</th>
+							<th>bagian</th>
+							<th>barcode</th>
+							<th>item</th>
+							<th>harga</th>
+							<th>qty</th>
+							<th>jumlah</th>
+						</tr>
+					</thead>
+					<tbody id="harian>
+					
+					</tbody>
+				</table>
+
+				</div>
 			</div>
 			<div class="tab-pane" id="2">
 				<h3>Notice the gap between the content and tab after applying a background color</h3>

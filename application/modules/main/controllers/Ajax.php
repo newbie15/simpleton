@@ -21,6 +21,7 @@ class Ajax extends CI_Controller {
         // echo "<h1>Welcome to the world of Codeigniter</h1>";//Just an example to ensure that we get into the function
         // die();
     }
+    
     public function barcode($kode)
     {
         $this->db->select('*');
@@ -34,6 +35,22 @@ class Ajax extends CI_Controller {
             echo $row->nama;
             echo ":";
             echo $row->harga;
+        }
+    }
+
+    public function kartu($kode)
+    {
+        $this->db->select('*');
+        $this->db->from('karyawan');
+        $this->db->where('npk', $kode); 
+        
+        $query = $this->db->get();
+
+        foreach ($query->result() as $row)
+        {
+            echo $row->nama;
+            echo ":";
+            echo $row->bagian;
         }
     }
 
@@ -96,6 +113,84 @@ class Ajax extends CI_Controller {
             echo json_encode($response);
         }
     }
+    public function jadwal_belanja(){
+        $npk = $this->uri->segment(4);
+
+        $this->db->select('join_date');		
+        $this->db->from('karyawan');		
+        $this->db->where('npk', $npk);
+
+        $tgl = null;
+        $query = $this->db->get();		
+        foreach ($query->result() as $row)		
+        {		
+            $tgl = $row->join_date;		
+        }
+        
+        $now = time(); // or your date as well
+        $your_date = strtotime($tgl);
+        $datediff = $now - $your_date;
+
+        $days = round($datediff / (60 * 60 * 24));
+        if($days > 91){
+            echo "ok";
+        }else{
+            if(date('j')<21){
+                echo "ok";
+            }else{
+                echo "nok";
+            }
+        }
+
+    }
+
+    public function limit_belanja(){
+        $tahun = date('y');		
+        $npk = $this->uri->segment(4);		
+        // $bulan = date('-m-');
+        $bulan = date('m');		
+        $tgl = date('d');
+        $startdate = null;
+
+        if($tgl>21){
+            $startdate = date('Y-m-')."21 00:00:00";
+        }else{
+            $lastmonth = null;
+            $y = null;
+            
+            if(date('n')==1){
+                $lastmonth = 12;
+                $y = date('Y')-1;
+            }else{
+                $lastmonth = date('n')-1;
+            }
+            
+            if($lastmonth<10){
+                $lastmonth = "0".$lastmonth;
+            }
+
+            if($y==null){
+                $startdate = date('Y-').$lastmonth."-21 00:00:00";
+            }else{
+                $startdate = $y.'-'.$lastmonth."-16 00:00:00";
+            }
+        }
+
+        // echo $startdate;
+
+        $this->db->select('SUM(jumlah) as jumlah');		
+        $this->db->from('penjualan');		
+        $this->db->where('id_karyawan', $npk);
+        $this->db->where('tgl >', $startdate);
+        // $this->db->where('tgl <', $npk);
+        // $this->db->like('tgl', $bulan); 		
+        $query = $this->db->get();		
+        // print_r($query);
+        foreach ($query->result() as $row)		
+        {		
+            echo $row->jumlah;		
+        }		
+    }
 
     public function upload_excel_karyawan(){
         if(isset($_POST) == true){
@@ -157,6 +252,51 @@ class Ajax extends CI_Controller {
 
     }
 
+
+    public function rekap_harian(){
+        $tgl = date('Y-m-d');
+        $query = $this->db->query("
+            SELECT penjualan.nota,karyawan.npk,karyawan.nama,karyawan.bagian,stok.barcode,stok.nama as item,penjualan.harga,penjualan.qty,penjualan.jumlah
+            FROM penjualan,stok,karyawan
+            WHERE penjualan.kode = stok.barcode AND
+            karyawan.npk = penjualan.id_karyawan AND
+            penjualan.tgl LIKE '%$tgl%' 
+            ORDER BY penjualan.id ASC
+        ");
+
+        // echo "
+        //     SELECT penjualan.nota,karyawan.npk,karyawan.nama,karyawan.bagian,stok.barcode,stok.nama,penjualan.harga,penjualan.qty,penjualan.jumlah
+        //     FROM penjualan,stok,karyawan
+        //     WHERE penjualan.kode = stok.barcode AND
+        //     karyawan.npk = penjualan.id_karyawan AND
+        //     penjualan.tgl LIKE '%tgl%' 
+        //     ORDER BY penjualan.id ASC
+
+        // ";
+        foreach ($query->result() as $row)
+        {
+        //     $nama = substr($row->nama,0,7)."...";
+        //     $harga = ($row->harga)/1000;
+        //     $jumlah = number_format($row->jumlah,0,",",".");
+            echo "
+        <tr>
+            <td>$row->nota</td>
+            <td>$row->npk</td>
+            <td>$row->nama</td>
+            <td>$row->bagian</td>
+            <td>$row->barcode</td>
+            <td>$row->item</td>
+            <td>$row->harga</td>
+            <td>$row->qty</td>
+            <td>$row->jumlah</td>
+        </tr>";
+            // echo $row->nama;
+            // echo ":";
+            // echo $row->harga;
+            // echo "<br>";
+            // print_r($row);
+        }
+    }
     // SELECT sum(jumlah) AS total FROM penjualan WHERE MONTH(tgl) = 9
     // SELECT CAST(tgl AS DATE) AS DATE, sum(jumlah) as summ FROM penjualan GROUP BY CAST(tgl AS DATE) ORDER BY 1
 }
