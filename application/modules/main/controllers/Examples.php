@@ -284,10 +284,31 @@ class Examples extends CI_Controller {
 		  <br>
           <table style="text-align: left; width: 100%;" border="0" cellpadding="1" cellspacing="1">
             <tbody>
+			<tr>
+				<td style="vertical-align: middle;">Kasir</td>
+				<td style="vertical-align: top;">
+					<select style="
+					border-color: #ccc;
+					border-radius: 4px;
+					border-style: solid;
+					border-width: 1px;
+					box-shadow: 0 1px 2px rgba(0,0,0,0.1) inset;
+					color: #555;
+					float: none;
+					padding: 6px 12px" id="nkasir" name="nkasir">
+					<option value="belum">Belum bisa dipakai</option>
+					<option value="volvo">Volvo</option>
+					<option value="saab">Saab</option>
+					<option value="fiat">Fiat</option>
+					<option value="audi">Audi</option>
+				</select>
+				</td>
+				<td style="vertical-align: middle;">Limit Belanja : <span id="limit_belanja"></span></td>
+			</tr>
             <tr>
               <td style="vertical-align: middle;">NPK</td>
               <td style="vertical-align: top;" width="250px"><input type="text" name="npk" id="npk" placeholder="npk"/></td>
-			  <td style="vertical-align: middle;">Limit Belanja : <span id="limit_belanja"></span><br/>Belanja Bulan ini : <span id="limit"></span></td>
+			  <td style="vertical-align: middle;">Belanja Bulan ini : <span id="limit"></span></td>
 			  <td style="vertical-align: middle;" rowspan="4" width="250px" align="center"><img id="foto_karyawan" style="width:150px;height:150px;"></td>
             </tr>
             <tr>

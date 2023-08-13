@@ -538,4 +538,18 @@ class Ajax extends CI_Controller {
 
     // SELECT sum(jumlah) AS total FROM penjualan WHERE MONTH(tgl) = 9
     // SELECT CAST(tgl AS DATE) AS DATE, sum(jumlah) as summ FROM penjualan GROUP BY CAST(tgl AS DATE) ORDER BY 1
+
+    public function daftar_kasir(){
+        $this->db->select('*');
+        $this->db->from('user');
+        
+        $query = $this->db->get();
+
+        echo '<option value="0">===pilih salah satu===</option>';
+        foreach ($query->result() as $row)
+        {
+            echo '<option value="'.$row->user.'">'.$row->user.'</option>';
+        }        
+    }
+
 }
