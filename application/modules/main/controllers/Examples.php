@@ -356,7 +356,9 @@ class Examples extends CI_Controller {
 						border: 1px solid #666;
 						background-color: #ccc;
 						padding: 8px;
-					">
+					"
+					id="scrll"
+					>
 						<div id="my"></div>				
 					</div>
 					<br>
