@@ -1,0 +1,152 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html><head><meta content="text/html; charset=ISO-8859-1" http-equiv="content-type"><title>contoh nota</title></head><body>
+<table style="font-size: 15px; text-align: left; width: 100%; font-family: sans-serif;" border="0" cellpadding="0" cellspacing="0">
+  <tbody>
+    <tr align="center">
+      <td colspan="4" rowspan="1" style="vertical-align: top;">
+        <span style="font-size: 15px;font-family: sans-serif;">
+          Koperasi Makmur Indah Sejahtera
+          <br>PT GSDI-GSYM : Telp 085245923130
+        </span><br>
+      </td>
+    </tr>
+    <tr><td colspan="4" rowspan="1">&nbsp;</td></tr>
+    <tr><td colspan="4" rowspan="1">No Nota : <span id="nonotax"></span></td></tr>
+    <tr><td colspan="4" rowspan="1" align="right">Tanggal : <span id="tglx"></span></td></tr>
+    <tr>
+      <td colspan="4" rowspan="1" style="vertical-align: top;">
+        <span id="nkar">Fajar</span>
+        <!-- Tgl : <span id="tgl"></span> -->
+      </td>
+    </tr>
+    <tr>
+      <td colspan="2" style="vertical-align: top;">
+        <!-- Kasir: -->
+      <span id="akar">STF</span>
+      </td>
+      <td colspan="2" align="right" style="vertical-align: top;">
+        NPK: <span id="npk">154481</span>
+      </td>
+    </tr>
+    <tr><td colspan="4" rowspan="1">&nbsp;</td></tr>
+    <tr>
+      <td style="vertical-align: top;">QTY<br></td>
+      <td style="vertical-align: top; text-align: center;">NAMA<br></td>
+      <td style="vertical-align: top; text-align: right;">HARGA<br></td>
+      <td style="vertical-align: top; text-align: right;">JUMLAH<br></td>
+    </tr>
+    <tbody id="cart"></tbody>
+
+    <tr><td colspan="4" rowspan="1">&nbsp;</td></tr>
+    <tr><td colspan="4" rowspan="1">PPN 10% : <span id="ppnx">Rp x.xxx.xxx</span></td></tr>
+    <tr><td colspan="4" rowspan="1"></td></tr>
+    <tr>
+      <!-- <td colspan="4" rowspan="1">Tanda Terima</td> -->
+      <td colspan="4" rowspan="1" border="2" align="right"><span id="ttlx">Rp x.xxx.xxx</span></td>
+    </tr>
+    <tr></tr>
+    <tr><td colspan="4" rowspan="1">&nbsp;</td></tr>
+    <!-- <tr><td colspan="4" rowspan="1">&nbsp;</td></tr>s -->
+    <tr><td colspan="4" rowspan="1">Tanda Terima - Ttd Dan Nama</td></tr>
+    <!-- <tr><td colspan="4" rowspan="1"></td></tr> -->
+    <tr><td colspan="4" rowspan="1">&nbsp;</td></tr>
+    <tr><td colspan="4" rowspan="1" align="center">Koperasi Mitra</td></tr>
+    <tr><td colspan="4" rowspan="1" align="center">"tumbuh & berkembang bersama Anda"</td></tr>
+
+
+  </tbody>
+</table>
+
+<br style="font-family: Courier;">
+</table>
+</body>
+<script src="http://localhost/simpleton/assets/adminlte/plugins/jQuery/jQuery-2.1.4.min.js"></script>
+<script>
+  $(document).ready(function() {
+    // alert(JSON.stringify(window.pass_data));
+    // window.print();
+    
+
+    $("#npk").html(window.npk);    
+    $("#nkar").html(window.nkar);    
+    $("#akar").html(window.akar); 
+    $("#tgl").html(window.tgl);
+    $("#nonotax").html(window.no);
+    var nota = window.no; 
+    
+    data = window.pass_data;
+    // alert();
+    var shtml = "";
+    var total = 0;
+    var pajak = 0;
+    var buff = 0;
+    var res;
+
+    $.ajax({
+      method: "POST",
+      url: "http://localhost/simpleton/index.php/main/ajax/checkout",
+      data: {
+        no: nota,
+        // id_user: "KMS",
+        // id_karyawan: $("#npk").val(),
+        // tgl: n,
+        // nama: res,
+        // harga: element[2],
+        // jumlah: element[2] * element[3],
+        // kode: element[0],
+        // kurangstok: element[3],
+      }
+    }).done(function (msg) {
+      // console.log("Data Saved: " + msg);
+      $("#cart").html(msg);
+
+      window.print();
+      window.setTimeout(window.close(), 6 * 1000);
+    });
+
+
+    data.forEach(element => {
+      // alert(JSON.stringify(element));
+      // alert(element[1]);
+      // if(element[1].length>10){
+      //   res = element[1].substr(0, 8)+"...";
+      // }
+      // shtml += '\
+      // <tr>\
+      //   <td style="vertical-align: top;">'+ element[3] +'</td>\
+      //   <td style="vertical-align: top;">'+res+'</td>\
+      //   <td style="vertical-align: top; text-align: right;">'+ (element[2]/1000.0)+"K" +'</td>\
+      //   <td style="vertical-align: top; text-align: right;">'+ (element[2]*element[3]).toLocaleString() +'</td>\
+      // </tr>\
+      // ';
+      buff = (element[2] * element[3]);
+
+      total+= buff + (buff * element[5]);
+      pajak+= (buff * element[5]);
+    });
+
+    // $("#cart").html(shtml);
+    $("#ttlx").html("TOTAL Rp "+total.toLocaleString());
+    $("#ppnx").html("Rp "+pajak.toLocaleString());
+    var date = new Date();
+    var d = date.getDate();
+    var m = date.getMonth() + 1;
+    var y = date.getFullYear();
+
+    $("#tglx").html(d+"-"+m+"-"+y);
+    // len = data.length;
+    // for(var i=0;i<len;i++){
+    //   document.write(data[i][0]);
+    //   document.write(data[i][1]);
+    //   document.write(data[i][2]);
+    //   document.write(data[i][3]);
+    //   document.write(data[i][4]);
+
+    // } 
+    
+    // alert(window.npk);
+    // alert(window.nkar);
+    // alert(window.akar); 
+  });
+</script>
+</html>
