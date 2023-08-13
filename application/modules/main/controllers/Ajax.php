@@ -35,6 +35,8 @@ class Ajax extends CI_Controller {
             echo $row->nama;
             echo ":";
             echo $row->harga;
+            echo ":";
+            echo $row->ppn;
         }
     }
 
