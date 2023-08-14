@@ -69,29 +69,55 @@ class Kasir extends CI_Controller {
 	}
 
 	public function checkout(){
-		$id_user = $_REQUEST['id_user'];
-		$id_karyawan = $_REQUEST['id_karyawan'];
-		$tgl = date('Y-m-d H:i:s');
-		$nama = $_REQUEST['nama'];
-		$harga = $_REQUEST['harga'];
-		$jumlah = $_REQUEST['jumlah'];
-		$kode = $_REQUEST['kode'];
-		$kurangstok = $_REQUEST['kurangstok'];
-		$nota = $_REQUEST['no'];
-		$ppn = $_REQUEST['pajak'];
+		$pajak_active = false;
 
-
-		$data = array(
-			'nota' => $nota,
-			'id_user' => $id_user,
-			'id_karyawan' => $id_karyawan,
-			'tgl' => $tgl,
-			'kode' => $kode,
-			'harga' => $harga,
-			'qty' => $kurangstok,
-			'jumlah' => $jumlah,
-			'ppn' => $ppn,
-		);
+		if($pajak_active){
+			$id_user = $_REQUEST['id_user'];
+			$id_karyawan = $_REQUEST['id_karyawan'];
+			$tgl = date('Y-m-d H:i:s');
+			$nama = $_REQUEST['nama'];
+			$harga = $_REQUEST['harga'];
+			$jumlah = $_REQUEST['jumlah'];
+			$kode = $_REQUEST['kode'];
+			$kurangstok = $_REQUEST['kurangstok'];
+			$nota = $_REQUEST['no'];
+			$ppn = $_REQUEST['pajak'];
+	
+			$data = array(
+				'nota' => $nota,
+				'id_user' => $id_user,
+				'id_karyawan' => $id_karyawan,
+				'tgl' => $tgl,
+				'kode' => $kode,
+				'harga' => $harga,
+				'qty' => $kurangstok,
+				'jumlah' => $jumlah,
+				'ppn' => $ppn,
+			);
+		}else{
+			$id_user = $_REQUEST['id_user'];
+			$id_karyawan = $_REQUEST['id_karyawan'];
+			$tgl = date('Y-m-d H:i:s');
+			$nama = $_REQUEST['nama'];
+			$harga = $_REQUEST['harga'];
+			$jumlah = $_REQUEST['jumlah'];
+			$kode = $_REQUEST['kode'];
+			$kurangstok = $_REQUEST['kurangstok'];
+			$nota = $_REQUEST['no'];
+			// $ppn = $_REQUEST['pajak'];
+	
+			$data = array(
+				'nota' => $nota,
+				'id_user' => $id_user,
+				'id_karyawan' => $id_karyawan,
+				'tgl' => $tgl,
+				'kode' => $kode,
+				'harga' => $harga,
+				'qty' => $kurangstok,
+				'jumlah' => $jumlah,
+				// 'ppn' => $ppn,
+			);
+		}
 
 		$this->db->insert('penjualan', $data);
 		
