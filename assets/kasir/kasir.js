@@ -7,6 +7,7 @@ $(document).ready(function(){
     var limit;
     var totl;
     var show;
+    var pajak_active = false;
 
     function check_limit_belanja(n){
         $("#limit").load("http://localhost/simpleton/index.php/main/ajax/limit_belanja/" + n);
@@ -40,13 +41,19 @@ $(document).ready(function(){
 
     function updatettl(){
         var total = 0;
-        var pajek = 0;
-        dx.forEach(element => {
-            console.log(element);
-            pjk = ((parseFloat(element[2]) * parseFloat(element[3]) * parseFloat(element[5])));
-            total += (parseFloat(element[2]) * parseFloat(element[3])) + pjk;
-            pajek += pjk;
-        });
+        if (pajak_active) {
+            var pajek = 0;
+            dx.forEach(element => {
+                console.log(element);
+                pjk = ((parseFloat(element[2]) * parseFloat(element[3]) * parseFloat(element[5])));
+                total += (parseFloat(element[2]) * parseFloat(element[3])) + pjk;
+                pajek += pjk;
+            });                
+        }else{
+            dx.forEach(element => {
+                total += element[2] * element[3];
+            });
+        }
         $("#ttx").html("Total Rp " + total.toLocaleString());
         // $("#ttx").html("Total Rp " + pajek.toLocaleString());
         totl = total;
@@ -140,7 +147,9 @@ $(document).ready(function(){
                         var nama = data[0];
                         var harga = data[1];
                         var jumlah = harga * kuantiti;
-                        var ppn = data[2];
+                        if(pajak_active){
+                            var ppn = data[2];
+                        }
 
                         console.log(dx);
                         len = dx.length;
@@ -154,8 +163,12 @@ $(document).ready(function(){
                         len = dx.length;
                         ln = len + 1;
                         last = '=C' + ln + '*D' + ln;
-                        pajak = '=E' +ln + '*F' + ln;
-                        dx.push([kode, nama, harga, kuantiti, last, ppn, pajak]);
+                        if(pajak_active){
+                            pajak = '=E' +ln + '*F' + ln;
+                            dx.push([kode, nama, harga, kuantiti, last, ppn, pajak]);    
+                        }else{
+                            dx.push([kode, nama, harga, kuantiti, last]);
+                        }
                         console.log(dx);
                         $('#my').jexcel('setData', dx, true);
                         updatettl();
@@ -262,21 +275,37 @@ $(document).ready(function(){
         // alert(e.which);
     });
 
-    $('#my').jexcel({
-        data: dx,
-        columns: [
-            { type: 'text' },
-            { type: 'text' },
-            { type: 'numeric' },
-            { type: 'numeric' },
-            { type: 'numeric' },
-            { type: 'numeric' },
-            { type: 'numeric' },
-        ],
-        colHeaders: ['kode', 'nama barang', 'harga','kuantiti', 'jumlah', 'ppn', 'pajak'],
-        // colWidths: [400, 100, 200],
-        colWidths: [100, 250, 150, 75, 150, 75, 150],
-    });
+    if(pajak_active){
+        $('#my').jexcel({
+            data: dx,
+            columns: [
+                { type: 'text' },
+                { type: 'text' },
+                { type: 'numeric' },
+                { type: 'numeric' },
+                { type: 'numeric' },
+                { type: 'numeric' },
+                { type: 'numeric' },
+            ],
+            colHeaders: ['kode', 'nama barang', 'harga','kuantiti', 'jumlah', 'ppn', 'pajak'],
+            // colWidths: [400, 100, 200],
+            colWidths: [100, 250, 150, 75, 150, 75, 150],
+        });    
+    }else{
+        $('#my').jexcel({
+            data: dx,
+            columns: [
+                { type: 'text' },
+                { type: 'text' },
+                { type: 'numeric' },
+                { type: 'numeric' },
+                { type: 'numeric' },
+            ],
+            colHeaders: ['kode', 'nama barang', 'harga','kuantiti', 'jumlah'],
+            // colWidths: [400, 100, 200],
+            colWidths: [100, 250, 150, 75, 150],
+        });    
+    }
 
     $('#my').jexcel('updateSettings', {
         cells: function (cell, col, row) {
@@ -296,7 +325,7 @@ $(document).ready(function(){
             alert("isi dulu NPK");
         }else if($("#nkasir").val()=="0"){
             alert("pilih dulu kasir");
-        }else{
+        }else if(pajak_active){
             var epoch = Math.floor((new Date).getTime() / 1000);
             var j = $('#my').jexcel('getData');
             // $('#txt').val();
@@ -333,6 +362,55 @@ $(document).ready(function(){
                     k++;
                     if(k==i){
                         var newWindow = window.open('http://localhost/simpleton/assets/kasir/notabaru.html', 'targetWindow', 'toolbar=no,location = no,status = no, menubar = no, scrollbars = yes, resizable = yes, width = 250, height = 500');
+
+                        // Access it using its variable
+                        newWindow.pass_data = j;
+                        newWindow.npk = $("#npk").val();
+                        newWindow.nkar = $("#nkaryawan").html();
+                        newWindow.akar = $("#akaryawan").html();
+                        newWindow.tgl = n;
+                        newWindow.no = nota;
+                        newWindow.nkasir = nama_kasir;
+                    }
+                    // console.log(i + " " + k);
+                });
+            });
+        }else{
+            var epoch = Math.floor((new Date).getTime() / 1000);
+            var j = $('#my').jexcel('getData');
+            // $('#txt').val();
+            console.log(j);
+            var datax = "";
+            var d = new Date();
+            var n = d.toLocaleString();
+            var nota = $("#npk").val()+"-"+epoch;
+            var i = j.length;
+            var k = 0;
+            var nama_kasir = "KMS";
+            nama_kasir = $("#nkasir").val();
+            j.forEach(element => {
+                res = element[1].substr(0, 10);
+                total += element[2] * element[3];
+
+                $.ajax({
+                    method: "POST",
+                    url: "http://localhost/simpleton/index.php/main/kasir/checkout",
+                    data: {
+                        no : nota,
+                        id_user: nama_kasir,
+                        id_karyawan: $("#npk").val(),
+                        tgl: n,
+                        nama: res,
+                        harga: element[2],
+                        jumlah: element[2] * element[3],
+                        kode: element[0],
+                        kurangstok: element[3],
+                    }
+                }).done(function (msg) {
+                    console.log("Data Saved: " + msg);
+                    k++;
+                    if(k==i){
+                        var newWindow = window.open('http://localhost/simpleton/assets/kasir/nota.html', 'targetWindow', 'toolbar=no,location = no,status = no, menubar = no, scrollbars = yes, resizable = yes, width = 250, height = 500');
 
                         // Access it using its variable
                         newWindow.pass_data = j;
