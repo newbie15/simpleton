@@ -7,6 +7,7 @@ $(document).ready(function(){
     var limit;
     var totl;
     var show;
+    var pajak_active = false;
 
     var url = window.location.href;
     console.log(url);
@@ -16,6 +17,7 @@ $(document).ready(function(){
 
     var BASE_URL = x[0]+"//"+x[2]+"/"+x[3]+"/"; // "http://10.23.3.101/MDP/";
     console.log(BASE_URL);
+
 
     function check_limit_belanja(n){
         $("#limit").load(BASE_URL+"index.php/main/ajax/limit_belanja/" + n);
@@ -31,13 +33,39 @@ $(document).ready(function(){
         },2000);
     }
 
+    function check_jadwal_belanja(n) {
+        $.ajax({
+            method: "GET",
+            url: BASE_URL+"index.php/main/ajax/jadwal_belanja/" + n,
+        }).done(function (msg) {
+            // alert("Data Saved: " + msg);
+            setTimeout(function () {
+                if (msg != "ok") {
+                    alert("jadwal belanja anda adalah mulai tgl 1 sampai 20, selain jadwal silahkan berbelanja secara cash");
+                    location.reload();
+                }
+            }, 2000);
+        });
+    }
+
 
     function updatettl(){
         var total = 0;
-        dx.forEach(element => {
-            total += element[2] * element[3];
-        });
+        if (pajak_active) {
+            var pajek = 0;
+            dx.forEach(element => {
+                console.log(element);
+                pjk = ((parseFloat(element[2]) * parseFloat(element[3]) * parseFloat(element[5])));
+                total += (parseFloat(element[2]) * parseFloat(element[3])) + pjk;
+                pajek += pjk;
+            });                
+        }else{
+            dx.forEach(element => {
+                total += element[2] * element[3];
+            });
+        }
         $("#ttx").html("Total Rp " + total.toLocaleString());
+        // $("#ttx").html("Total Rp " + pajek.toLocaleString());
         totl = total;
     }
 
@@ -98,6 +126,8 @@ $(document).ready(function(){
     var no = 1;
     var total = 0;
 
+    $("#nkasir").load(BASE_URL+"index.php/main/ajax/daftar_kasir");
+
     function add(kode,kuantiti){
         var sama = 0;
         var index = 0;
@@ -127,6 +157,9 @@ $(document).ready(function(){
                         var nama = data[0];
                         var harga = data[1];
                         var jumlah = harga * kuantiti;
+                        if(pajak_active){
+                            var ppn = data[2];
+                        }
 
                         console.log(dx);
                         len = dx.length;
@@ -140,7 +173,12 @@ $(document).ready(function(){
                         len = dx.length;
                         ln = len + 1;
                         last = '=C' + ln + '*D' + ln;
-                        dx.push([kode, nama, harga, kuantiti, last]);
+                        if(pajak_active){
+                            pajak = '=E' +ln + '*F' + ln;
+                            dx.push([kode, nama, harga, kuantiti, last, ppn, pajak]);    
+                        }else{
+                            dx.push([kode, nama, harga, kuantiti, last]);
+                        }
                         console.log(dx);
                         $('#my').jexcel('setData', dx, true);
                         updatettl();
@@ -161,35 +199,57 @@ $(document).ready(function(){
         updatescroll();
     }
 
+    function tampilkan_foto(npk){
+        // $("#foto_karyawan").attr("src",);
+        var image = document.querySelector('#foto_karyawan');
+        image.setAttribute('src', BASE_URL+"assets/uploads/karyawan/" + npk + ".png");
+    }
+
+    var sttime = null;
     $("#npk").keypress(function(e){
+        if(sttime==null){
+            sttime =performance.now();
+        }
         if(e.which==13 && $(this).val()!=""){
             var t = $(this).val();
             console.log(t);
             var x = t.split("-");
             $(this).val(x[1]);
+            stotime = performance.now();
 
-        $.ajax({
-            url: BASE_URL+'index.php/main/ajax/karyawan/' + $(this).val(),
-            // dataType: 'json',
-            success: function( resp ) {
-                if(resp!=""){
-                    var data = resp.split(":");
-                    var nama = data[0];
-                    var alamat = data[1];
-                    var limit_belanja = data[2];
-                    limit = limit_belanja;
-                    $("#nkaryawan").html(nama);
-                    $("#akaryawan").html(alamat);
-                    $("#limit_belanja").html(limit_belanja);
-                    check_limit_belanja($("#npk").val());
-                }else{
-                    console.log("tidak ketemu");
+            $.ajax({
+                url: BASE_URL+'index.php/main/ajax/karyawan/' + $(this).val(),
+                // dataType: 'json',
+                success: function( resp ) {
+                    if(resp!=""){
+                        var data = resp.split(":");
+                        var nama = data[0];
+                        var alamat = data[1];
+                        var limit_belanja = data[2];
+                        limit = limit_belanja;
+                        $("#nkaryawan").html(nama);
+                        $("#akaryawan").html(alamat);
+                        $("#limit_belanja").html(limit_belanja);
+                        check_limit_belanja($("#npk").val());
+                        check_jadwal_belanja($("#npk").val());
+                        tampilkan_foto($("#npk").val());
+                    }else{
+                        console.log("tidak ketemu");
+                    }
+                },
+                error: function( req, status, err ) {
+                console.log( 'something went wrong', status, err );
                 }
-            },
-            error: function( req, status, err ) {
-            console.log( 'something went wrong', status, err );
+            });
+
+            console.log(stotime-sttime);
+
+
+            if ((stotime - sttime)>100000 && x[1] != '1'){
+                alert("hanya bisa berbelanja menggunakan kartu");
+                location.reload();
             }
-        });
+            sttime = null;
         }
 
     });
@@ -225,19 +285,37 @@ $(document).ready(function(){
         // alert(e.which);
     });
 
-    $('#my').jexcel({
-        data: dx,
-        columns: [
-            { type: 'text' },
-            { type: 'text' },
-            { type: 'numeric' },
-            { type: 'numeric' },
-            { type: 'numeric' },
-        ],
-        colHeaders: ['kode', 'nama barang', 'harga','kuantiti', 'jumlah'],
-        // colWidths: [400, 100, 200],
-        colWidths: [100, 250, 150, 75, 150],
-    });
+    if(pajak_active){
+        $('#my').jexcel({
+            data: dx,
+            columns: [
+                { type: 'text' },
+                { type: 'text' },
+                { type: 'numeric' },
+                { type: 'numeric' },
+                { type: 'numeric' },
+                { type: 'numeric' },
+                { type: 'numeric' },
+            ],
+            colHeaders: ['kode', 'nama barang', 'harga','kuantiti', 'jumlah', 'ppn', 'pajak'],
+            // colWidths: [400, 100, 200],
+            colWidths: [100, 250, 150, 75, 150, 75, 150],
+        });    
+    }else{
+        $('#my').jexcel({
+            data: dx,
+            columns: [
+                { type: 'text' },
+                { type: 'text' },
+                { type: 'numeric' },
+                { type: 'numeric' },
+                { type: 'numeric' },
+            ],
+            colHeaders: ['kode', 'nama barang', 'harga','kuantiti', 'jumlah'],
+            // colWidths: [400, 100, 200],
+            colWidths: [100, 250, 150, 75, 150],
+        });    
+    }
 
     $('#my').jexcel('updateSettings', {
         cells: function (cell, col, row) {
@@ -255,6 +333,58 @@ $(document).ready(function(){
     function checkout(){
         if($("#npk").val()==""){
             alert("isi dulu NPK");
+        }else if($("#nkasir").val()=="0"){
+            alert("pilih dulu kasir");
+        }else if(pajak_active){
+            var epoch = Math.floor((new Date).getTime() / 1000);
+            var j = $('#my').jexcel('getData');
+            // $('#txt').val();
+            console.log(j);
+            var datax = "";
+            var d = new Date();
+            var n = d.toLocaleString();
+            var nota = $("#npk").val()+"-"+epoch;
+            var i = j.length;
+            var k = 0;
+            var nama_kasir = "KMS";
+            nama_kasir = $("#nkasir").val();
+            j.forEach(element => {
+                res = element[1].substr(0, 10);
+                total += (element[2] * element[3]) + element[6];
+                pjkx += element[6];
+                $.ajax({
+                    method: "POST",
+                    url: BASE_URL+"index.php/main/kasir/checkout",
+                    data: {
+                        no : nota,
+                        id_user: nama_kasir,
+                        id_karyawan: $("#npk").val(),
+                        tgl: n,
+                        nama: res,
+                        harga: element[2],
+                        jumlah: element[2] * element[3],
+                        pajak: (element[2] * element[3]) * element[5],
+                        kode: element[0],
+                        kurangstok: element[3],
+                    }
+                }).done(function (msg) {
+                    console.log("Data Saved: " + msg);
+                    k++;
+                    if(k==i){
+                        var newWindow = window.open(BASE_URL+'assets/kasir/notabaru.html', 'targetWindow', 'toolbar=no,location = no,status = no, menubar = no, scrollbars = yes, resizable = yes, width = 250, height = 500');
+
+                        // Access it using its variable
+                        newWindow.pass_data = j;
+                        newWindow.npk = $("#npk").val();
+                        newWindow.nkar = $("#nkaryawan").html();
+                        newWindow.akar = $("#akaryawan").html();
+                        newWindow.tgl = n;
+                        newWindow.no = nota;
+                        newWindow.nkasir = nama_kasir;
+                    }
+                    // console.log(i + " " + k);
+                });
+            });
         }else{
             var epoch = Math.floor((new Date).getTime() / 1000);
             var j = $('#my').jexcel('getData');
@@ -267,7 +397,7 @@ $(document).ready(function(){
             var i = j.length;
             var k = 0;
             var nama_kasir = "KMS";
-            //nama_kasir = $("#nkasir").val();
+            nama_kasir = $("#nkasir").val();
             j.forEach(element => {
                 res = element[1].substr(0, 10);
                 total += element[2] * element[3];
