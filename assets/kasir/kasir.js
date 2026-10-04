@@ -7,7 +7,17 @@ $(document).ready(function(){
     var limit;
     var totl;
     var show;
-    var pajak_active = false;
+    var pajak_active = window.localStorage.getItem("simpleton_pajak_active") === "true";
+    $("#pajak-active").prop("checked", pajak_active).on("change", function () {
+        if (dx.length > 0) {
+            alert("Kosongkan keranjang atau mulai transaksi baru sebelum mengubah status pajak.");
+            $(this).prop("checked", pajak_active);
+            return;
+        }
+        pajak_active = this.checked;
+        window.localStorage.setItem("simpleton_pajak_active", pajak_active ? "true" : "false");
+        window.location.reload();
+    });
 
     function check_limit_belanja(n){
         $("#limit").load("http://localhost/simpleton/index.php/main/ajax/limit_belanja/" + n);
@@ -116,7 +126,18 @@ $(document).ready(function(){
     var no = 1;
     var total = 0;
 
-    $("#nkasir").load("http://localhost/simpleton/index.php/main/ajax/daftar_kasir");
+    $("#nkasir").load("http://localhost/simpleton/index.php/main/ajax/daftar_kasir", function (response, status) {
+        if (status !== "success") {
+            $(this).html('<option value="0">Gagal memuat daftar kasir</option>');
+            return;
+        }
+        var cashierOptions = $(this).find("option").filter(function () {
+            return this.value !== "0" && this.value !== "belum";
+        });
+        if (cashierOptions.length === 1) {
+            $(this).val(cashierOptions.first().val());
+        }
+    });
 
     function add(kode,kuantiti){
         var sama = 0;
@@ -190,9 +211,19 @@ $(document).ready(function(){
     }
 
     function tampilkan_foto(npk){
-        // $("#foto_karyawan").attr("src",);
         var image = document.querySelector('#foto_karyawan');
-        image.setAttribute('src', "http://localhost/simpleton/assets/uploads/karyawan/" + npk + ".png");
+        var placeholder = document.querySelector('#foto-karyawan-placeholder');
+        image.style.display = "none";
+        placeholder.style.display = "flex";
+        image.onload = function () {
+            image.style.display = "block";
+            placeholder.style.display = "none";
+        };
+        image.onerror = function () {
+            image.style.display = "none";
+            placeholder.style.display = "flex";
+        };
+        image.setAttribute('src', "http://localhost/simpleton/assets/uploads/karyawan/" + encodeURIComponent(npk) + ".png?v=" + new Date().getTime());
     }
 
     var sttime = null;
@@ -204,11 +235,14 @@ $(document).ready(function(){
             var t = $(this).val();
             console.log(t);
             var x = t.split("-");
-            $(this).val(x[1]);
+            var npk = x.length > 1 ? x[x.length - 1] : $.trim(t);
+            $(this).val(npk);
+            $("#foto_karyawan").hide().attr("src", "");
+            $("#foto-karyawan-placeholder").text("Memuat foto...").show();
             stotime = performance.now();
 
             $.ajax({
-                url: 'http://localhost/simpleton/index.php/main/ajax/karyawan/' + $(this).val(),
+                url: 'http://localhost/simpleton/index.php/main/ajax/karyawan/' + encodeURIComponent(npk),
                 // dataType: 'json',
                 success: function( resp ) {
                     if(resp!=""){
@@ -222,9 +256,13 @@ $(document).ready(function(){
                         $("#limit_belanja").html(limit_belanja);
                         check_limit_belanja($("#npk").val());
                         check_jadwal_belanja($("#npk").val());
-                        tampilkan_foto($("#npk").val());
+                        tampilkan_foto(npk);
                     }else{
                         console.log("tidak ketemu");
+                        $("#nkaryawan, #akaryawan, #limit, #limit_belanja").html("");
+                        $("#foto_karyawan").hide().attr("src", "");
+                        $("#foto-karyawan-placeholder").text("Foto tidak tersedia");
+                        $("#foto-karyawan-placeholder").show();
                     }
                 },
                 error: function( req, status, err ) {
@@ -235,7 +273,7 @@ $(document).ready(function(){
             console.log(stotime-sttime);
 
 
-            if ((stotime - sttime)>100000 && x[1] != '1'){
+            if ((stotime - sttime)>100000 && npk != '1'){
                 alert("hanya bisa berbelanja menggunakan kartu");
                 location.reload();
             }
@@ -321,110 +359,78 @@ $(document).ready(function(){
     });
 
     function checkout(){
-        if($("#npk").val()==""){
-            alert("isi dulu NPK");
-        }else if($("#nkasir").val()=="0"){
-            alert("pilih dulu kasir");
-        }else if(pajak_active){
-            var epoch = Math.floor((new Date).getTime() / 1000);
-            var j = $('#my').jexcel('getData');
-            // $('#txt').val();
-            console.log(j);
-            var datax = "";
-            var d = new Date();
-            var n = d.toLocaleString();
-            var nota = $("#npk").val()+"-"+epoch;
-            var i = j.length;
-            var k = 0;
-            var nama_kasir = "KMS";
-            nama_kasir = $("#nkasir").val();
-            j.forEach(element => {
-                res = element[1].substr(0, 10);
-                total += (element[2] * element[3]) + element[6];
-                pjkx += element[6];
-                $.ajax({
-                    method: "POST",
-                    url: "http://localhost/simpleton/index.php/main/kasir/checkout",
-                    data: {
-                        no : nota,
-                        id_user: nama_kasir,
-                        id_karyawan: $("#npk").val(),
-                        tgl: n,
-                        nama: res,
-                        harga: element[2],
-                        jumlah: element[2] * element[3],
-                        pajak: (element[2] * element[3]) * element[5],
-                        kode: element[0],
-                        kurangstok: element[3],
-                    }
-                }).done(function (msg) {
-                    console.log("Data Saved: " + msg);
-                    k++;
-                    if(k==i){
-                        var newWindow = window.open('http://localhost/simpleton/assets/kasir/notabaru.html', 'targetWindow', 'toolbar=no,location = no,status = no, menubar = no, scrollbars = yes, resizable = yes, width = 250, height = 500');
-
-                        // Access it using its variable
-                        newWindow.pass_data = j;
-                        newWindow.npk = $("#npk").val();
-                        newWindow.nkar = $("#nkaryawan").html();
-                        newWindow.akar = $("#akaryawan").html();
-                        newWindow.tgl = n;
-                        newWindow.no = nota;
-                        newWindow.nkasir = nama_kasir;
-                    }
-                    // console.log(i + " " + k);
-                });
-            });
-        }else{
-            var epoch = Math.floor((new Date).getTime() / 1000);
-            var j = $('#my').jexcel('getData');
-            // $('#txt').val();
-            console.log(j);
-            var datax = "";
-            var d = new Date();
-            var n = d.toLocaleString();
-            var nota = $("#npk").val()+"-"+epoch;
-            var i = j.length;
-            var k = 0;
-            var nama_kasir = "KMS";
-            nama_kasir = $("#nkasir").val();
-            j.forEach(element => {
-                res = element[1].substr(0, 10);
-                total += element[2] * element[3];
-
-                $.ajax({
-                    method: "POST",
-                    url: "http://localhost/simpleton/index.php/main/kasir/checkout",
-                    data: {
-                        no : nota,
-                        id_user: nama_kasir,
-                        id_karyawan: $("#npk").val(),
-                        tgl: n,
-                        nama: res,
-                        harga: element[2],
-                        jumlah: element[2] * element[3],
-                        kode: element[0],
-                        kurangstok: element[3],
-                    }
-                }).done(function (msg) {
-                    console.log("Data Saved: " + msg);
-                    k++;
-                    if(k==i){
-                        var newWindow = window.open('http://localhost/simpleton/assets/kasir/nota.html', 'targetWindow', 'toolbar=no,location = no,status = no, menubar = no, scrollbars = yes, resizable = yes, width = 250, height = 500');
-
-                        // Access it using its variable
-                        newWindow.pass_data = j;
-                        newWindow.npk = $("#npk").val();
-                        newWindow.nkar = $("#nkaryawan").html();
-                        newWindow.akar = $("#akaryawan").html();
-                        newWindow.tgl = n;
-                        newWindow.no = nota;
-                        newWindow.nkasir = nama_kasir;
-                    }
-                    // console.log(i + " " + k);
-                });
-            });
+        var npk = $.trim($("#npk").val());
+        var cashier = $("#nkasir").val();
+        var paymentMethod = $("#metode_pembayaran").val();
+        if(npk === ""){
+            alert("Isi dulu NPK.");
+            return;
         }
+        if(!cashier || cashier === "0" || cashier === "belum"){
+            alert("Belum ada kasir yang dipilih. Pilih kasir dari daftar sebelum checkout.");
+            return;
+        }
+        var data = $('#my').jexcel('getData') || [];
+        var cartRows = data.filter(function (row) {
+            return row && $.trim(String(row[0] || "")) !== "";
+        });
+        if(cartRows.length === 0){
+            alert("Keranjang belanja masih kosong.");
+            return;
+        }
+        var epoch = Math.floor((new Date()).getTime() / 1000);
+        var now = new Date().toLocaleString();
+        var nota = npk + "-" + epoch;
+        var cashierName = cashier || "KMS";
+        var items = cartRows.map(function (row) {
+            return {
+                barcode: row[0],
+                qty: row[3],
+                ppn: pajak_active ? row[6] : 0
+            };
+        });
+
+        $.ajax({
+            method: "POST",
+            url: "http://localhost/simpleton/index.php/main/kasir/checkout",
+            dataType: "json",
+            data: {
+                no: nota,
+                id_user: cashierName,
+                id_karyawan: npk,
+                metode_pembayaran: paymentMethod,
+                items_json: JSON.stringify(items)
+            }
+        }).done(function (response) {
+            if (!response || !response.success) {
+                var message = response && response.message
+                    ? response.message
+                    : "Transaksi gagal dan belum tercatat.";
+                if (response && response.errors && response.errors.length) {
+                    message += "\n\n" + response.errors.join("\n");
+                }
+                alert(message);
+                return;
+            }
+            var receiptUrl = pajak_active
+                ? "http://localhost/simpleton/assets/kasir/notabaru.html"
+                : "http://localhost/simpleton/assets/kasir/nota.html";
+            var receipt = window.open(receiptUrl, "targetWindow", "toolbar=no,location=no,status=no,menubar=no,scrollbars=yes,resizable=yes,width=250,height=500");
+            if (!receipt) {
+                alert("Transaksi berhasil dicatat, tetapi jendela nota diblokir browser. Nomor nota: " + nota);
+                return;
+            }
+            receipt.pass_data = cartRows;
+            receipt.npk = npk;
+            receipt.nkar = $("#nkaryawan").html();
+            receipt.akar = $("#akaryawan").html();
+            receipt.tgl = now;
+            receipt.no = nota;
+            receipt.nkasir = cashierName;
+            receipt.metodePembayaran = paymentMethod;
+        }).fail(function () {
+            alert("Checkout tidak mendapat respons server. Status pencatatan belum dapat dipastikan; periksa transaksi sebelum mencoba lagi.");
+        });
     }
 
     $("#checkout").click(function(){

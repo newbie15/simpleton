@@ -13,6 +13,7 @@
     <tr><td colspan="4" rowspan="1">&nbsp;</td></tr>
     <tr><td colspan="4" rowspan="1">No Nota : <span id="nonotax"></span></td></tr>
     <tr><td colspan="4" rowspan="1" align="right">Tanggal : <span id="tglx"></span></td></tr>
+    <tr><td colspan="4" rowspan="1" align="right">Pembayaran : <span id="metode_pembayaran_nota"></span></td></tr>
     <tr>
       <td colspan="4" rowspan="1" style="vertical-align: top;">
         <span id="nkar">Fajar</span>
@@ -72,6 +73,12 @@
     $("#akar").html(window.akar); 
     $("#tgl").html(window.tgl);
     $("#nonotax").html(window.no);
+    var paymentLabels = {
+      potong_gaji: "Potong gaji",
+      tunai: "Tunai / Cash",
+      qris: "QRIS"
+    };
+    $("#metode_pembayaran_nota").text(paymentLabels[window.metodePembayaran] || "");
     var nota = window.no; 
     
     data = window.pass_data;

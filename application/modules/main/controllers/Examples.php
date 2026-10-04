@@ -276,59 +276,65 @@ class Examples extends CI_Controller {
 			base_url("assets/jexcel/js/excel-formula.min.js"),			
 			base_url("assets/jexcel/js/numeral.min.js"),			
 			base_url("assets/easyautocomplete/jquery.easy-autocomplete.min.js"),			
-			base_url("assets/kasir/kasir.js"),			
+			base_url("assets/kasir/kasir.js?v=20261004-cashier-default"),
 		];
 
 		$data['output'] = '
 		<main role="main" class="col-md-9 ml-sm-auto col-lg-10 px-4"><div class="chartjs-size-monitor" style="position: absolute; left: 0px; top: 0px; right: 0px; bottom: 0px; overflow: hidden; pointer-events: none; visibility: hidden; z-index: -1;"><div class="chartjs-size-monitor-expand" style="position:absolute;left:0;top:0;right:0;bottom:0;overflow:hidden;pointer-events:none;visibility:hidden;z-index:-1;"><div style="position:absolute;width:1000000px;height:1000000px;left:0;top:0"></div></div><div class="chartjs-size-monitor-shrink" style="position:absolute;left:0;top:0;right:0;bottom:0;overflow:hidden;pointer-events:none;visibility:hidden;z-index:-1;"><div style="position:absolute;width:200%;height:200%;left:0; top:0"></div></div></div>
 		  <br>
-          <table style="text-align: left; width: 100%;" border="0" cellpadding="1" cellspacing="1">
-            <tbody>
-			<tr>
-				<td style="vertical-align: middle;">Kasir</td>
-				<td style="vertical-align: top;">
-					<select style="
-					border-color: #ccc;
-					border-radius: 4px;
-					border-style: solid;
-					border-width: 1px;
-					box-shadow: 0 1px 2px rgba(0,0,0,0.1) inset;
-					color: #555;
-					float: none;
-					padding: 6px 12px" id="nkasir" name="nkasir">
-					<option value="belum">Belum bisa dipakai</option>
-					<option value="volvo">Volvo</option>
-					<option value="saab">Saab</option>
-					<option value="fiat">Fiat</option>
-					<option value="audi">Audi</option>
-				</select>
-				</td>
-				<td style="vertical-align: middle;">Limit Belanja : <span id="limit_belanja"></span></td>
-			</tr>
-            <tr>
-              <td style="vertical-align: middle;">NPK</td>
-              <td style="vertical-align: top;" width="250px"><input type="text" name="npk" id="npk" placeholder="npk"/></td>
-			  <td style="vertical-align: middle;">Belanja Bulan ini : <span id="limit"></span></td>
-			  <td style="vertical-align: middle;" rowspan="4" width="250px" align="center"><img id="foto_karyawan" style="width:150px;height:150px;"></td>
-            </tr>
-            <tr>
-              <td style="vertical-align: top;">Nama<br></td>
-			  <td style="vertical-align: top;"><span id="nkaryawan"></span></td>			  
-			  <td colspan="1" rowspan="2" style="vertical-align: top;"><big><big><big><big></big><span id="ttx">Total</span></big></big></big></td>
-
-            </tr>
-            <tr>
-              <td style="vertical-align: top;">Alamat<br></td>
-              <td style="vertical-align: top;"><span id="akaryawan"></span></td>
-			</tr>
-            <tr>
-							<td colspan="3" rowspan="1">
-							<br/>
-                <input class="form-control w-100" type="text" name="barcode" id="barcode" autocomplete="off" placeholder="scan barcode here"/>
-              </td>            
-            </tr>
-            </tbody>
-          </table>
+          <div class="row">
+            <div class="col-sm-4">
+              <div class="form-group">
+                <label for="npk">NPK / Karyawan</label>
+                <input class="form-control" type="text" name="npk" id="npk" placeholder="Cari nama atau masukkan NPK">
+              </div>
+              <div class="form-group">
+                <label for="metode_pembayaran">Metode Pembayaran</label>
+                <select class="form-control" id="metode_pembayaran" name="metode_pembayaran">
+                  <option value="potong_gaji">Potong gaji</option>
+                  <option value="tunai">Tunai / Cash</option>
+                  <option value="qris">QRIS</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="nkasir">Kasir</label>
+                <select class="form-control" id="nkasir" name="nkasir">
+                  <option value="belum">Memuat daftar kasir...</option>
+                </select>
+              </div>
+            </div>
+            <div class="col-sm-4">
+              <div style="min-height: 145px; padding-top: 4px;">
+                <div><strong id="nkaryawan"></strong></div>
+                <div id="akaryawan" class="text-muted"></div>
+                <div class="small" style="margin-top: 8px;">Belanja bulan ini: <strong id="limit"></strong></div>
+                <div class="small" style="margin-top: 4px;">Limit belanja: <strong id="limit_belanja"></strong></div>
+                <div style="margin-top: 14px; font-size: 22px; font-weight: bold;" id="ttx">Total Rp 0</div>
+                <div class="checkbox" style="margin-top: 12px;">
+                  <label style="font-weight: normal;">
+                    <input type="checkbox" id="pajak-active">
+                    Aktifkan pajak (PPN)
+                  </label>
+                </div>
+                <span class="help-block" style="margin: 0;">Atur sebelum scan barang.</span>
+              </div>
+            </div>
+            <div class="col-sm-4 text-center">
+              <label style="display: block;">Verifikasi karyawan</label>
+              <div id="foto-karyawan-placeholder" class="text-muted small" style="width: 150px; height: 190px; margin: 0 auto; border: 1px dashed #aaa; display: flex; align-items: center; justify-content: center; text-align: center;">Foto belum ada</div>
+              <img id="foto_karyawan" alt="Foto karyawan" style="display: none; width: 150px; height: 190px; margin: 0 auto; object-fit: cover; border: 1px solid #ddd;">
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-sm-9">
+              <label for="barcode">Scan / cari barang</label>
+              <input class="form-control" type="text" name="barcode" id="barcode" autocomplete="off" placeholder="Scan barcode barang">
+            </div>
+            <div class="col-sm-3">
+              <label>&nbsp;</label>
+              <button id="checkout" class="btn btn-info btn-block">Checkout [ F9 ]</button>
+            </div>
+          </div>
           <br>
           <!-- <div class="table-responsive">
             <table id="tablecart" class="table table-striped table-sm">
@@ -361,8 +367,6 @@ class Examples extends CI_Controller {
 					>
 						<div id="my"></div>				
 					</div>
-					<br>
-					<button id="checkout" class="btn btn-info">Checkout [ F9 ]</button>
 				</main>
 				
 		';
@@ -378,7 +382,7 @@ class Examples extends CI_Controller {
 		$data['js_file'] = [
 			// base_url("assets/flot/jquery.flot.min.js"),			
 			base_url("assets/easyautocomplete/jquery.easy-autocomplete.min.js"),			
-			base_url("assets/kasir/rekap.js?v=20261004-2"),
+			base_url("assets/kasir/rekap.js?v=20261004-4"),
 			base_url("assets/jexcel/js/jexcel.js"),
 			base_url("assets/jexcel/js/jsuites.js"),
 			base_url("assets/papaparse/papaparse.min.js"),			
@@ -405,7 +409,9 @@ class Examples extends CI_Controller {
 			<div id="harian">
 				<br>Tanggal : <input type="date" name="tanggal" id="tanggal"/>
 				<button type="button" id="download-csv-harian">Download CSV</button>
-				<div id="harian-sheet"></div>
+				<div style="max-width: 100%; overflow-x: auto;">
+					<div id="harian-sheet"></div>
+				</div>
 			</div>
 			<div id="perorangan">
 				<br>

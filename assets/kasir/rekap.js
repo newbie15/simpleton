@@ -105,7 +105,8 @@ $(document).ready(function () {
             { type: 'text', width: 250 },
             { type: 'text', width: 80 },
             { type: 'text', width: 60 },
-            { type: 'text', width: 100 }
+            { type: 'text', width: 100 },
+            { type: 'text', width: 140 }
         ];
     }
 

@@ -228,16 +228,12 @@ class Ajax extends CI_Controller {
 
     public function checkout()
     {
-        // $this->db->select('penjualan.qty,stok.nama,penjualan.harga,penjualan.jumlah');
-        // $this->db->from('penjualan,stok');
-        // $this->db->where('penjualan.kode', 'stok.barcode'); 
-        // $this->db->where('penjualan.nota', $nota); 
-        $nota = $_REQUEST['no'];
+        $nota = $this->input->post('no', TRUE);
         $query = $this->db->query("
             SELECT penjualan.qty,stok.nama,penjualan.harga,penjualan.jumlah FROM penjualan,stok
             where penjualan.kode = stok.barcode and
-            penjualan.nota = '$nota' order by penjualan.id asc
-        ");
+            penjualan.nota = ? order by penjualan.id asc
+        ", array($nota));
 
         foreach ($query->result() as $row)
         {
@@ -271,7 +267,8 @@ class Ajax extends CI_Controller {
         $end = date('Y-m-d', strtotime($date.' +1 day')).' 00:00:00';
         $rows = $this->db->query("
             SELECT sale.nota, sale.id_karyawan AS npk, employee.nama, employee.bagian,
-                sale.kode AS barcode, product.nama AS item, sale.harga, sale.qty, sale.jumlah
+                sale.kode AS barcode, product.nama AS item, sale.harga, sale.qty, sale.jumlah,
+                sale.metode_pembayaran
             FROM penjualan sale
             LEFT JOIN stok product ON product.barcode = sale.kode
             LEFT JOIN karyawan employee ON employee.npk = sale.id_karyawan
@@ -279,7 +276,8 @@ class Ajax extends CI_Controller {
             ORDER BY sale.tgl ASC, sale.id ASC
         ", array($start, $end))->result_array();
         $this->_sales_csv(
-            array('nota', 'npk', 'nama', 'bagian', 'barcode', 'item', 'harga', 'qty', 'jumlah'),
+            array('nota', 'npk', 'nama', 'bagian', 'barcode', 'item', 'harga', 'qty', 'jumlah',
+                'metode_pembayaran'),
             $rows,
             'data_harian_'.$date.'.csv',
             $this->uri->segment(5) === 'd'

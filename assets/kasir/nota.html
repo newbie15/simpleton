@@ -14,6 +14,7 @@
     <tr><td colspan="4" rowspan="1" align="right">Tanggal : <span id="tglx"></span></td></tr>
     <tr><td colspan="4" rowspan="1" align="right">Kasir   : <span id="nama_kasir"></span></td></tr> 
     <tr><td colspan="4" rowspan="1" align="right">No Nota : <span id="no_nota"></span></td></tr>
+    <tr><td colspan="4" rowspan="1" align="right">Pembayaran : <span id="metode_pembayaran_nota"></span></td></tr>
     <tr>
       <td colspan="4" rowspan="1" style="vertical-align: top;">
         <span id="nkar">Fajar</span>
@@ -88,6 +89,12 @@ Rp 65.100<br>
     $("#tgl").html(window.tgl);
     $("#no_nota").html(window.no);
     $("#nama_kasir").html(window.nkasir);
+    var paymentLabels = {
+      potong_gaji: "Potong gaji",
+      tunai: "Tunai / Cash",
+      qris: "QRIS"
+    };
+    $("#metode_pembayaran_nota").text(paymentLabels[window.metodePembayaran] || "");
 
     var nota = window.no; 
     
