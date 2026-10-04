@@ -378,57 +378,43 @@ class Examples extends CI_Controller {
 		$data['js_file'] = [
 			// base_url("assets/flot/jquery.flot.min.js"),			
 			base_url("assets/easyautocomplete/jquery.easy-autocomplete.min.js"),			
-			base_url("assets/kasir/rekap.js"),			
+			base_url("assets/kasir/rekap.js?v=20261004-2"),
 			base_url("assets/jexcel/js/jexcel.js"),
 			base_url("assets/jexcel/js/jsuites.js"),
 			base_url("assets/papaparse/papaparse.min.js"),			
 		];
 
-		// $crud = new grocery_CRUD();
-
-		// $crud->like('tgl',date('Y-m-d'));
-		// $crud->set_table('penjualan');
-
-		// $output = $crud->render();
-
-
-
 	$data['output'] = '
-	<div class="container">
-		<h3>Rekap Penjualan</h3>
-	</div>
-
-
-	<div id="exTab2" class="container">	
+	<div id="exTab2" class="container" data-ajax-base="'.site_url('main/ajax').'">
 		<ul class="nav nav-tabs">
 			<li class="active">
-        		<a id="h" href="#" data-toggle="tab">Harian</a>
+				<a id="h" href="#harian">Harian</a>
 			</li>
 			<li>
-				<a id="m" href="#" data-toggle="tab">Perorangan</a>
+				<a id="m" href="#perorangan">Perorangan</a>
 			</li>
 			<li>
-				<a id="b" href="#" data-toggle="tab">Bulanan</a>
+				<a id="b" href="#bulanan">Bulanan</a>
 			</li>
 			<li>
-				<a id="t" href="#" data-toggle="tab">Tahunan</a>
+				<a id="t" href="#tahunan">Tahunan</a>
 			</li>
 		</ul>
 
 		<div class="tab-content ">
 			<div id="harian">
 				<br>Tanggal : <input type="date" name="tanggal" id="tanggal"/>
-				<button id="download-csv-harian">Download</button>
+				<button type="button" id="download-csv-harian">Download CSV</button>
 				<div id="harian-sheet"></div>
 			</div>
-			<div id="mingguan">
+			<div id="perorangan">
 				<br>
 				<table>
 					<tr>
 						<td align="right">NPK&nbsp;&nbsp;</td>
 						<td>
 							<div class="easy-autocomplete" style="width: 196px; float: left">
-								<input type="text" name="npk" id="npk" placeholder="npk" autocomplete="off">
+								<input type="text" name="npk" id="npk" placeholder="Nama atau NPK karyawan" autocomplete="off">
 							</div>						
 						</td>
 						<td>
@@ -439,24 +425,23 @@ class Examples extends CI_Controller {
 							</select>
 							Bulan : 
 							<select id="bulan_perorangan">
-								<option value="xx">-- ALL --</option>
-								<option value="01">januari</option>
-								<option value="02">februari</option>
-								<option value="03">maret</option>
-								<option value="04">april</option>
-								<option value="05">mei</option>
-								<option value="06">juni</option>
-								<option value="07">juli</option>
-								<option value="08">agustus</option>
-								<option value="09">september</option>
-								<option value="10">oktober</option>
-								<option value="11">november</option>
-								<option value="12">desember</option>
+								<option value="01">17 Des - 20 Jan</option>
+								<option value="02">21 Jan - 20 Feb</option>
+								<option value="03">21 Feb - 20 Mar</option>
+								<option value="04">21 Mar - 20 Apr</option>
+								<option value="05">21 Apr - 20 Mei</option>
+								<option value="06">21 Mei - 20 Jun</option>
+								<option value="07">21 Jun - 20 Jul</option>
+								<option value="08">21 Jul - 20 Agu</option>
+								<option value="09">21 Agu - 20 Sep</option>
+								<option value="10">21 Sep - 20 Okt</option>
+								<option value="11">21 Okt - 20 Nov</option>
+								<option value="12">21 Nov - 16 Des</option>
 							</select>						
 						</td>
 						<td align="right">
 							&nbsp;&nbsp;
-							<button id="download-csv-harian">Download</button>						
+							<button type="button" id="download-csv-perorangan">Download CSV</button>
 						</td>
 					</tr>
 				</table>
@@ -474,7 +459,6 @@ class Examples extends CI_Controller {
 				</select>
 				Bulan Pembukuan
 				<select id="bulan_bulanan">
-					<option value="xx">--pilih salah satu--</option>
 					<option value="01">17 desember - 20 januari</option>
 					<option value="02">21 januari - 20 februari</option>
 					<option value="03">21 februari - 20 maret</option>
@@ -488,13 +472,15 @@ class Examples extends CI_Controller {
 					<option value="11">21 oktober - 20 november</option>
 					<option value="12">21 november - 16 desember</option>
 				</select>
-					
+				<button type="button" id="download-csv-bulanan">Download CSV</button>
 				<div id="bulanan-sheet"></div>
 
 			</div>
 			<div id="tahunan">
-				<h3>add clearfix to tab-content (see the css)</h3>
-				<div id="placeholder4" style="width: 720px;height: 300px;"></div>
+				<br>Tahun :
+				<select id="tahun_tahunan"><option>tahun</option></select>
+				<button type="button" id="download-csv-tahunan">Download CSV</button>
+				<div id="tahunan-sheet"></div>
 			</div>
 		</div>
   </div>
