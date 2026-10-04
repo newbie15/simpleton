@@ -2,6 +2,8 @@
 
 <li <?php if(isset($m_penjualan)) { ?>class = "active" <?php } ?>><a href='<?php echo site_url('main/examples/penjualan')?>'><i class="fa fa-shopping-cart"></i> <span>Penjualan</span></a></li>
 <li <?php if(isset($m_stok)) { ?>class = "active" <?php } ?>><a href='<?php echo site_url('main/examples/stok')?>'><i class="fa fa-dropbox"></i> <span>Stok</a></span></li>
+<li <?php if(isset($m_purchasing)) { ?>class = "active" <?php } ?>><a href='<?php echo site_url('main/purchasing')?>'><i class="fa fa-truck"></i> <span>Purchasing</span></a></li>
+<li <?php if(isset($m_supplier)) { ?>class = "active" <?php } ?>><a href='<?php echo site_url('main/purchasing/suppliers')?>'><i class="fa fa-building"></i> <span>Supplier</span></a></li>
 
 
 <li <?php if(isset($m_user)) { ?>class = "active" <?php } ?>><a href='<?php echo site_url('main/examples/user')?>'><i class="fa fa-user"></i> <span>User</a></span></li>
