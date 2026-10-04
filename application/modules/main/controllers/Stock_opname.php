@@ -196,7 +196,7 @@ class Stock_opname extends CI_Controller
 		}
 
 		$items = $this->db->query("
-			SELECT item.*, stock.jumlah AS current_qty
+			SELECT item.*, stock.jumlah AS current_qty, stock.barcode AS current_barcode
 			FROM stock_opname_items item
 			JOIN stok stock ON stock.id = item.product_id
 			WHERE item.stock_opname_id = ?
@@ -225,10 +225,10 @@ class Stock_opname extends CI_Controller
 				->update('stok');
 			$unit_cost = $item->unit_cost === NULL ? '0.0000' : $item->unit_cost;
 			$this->db->query("
-				INSERT INTO inventory_costs (product_id, average_cost, updated_at)
-				VALUES (?, ?, ?)
-				ON DUPLICATE KEY UPDATE average_cost = VALUES(average_cost), updated_at = VALUES(updated_at)
-			", array((int) $item->product_id, $unit_cost, date('Y-m-d H:i:s')));
+				INSERT INTO inventory_costs (product_id, barcode, average_cost, updated_at)
+				VALUES (?, ?, ?, ?)
+				ON DUPLICATE KEY UPDATE barcode = VALUES(barcode), average_cost = VALUES(average_cost), updated_at = VALUES(updated_at)
+			", array((int) $item->product_id, $item->current_barcode, $unit_cost, date('Y-m-d H:i:s')));
 		}
 
 		$this->db->where('id', (int) $opname_id)->update('stock_opnames', array(

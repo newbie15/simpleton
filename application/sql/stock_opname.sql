@@ -27,7 +27,29 @@ CREATE TABLE IF NOT EXISTS `stock_opname_items` (
 
 CREATE TABLE IF NOT EXISTS `inventory_costs` (
   `product_id` int(11) NOT NULL,
+  `barcode` varchar(64) NOT NULL,
   `average_cost` decimal(15,4) NOT NULL DEFAULT 0.0000,
   `updated_at` datetime NOT NULL,
   PRIMARY KEY (`product_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+SET @inventory_costs_barcode_exists = (
+  SELECT COUNT(1)
+  FROM INFORMATION_SCHEMA.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'inventory_costs'
+    AND COLUMN_NAME = 'barcode'
+);
+SET @stock_opname_sql = IF(
+  @inventory_costs_barcode_exists = 0,
+  'ALTER TABLE `inventory_costs` ADD COLUMN `barcode` varchar(64) NOT NULL DEFAULT '''' AFTER `product_id`',
+  'SELECT 1'
+);
+PREPARE stock_opname_stmt FROM @stock_opname_sql;
+EXECUTE stock_opname_stmt;
+DEALLOCATE PREPARE stock_opname_stmt;
+
+UPDATE `inventory_costs` costs
+JOIN `stok` stock ON stock.id = costs.product_id
+SET costs.barcode = stock.barcode
+WHERE costs.barcode = '';
