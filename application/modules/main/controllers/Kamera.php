@@ -35,7 +35,7 @@ class Kamera extends CI_Controller {
 			// base_url("assets/jexcel/js/excel-formula.min.js"),			
 			// base_url("assets/jexcel/js/numeral.min.js"),			
 			base_url("assets/easyautocomplete/jquery.easy-autocomplete.min.js"),			
-			base_url("assets/kamera/kamera.js"),			
+			base_url("assets/kamera/kamera.js?v=20261004-photo-save"),
 		];
 
 		$data['output'] = '
@@ -105,26 +105,36 @@ class Kamera extends CI_Controller {
 	}
 	public function upload_photo()
 	{
-
-		$npk = explode("-",$_POST['id_karyawan']) ;
-
-		$b64 = $_POST['foto'];
-
-		if($npk != "" && $b64 != ""){
-
-			$b64 = str_replace("data:image/png;base64,","",$b64); 
-			// Obtain the original content (usually binary data)
-			$bin = base64_decode($b64);
-			// Specify the location where you want to save the image
-			$img_file = "./assets/uploads/karyawan/$npk[1].png";
-			// Save binary data as raw data (that is, it will not remove metadata or invalid contents)
-			// In this case, the PHP backdoor will be stored on the server
-
-			// raw data is not safe and make a security hole, but i don't mind :) 
-			file_put_contents($img_file, $bin);
-
-		
+		if ($this->input->method(TRUE) !== 'POST') {
+			show_404();
 		}
+		$employee_value = trim((string) $this->input->post('id_karyawan', TRUE));
+		$photo = $this->input->post('foto', FALSE);
+		$parts = explode('-', $employee_value);
+		$npk = trim(end($parts));
+		$prefix = 'data:image/png;base64,';
+		if (!preg_match('/^[A-Za-z0-9_]+$/', $npk) ||
+			!is_string($photo) || strpos($photo, $prefix) !== 0) {
+			show_error('NPK atau format foto tidak valid.', 400);
+		}
+		$encoded_photo = substr($photo, strlen($prefix));
+		if ($encoded_photo === '' || strlen($encoded_photo) > 7000000) {
+			show_error('Data foto kosong atau terlalu besar.', 400);
+		}
+		$image_data = base64_decode($encoded_photo, TRUE);
+		if ($image_data === FALSE || substr($image_data, 0, 8) !== "\x89PNG\r\n\x1a\n") {
+			show_error('Data yang dikirim bukan gambar PNG yang valid.', 400);
+		}
+		$upload_dir = FCPATH.'assets/uploads/karyawan/';
+		if (!is_dir($upload_dir) && !mkdir($upload_dir, 0755, TRUE)) {
+			show_error('Folder penyimpanan foto karyawan tidak dapat dibuat.', 500);
+		}
+		if (file_put_contents($upload_dir.$npk.'.png', $image_data) === FALSE) {
+			show_error('Foto karyawan gagal disimpan.', 500);
+		}
+		$this->output
+			->set_content_type('application/json')
+			->set_output(json_encode(array('success' => TRUE, 'npk' => $npk)));
 
 		// // Load GD resource from binary data
 		// $im = imageCreateFromString($bin);

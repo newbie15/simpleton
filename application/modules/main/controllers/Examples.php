@@ -93,6 +93,8 @@ class Examples extends CI_Controller {
 		// $output->m_ustok = TRUE;
 
 		// $this->_example_output($output);
+		$data['m_update'] = TRUE;
+
 		$this->load->view('welcome_message', $data);
 	}
 
@@ -175,6 +177,82 @@ class Examples extends CI_Controller {
 				</main>
 				
 		';
+		$data['m_kartu'] = TRUE;
+
+		$this->load->view('welcome_message', $data);
+
+	}
+
+	public function kamera(){
+		$data['css_file'] = [
+			// base_url("assets/datatables/css/jquery.dataTables.min.css"),
+			// base_url("assets/jexcel/css/jquery.jexcel.css"),
+			// base_url("assets/jexcel/css/jquery.jcalendar.css"),
+			base_url("assets/easyautocomplete/easy-autocomplete.min.css"),			
+		];
+
+		$data['js_file'] = [
+			// base_url('assets/adminlte/plugins/jQuery/jQuery-2.1.4.min.js'),
+			// base_url("assets/datatables/js/jquery.dataTables.min.js"),
+			// base_url("assets/jexcel/js/jquery.jexcel.js"),
+			// base_url("assets/jexcel/js/jquery.jcalendar.js"),
+			// base_url("assets/jexcel/js/excel-formula.min.js"),			
+			// base_url("assets/jexcel/js/numeral.min.js"),			
+			base_url("assets/easyautocomplete/jquery.easy-autocomplete.min.js"),			
+			base_url("assets/kamera/kamera.js"),			
+		];
+
+		$data['output'] = '
+		<main role="main" class="col-md-9 ml-sm-auto col-lg-10 px-4"><div class="chartjs-size-monitor" style="position: absolute; left: 0px; top: 0px; right: 0px; bottom: 0px; overflow: hidden; pointer-events: none; visibility: hidden; z-index: -1;"><div class="chartjs-size-monitor-expand" style="position:absolute;left:0;top:0;right:0;bottom:0;overflow:hidden;pointer-events:none;visibility:hidden;z-index:-1;"><div style="position:absolute;width:1000000px;height:1000000px;left:0;top:0"></div></div><div class="chartjs-size-monitor-shrink" style="position:absolute;left:0;top:0;right:0;bottom:0;overflow:hidden;pointer-events:none;visibility:hidden;z-index:-1;"><div style="position:absolute;width:200%;height:200%;left:0; top:0"></div></div></div>
+		  <h3>Ambil Foto Anggota Koperasi</h3>
+          <table style="text-align: left; width: 100%;" border="0" cellpadding="1" cellspacing="1">
+            <tbody>
+            <tr>
+              <td style="vertical-align: middle;">NPK</td>
+              <td style="vertical-align: top;"><input type="text" name="npk" id="npk" placeholder="npk"/></td>
+            </tr>
+			</tbody>
+          </table>
+		  <br>
+		  
+				<div style="
+					height: 325px;
+					width: 47%;
+					overflow: auto;
+					border: 1px solid #666;
+					background-color: #ccc;
+					padding: 8px;
+					margin-right: 10px;
+					float: left;
+				">
+					<video autoplay="true" id="videoElement" style="
+						height: 100%;
+						width: 100%;
+						overflow: auto;
+						border: 1px solid #666;
+						background-color: #ccc;
+						padding: 8px;
+						margin-right: 10px;
+						float: left;
+					">
+					</video>
+				</div>
+				<div style="
+					height: 325px;
+					width: 47%;
+					overflow: auto;
+					border: 1px solid #666;
+					background-color: #ccc;
+					padding: 8px;
+				">
+					<div id="my"></div>				
+				</div>
+				<br>
+				<button id="checkout" class="btn btn-info">Cetak [ F9 ]</button>
+			</main>
+				
+		';
+		$data['m_foto'] = TRUE;
 		$this->load->view('welcome_message', $data);
 
 	}
@@ -198,58 +276,66 @@ class Examples extends CI_Controller {
 			base_url("assets/jexcel/js/excel-formula.min.js"),			
 			base_url("assets/jexcel/js/numeral.min.js"),			
 			base_url("assets/easyautocomplete/jquery.easy-autocomplete.min.js"),			
-			base_url("assets/kasir/kasir.js"),			
+			base_url("assets/kasir/kasir.js?v=20261004-cashier-default"),
 		];
+		$data['m_penjualan'] = TRUE;
 
 		$data['output'] = '
 		<main role="main" class="col-md-9 ml-sm-auto col-lg-10 px-4"><div class="chartjs-size-monitor" style="position: absolute; left: 0px; top: 0px; right: 0px; bottom: 0px; overflow: hidden; pointer-events: none; visibility: hidden; z-index: -1;"><div class="chartjs-size-monitor-expand" style="position:absolute;left:0;top:0;right:0;bottom:0;overflow:hidden;pointer-events:none;visibility:hidden;z-index:-1;"><div style="position:absolute;width:1000000px;height:1000000px;left:0;top:0"></div></div><div class="chartjs-size-monitor-shrink" style="position:absolute;left:0;top:0;right:0;bottom:0;overflow:hidden;pointer-events:none;visibility:hidden;z-index:-1;"><div style="position:absolute;width:200%;height:200%;left:0; top:0"></div></div></div>
 		  <br>
-          <table style="text-align: left; width: 100%;" border="0" cellpadding="1" cellspacing="2">
-            <tbody>
-            <tr>
-              <td style="vertical-align: middle;">Kasir</td>
-              <td style="vertical-align: top;">
-			  	<select style="
-				  border-color: #ccc;
-				  border-radius: 4px;
-				  border-style: solid;
-				  border-width: 1px;
-				  box-shadow: 0 1px 2px rgba(0,0,0,0.1) inset;
-				  color: #555;
-				  float: none;
-				  padding: 6px 12px" id="nkasir" name="nkasir">
-					<option value="belum">Belum bisa dipakai</option>
-					<option value="volvo">Volvo</option>
-					<option value="saab">Saab</option>
-					<option value="fiat">Fiat</option>
-					<option value="audi">Audi</option>
-				</select>
-			  </td>
-			  <td style="vertical-align: middle;">Limit Belanja : <span id="limit_belanja"></span></td>
-            </tr>
-			<tr>
-              <td style="vertical-align: middle;">NPK</td>
-              <td style="vertical-align: top;"><input type="text" name="npk" id="npk" placeholder="npk"/></td>
-			  <td style="vertical-align: middle;">Belanja Bulan ini : <span id="limit"></span></td>
-            </tr>
-            <tr>
-              <td style="vertical-align: top;">Nama<br></td>
-			  <td style="vertical-align: top;"><span id="nkaryawan"></span></td>			  
-			  <td colspan="1" rowspan="2" style="vertical-align: top;"><big><big><big><big></big><span id="ttx">Total</span></big></big></big></td>
-
-            </tr>
-            <tr>
-              <td style="vertical-align: top;">Alamat<br></td>
-              <td style="vertical-align: top;"><span id="akaryawan"></span></td>
-			</tr>
-            <tr>
-							<td colspan="3" rowspan="1">
-							<br/>
-                <input class="form-control w-100" type="text" name="barcode" id="barcode" autocomplete="off" placeholder="scan barcode here"/>
-              </td>            
-            </tr>
-            </tbody>
-          </table>
+          <div class="row">
+            <div class="col-sm-4">
+              <div class="form-group">
+                <label for="npk">NPK / Karyawan</label>
+                <input class="form-control" type="text" name="npk" id="npk" placeholder="Cari nama atau masukkan NPK">
+              </div>
+              <div class="form-group">
+                <label for="metode_pembayaran">Metode Pembayaran</label>
+                <select class="form-control" id="metode_pembayaran" name="metode_pembayaran">
+                  <option value="potong_gaji">Potong gaji</option>
+                  <option value="tunai">Tunai / Cash</option>
+                  <option value="qris">QRIS</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="nkasir">Kasir</label>
+                <select class="form-control" id="nkasir" name="nkasir">
+                  <option value="belum">Memuat daftar kasir...</option>
+                </select>
+              </div>
+            </div>
+            <div class="col-sm-4">
+              <div style="min-height: 145px; padding-top: 4px;">
+                <div><strong id="nkaryawan"></strong></div>
+                <div id="akaryawan" class="text-muted"></div>
+                <div class="small" style="margin-top: 8px;">Belanja bulan ini: <strong id="limit"></strong></div>
+                <div class="small" style="margin-top: 4px;">Limit belanja: <strong id="limit_belanja"></strong></div>
+                <div style="margin-top: 14px; font-size: 22px; font-weight: bold;" id="ttx">Total Rp 0</div>
+                <div class="checkbox" style="margin-top: 12px;">
+                  <label style="font-weight: normal;">
+                    <input type="checkbox" id="pajak-active">
+                    Aktifkan pajak (PPN)
+                  </label>
+                </div>
+                <span class="help-block" style="margin: 0;">Atur sebelum scan barang.</span>
+              </div>
+            </div>
+            <div class="col-sm-4 text-center">
+              <label style="display: block;">Verifikasi karyawan</label>
+              <div id="foto-karyawan-placeholder" class="text-muted small" style="width: 150px; height: 190px; margin: 0 auto; border: 1px dashed #aaa; display: flex; align-items: center; justify-content: center; text-align: center;">Foto belum ada</div>
+              <img id="foto_karyawan" alt="Foto karyawan" style="display: none; width: 150px; height: 190px; margin: 0 auto; object-fit: cover; border: 1px solid #ddd;">
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-sm-9">
+              <label for="barcode">Scan / cari barang</label>
+              <input class="form-control" type="text" name="barcode" id="barcode" autocomplete="off" placeholder="Scan barcode barang">
+            </div>
+            <div class="col-sm-3">
+              <label>&nbsp;</label>
+              <button id="checkout" class="btn btn-info btn-block">Checkout [ F9 ]</button>
+            </div>
+          </div>
           <br>
           <!-- <div class="table-responsive">
             <table id="tablecart" class="table table-striped table-sm">
@@ -260,7 +346,7 @@ class Examples extends CI_Controller {
                   <th>nama barang</th>
                   <th>harga</th>
                   <th>kuantiti</th>
-									<th>jumlah</th>
+				  <th>jumlah</th>
 									
                 </tr>
               </thead>
@@ -277,105 +363,131 @@ class Examples extends CI_Controller {
 						border: 1px solid #666;
 						background-color: #ccc;
 						padding: 8px;
-					">
+					"
+					id="scrll"
+					>
 						<div id="my"></div>				
 					</div>
-					<br>
-					<button id="checkout" class="btn btn-info">Checkout [ F9 ]</button>
 				</main>
 				
 		';
 		$this->load->view('welcome_message', $data);
 	}
 	public function rekap_penjualan(){
+		$data['css_file'] = [
+			// base_url("assets/datatables/css/jquery.dataTables.min.css"),
+			base_url("assets/jexcel/css/jexcel.css"),
+			base_url("assets/jexcel/css/jsuites.css"),
+			base_url("assets/easyautocomplete/easy-autocomplete.min.css"),			
+		];
 		$data['js_file'] = [
 			// base_url("assets/flot/jquery.flot.min.js"),			
-			base_url("assets/kasir/rekap.js"),			
+			base_url("assets/easyautocomplete/jquery.easy-autocomplete.min.js"),			
+			base_url("assets/kasir/rekap.js?v=20261004-4"),
+			base_url("assets/jexcel/js/jexcel.js"),
+			base_url("assets/jexcel/js/jsuites.js"),
+			base_url("assets/papaparse/papaparse.min.js"),			
 		];
 
-
-
-
 	$data['output'] = '
-	<div class="container">
-		<h3>Rekap Penjualan</h3>
-	</div>
-
-
-	<div id="exTab2" class="container">	
+	<div id="exTab2" class="container" data-ajax-base="'.site_url('main/ajax').'">
 		<ul class="nav nav-tabs">
 			<li class="active">
-        		<a href="#1" data-toggle="tab">Harian</a>
+				<a id="h" href="#harian">Harian</a>
 			</li>
 			<li>
-				<a href="#2" data-toggle="tab">Mingguan</a>
+				<a id="m" href="#perorangan">Perorangan</a>
 			</li>
 			<li>
-				<a href="#3" data-toggle="tab">Bulanan</a>
+				<a id="b" href="#bulanan">Bulanan</a>
 			</li>
 			<li>
-				<a href="#4" data-toggle="tab">Tahunan</a>
+				<a id="t" href="#tahunan">Tahunan</a>
 			</li>
 		</ul>
 
 		<div class="tab-content ">
-			<div class="tab-pane active" id="1">
-
-
-
-				<h3>Standard tab panel created on bootstrap using nav-tabs</h3>
-				<div id="placeholder1" style="width: 720px;height: 300px;"></div>
-				<div>
-				<table>
-					<thead>
-						<tr>
-							<th>nota</th>
-							<th>npk</th>
-							<th>nama</th>
-							<th>bagian</th>
-							<th>barcode</th>
-							<th>item</th>
-							<th>harga</th>
-							<th>qty</th>
-							<th>jumlah</th>
-						</tr>
-					</thead>
-					<tbody id="harian>
-					
-					</tbody>
-				</table>
-
+			<div id="harian">
+				<br>Tanggal : <input type="date" name="tanggal" id="tanggal"/>
+				<button type="button" id="download-csv-harian">Download CSV</button>
+				<div style="max-width: 100%; overflow-x: auto;">
+					<div id="harian-sheet"></div>
 				</div>
 			</div>
-			<div class="tab-pane" id="2">
-				<h3>Notice the gap between the content and tab after applying a background color</h3>
-				<div id="placeholder2" style="width: 720px;height: 300px;"></div>
-			</div>
-			<div class="tab-pane" id="3">
-			<br/>
-				Tampilkan data bulan
-				<select id="bulanan">
-					<option value="1">januari</option>
-					<option value="2">februari</option>
-					<option value="3">maret</option>
-					<option value="4">april</option>
-					<option value="5">mei</option>
-					<option value="6">juni</option>
-					<option value="7">juli</option>
-					<option value="8">agustus</option>
-					<option value="9">september</option>
-					<option value="10">oktober</option>
-					<option value="11">november</option>
-					<option value="12">desember</option>
-				</select>
-					
+			<div id="perorangan">
+				<br>
+				<table>
+					<tr>
+						<td align="right">NPK&nbsp;&nbsp;</td>
+						<td>
+							<div class="easy-autocomplete" style="width: 196px; float: left">
+								<input type="text" name="npk" id="npk" placeholder="Nama atau NPK karyawan" autocomplete="off">
+							</div>						
+						</td>
+						<td>
+							&nbsp;&nbsp;
+							Tahun :
+							<select id="tahun_perorangan">
+								<option>tahun</option>
+							</select>
+							Bulan : 
+							<select id="bulan_perorangan">
+								<option value="01">17 Des - 20 Jan</option>
+								<option value="02">21 Jan - 20 Feb</option>
+								<option value="03">21 Feb - 20 Mar</option>
+								<option value="04">21 Mar - 20 Apr</option>
+								<option value="05">21 Apr - 20 Mei</option>
+								<option value="06">21 Mei - 20 Jun</option>
+								<option value="07">21 Jun - 20 Jul</option>
+								<option value="08">21 Jul - 20 Agu</option>
+								<option value="09">21 Agu - 20 Sep</option>
+								<option value="10">21 Sep - 20 Okt</option>
+								<option value="11">21 Okt - 20 Nov</option>
+								<option value="12">21 Nov - 16 Des</option>
+							</select>						
+						</td>
+						<td align="right">
+							&nbsp;&nbsp;
+							<button type="button" id="download-csv-perorangan">Download CSV</button>
+						</td>
+					</tr>
+				</table>
+				<br>
 
-				<h3>add clearfix to tab-content (see the css)</h3>
-				<div id="placeholder3" style="width: 720px;height: 300px;"></div>
+				<br>
+
+				<div id="perorangan-sheet"></div>
 			</div>
-			<div class="tab-pane" id="4">
-				<h3>add clearfix to tab-content (see the css)</h3>
-				<div id="placeholder4" style="width: 720px;height: 300px;"></div>
+			<div id="bulanan">
+			<br/>
+				Tahun :
+				<select id="tahun_bulanan">
+					<option>tahun</option>
+				</select>
+				Bulan Pembukuan
+				<select id="bulan_bulanan">
+					<option value="01">17 desember - 20 januari</option>
+					<option value="02">21 januari - 20 februari</option>
+					<option value="03">21 februari - 20 maret</option>
+					<option value="04">21 maret - 20 april</option>
+					<option value="05">21 april - 20 mei</option>
+					<option value="06">21 mei - 20 juni</option>
+					<option value="07">21 juni - 20 juli</option>
+					<option value="08">21 juli - 20 agustus</option>
+					<option value="09">21 agustus - 20 september</option>
+					<option value="10">21 september - 20 oktober</option>
+					<option value="11">21 oktober - 20 november</option>
+					<option value="12">21 november - 16 desember</option>
+				</select>
+				<button type="button" id="download-csv-bulanan">Download CSV</button>
+				<div id="bulanan-sheet"></div>
+
+			</div>
+			<div id="tahunan">
+				<br>Tahun :
+				<select id="tahun_tahunan"><option>tahun</option></select>
+				<button type="button" id="download-csv-tahunan">Download CSV</button>
+				<div id="tahunan-sheet"></div>
 			</div>
 		</div>
   </div>
@@ -384,6 +496,8 @@ class Examples extends CI_Controller {
 
 	</div>
 	';
+
+	$data['m_rekap'] = TRUE;
 
 	$this->load->view('welcome_message', $data);
 	}

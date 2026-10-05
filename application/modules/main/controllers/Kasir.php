@@ -69,69 +69,165 @@ class Kasir extends CI_Controller {
 	}
 
 	public function checkout(){
-		$pajak_active = false;
+		if ($this->input->method(TRUE) !== 'POST') {
+			show_404();
+		}
 
-		if($pajak_active){
-			$id_user = $_REQUEST['id_user'];
-			$id_karyawan = $_REQUEST['id_karyawan'];
-			$tgl = date('Y-m-d H:i:s');
-			$nama = $_REQUEST['nama'];
-			$harga = $_REQUEST['harga'];
-			$jumlah = $_REQUEST['jumlah'];
-			$kode = $_REQUEST['kode'];
-			$kurangstok = $_REQUEST['kurangstok'];
-			$nota = $_REQUEST['no'];
-			$ppn = $_REQUEST['pajak'];
-	
-			$data = array(
-				'nota' => $nota,
-				'id_user' => $id_user,
-				'id_karyawan' => $id_karyawan,
-				'tgl' => $tgl,
-				'kode' => $kode,
-				'harga' => $harga,
-				'qty' => $kurangstok,
-				'jumlah' => $jumlah,
-				'ppn' => $ppn,
-			);
-		}else{
-			$id_user = $_REQUEST['id_user'];
-			$id_karyawan = $_REQUEST['id_karyawan'];
-			$tgl = date('Y-m-d H:i:s');
-			$nama = $_REQUEST['nama'];
-			$harga = $_REQUEST['harga'];
-			$jumlah = $_REQUEST['jumlah'];
-			$kode = $_REQUEST['kode'];
-			$kurangstok = $_REQUEST['kurangstok'];
-			$nota = $_REQUEST['no'];
-			// $ppn = $_REQUEST['pajak'];
-	
-			$data = array(
-				'nota' => $nota,
-				'id_user' => $id_user,
-				'id_karyawan' => $id_karyawan,
-				'tgl' => $tgl,
-				'kode' => $kode,
-				'harga' => $harga,
-				'qty' => $kurangstok,
-				'jumlah' => $jumlah,
-				// 'ppn' => $ppn,
+		$nota = trim((string) $this->input->post('no', TRUE));
+		$id_user = trim((string) $this->input->post('id_user', TRUE));
+		$id_karyawan = trim((string) $this->input->post('id_karyawan', TRUE));
+		$payment_method = trim((string) $this->input->post('metode_pembayaran', TRUE));
+		$items_json = $this->input->post('items_json', FALSE);
+		$items = is_string($items_json) ? json_decode($items_json, TRUE) : NULL;
+		$allowed_methods = array('potong_gaji', 'tunai', 'qris');
+
+		if ($nota === '' || strlen($nota) > 64 ||
+			$id_user === '' || strlen($id_user) > 11 ||
+			$id_karyawan === '' || strlen($id_karyawan) > 11 ||
+			!in_array($payment_method, $allowed_methods, TRUE) ||
+			!is_array($items) || count($items) === 0) {
+			$this->_checkout_json(FALSE, 'Data checkout tidak valid. Periksa NPK, kasir, metode pembayaran, dan keranjang.');
+			return;
+		}
+
+		$clean_items = array();
+		$seen_barcodes = array();
+		foreach ($items as $item) {
+			if (!is_array($item) || !isset($item['barcode'], $item['qty'])) {
+				$this->_checkout_json(FALSE, 'Data barang pada keranjang tidak valid.');
+				return;
+			}
+			$barcode = trim((string) $item['barcode']);
+			$qty = (string) $item['qty'];
+			$ppn = isset($item['ppn']) ? $item['ppn'] : 0;
+			if ($barcode === '' || strlen($barcode) > 64 ||
+				!preg_match('/^[1-9][0-9]*$/', $qty) ||
+				!is_numeric($ppn) || (float) $ppn < 0 ||
+				isset($seen_barcodes[$barcode])) {
+				$this->_checkout_json(FALSE, 'Barcode atau qty barang pada keranjang tidak valid.');
+				return;
+			}
+			$seen_barcodes[$barcode] = TRUE;
+			$clean_items[] = array(
+				'barcode' => $barcode,
+				'qty' => (int) $qty,
+				'ppn' => (float) $ppn
 			);
 		}
 
-		$this->db->insert('penjualan', $data);
-		
-		$query = $this->db->query("select * from stok where barcode = $kode");
-		$row = $query->row_array();
+		$previous_db_debug = $this->db->db_debug;
+		$this->db->db_debug = FALSE;
+		if (!$this->db->trans_begin()) {
+			$this->db->db_debug = $previous_db_debug;
+			$this->_checkout_json(FALSE, 'Transaksi gagal dan belum tercatat. Database tidak dapat memulai penyimpanan.');
+			return;
+		}
+		$resolved_items = array();
+		$errors = array();
+		foreach ($clean_items as $item) {
+			$product_query = $this->db->query("
+				SELECT stock.id, stock.barcode, stock.nama, stock.jumlah, stock.harga,
+					cost.average_cost
+				FROM stok stock
+				LEFT JOIN inventory_costs cost
+					ON cost.product_id = stock.id AND cost.barcode = stock.barcode
+				WHERE stock.barcode = ?
+				FOR UPDATE
+			", array($item['barcode']));
 
-		$update = $row['jumlah'] - $kurangstok;
+			if ($product_query === FALSE) {
+				$errors[] = 'Database gagal membaca data barang.';
+				break;
+			}
+			$product = $product_query->row();
+			if (!$product) {
+				$errors[] = 'Barcode '.$item['barcode'].' tidak ditemukan di stok.';
+				continue;
+			}
+			if ($product->average_cost === NULL || (float) $product->average_cost <= 0) {
+				$errors[] = $product->nama.' (barcode '.$product->barcode.') belum memiliki HPP valid.';
+				continue;
+			}
+			if ((int) $product->jumlah < $item['qty']) {
+				$errors[] = $product->nama.' (barcode '.$product->barcode.') stok tidak cukup. Stok tersedia: '.(int) $product->jumlah.'.';
+				continue;
+			}
+			$resolved_items[] = array(
+				'product' => $product,
+				'qty' => $item['qty'],
+				'ppn' => $item['ppn']
+			);
+		}
 
-		$data = array('jumlah' => $update);
-		$where = "barcode = $kode";
-		$str = $this->db->update_string('stok', $data, $where);
-		$this->db->query($str);
+		if (count($errors) > 0) {
+			$database_error = $this->db->error();
+			$this->db->trans_rollback();
+			$this->db->db_debug = $previous_db_debug;
+			if (!empty($database_error['code'])) {
+				error_log('Checkout database error '.$database_error['code'].': '.$database_error['message']);
+				$this->_checkout_json(FALSE, 'Transaksi gagal dan belum tercatat (database error '.$database_error['code'].').');
+				return;
+			}
+			$this->_checkout_json(FALSE, 'Transaksi gagal dan belum tercatat.', $errors);
+			return;
+		}
 
-		// echo $str;
+		date_default_timezone_set('Asia/Jakarta');
+		$sale_time = date('Y-m-d H:i:s');
+		foreach ($resolved_items as $item) {
+			$product = $item['product'];
+			$qty = $item['qty'];
+			$this->db->set('jumlah', 'jumlah - '.$qty, FALSE)
+				->where('id', (int) $product->id)
+				->update('stok');
+			$this->db->insert('penjualan', array(
+				'nota' => $nota,
+				'id_user' => $id_user,
+				'id_karyawan' => $id_karyawan,
+				'tgl' => $sale_time,
+				'kode' => $product->barcode,
+				'harga' => (int) $product->harga,
+				'qty' => $qty,
+				'jumlah' => (int) $product->harga * $qty,
+				'ppn' => $item['ppn'],
+				'hpp' => $product->average_cost,
+				'metode_pembayaran' => $payment_method
+			));
+		}
+
+		if ($this->db->trans_status() === FALSE) {
+			$database_error = $this->db->error();
+			$this->db->trans_rollback();
+			$this->db->db_debug = $previous_db_debug;
+			$error_code = !empty($database_error['code']) ? $database_error['code'] : 'unknown';
+			$error_message = !empty($database_error['message']) ? $database_error['message'] : 'Database transaction failed.';
+			error_log('Checkout database error '.$error_code.': '.$error_message);
+			$this->_checkout_json(FALSE, 'Transaksi gagal dan belum tercatat (database error '.$error_code.').');
+			return;
+		}
+		if (!$this->db->trans_commit()) {
+			$database_error = $this->db->error();
+			$this->db->trans_rollback();
+			$this->db->db_debug = $previous_db_debug;
+			$error_code = !empty($database_error['code']) ? $database_error['code'] : 'unknown';
+			$error_message = !empty($database_error['message']) ? $database_error['message'] : 'Database commit failed.';
+			error_log('Checkout database error '.$error_code.': '.$error_message);
+			$this->_checkout_json(FALSE, 'Transaksi gagal dan belum tercatat (database error '.$error_code.').');
+			return;
+		}
+		$this->db->db_debug = $previous_db_debug;
+		$this->_checkout_json(TRUE, 'Transaksi berhasil dicatat.');
+	}
+
+	private function _checkout_json($success, $message, $errors = array())
+	{
+		$this->output
+			->set_content_type('application/json')
+			->set_output(json_encode(array(
+				'success' => (bool) $success,
+				'message' => $message,
+				'errors' => $errors
+			)));
 	}
 
 	public function delete_excel($f){
@@ -179,11 +275,16 @@ class Kasir extends CI_Controller {
 				$column = $objPHPExcel->getActiveSheet()->getCell($cell)->getColumn();
 				$row = $objPHPExcel->getActiveSheet()->getCell($cell)->getRow();
 
-				if($column != 'E'){
+
+				if($fe != 'karyawan.xls'){
 					$data_value = $objPHPExcel->getActiveSheet()->getCell($cell)->getValue();
 				}else{
-					$dateTimeObject = PHPExcel_Shared_Date::ExcelToPHPObject($objPHPExcel->getActiveSheet()->getCell($cell)->getValue());
-					$data_value = $dateTimeObject->format('Y-m-d');
+					if ($column == 'E') {
+						$dateTimeObject = PHPExcel_Shared_Date::ExcelToPHPObject($objPHPExcel->getActiveSheet()->getCell($cell)->getValue());
+						$data_value = $dateTimeObject->format('Y-m-d');
+					}else{
+						$data_value = $objPHPExcel->getActiveSheet()->getCell($cell)->getValue();
+					}
 				}
 
 				//The header will/should be in row 1 only. of course, this can be modified to suit your need.
@@ -208,8 +309,9 @@ class Kasir extends CI_Controller {
 				$v2 = str_replace("'","`",$value['B']); // nama
 				$v3 = $value['C']; // jumlah
 				$v4 = $value['D']; // harga
-				$v5 = $value['E']; // distributor		
-				$this->db->query("INSERT INTO `simpleton`.`stok` (`id`, `barcode`, `nama`, `jumlah`, `harga`, `distributor`) VALUES (NULL, '$v1', '$v2', '$v3', '$v4', '$v5');");
+				$v5 = $value['E']; // distributor	
+				$v6 = $value['F'];	
+				$this->db->query("INSERT INTO `simpleton`.`stok` (`id`, `barcode`, `nama`, `jumlah`, `harga`, `distributor`,`ppn`) VALUES (NULL, '$v1', '$v2', '$v3', '$v4', '$v5', '$v6');");
 				// $this->db->query("INSERT INTO `simpleton`.`stok` (`id`, `barcode`, `nama`, `jumlah`, `harga`) VALUES (NULL, '$v1', '$v2', '$v3', '$v4');");
 			}
 
@@ -236,9 +338,7 @@ class Kasir extends CI_Controller {
 				@$v5 = $value['E']; // join_date
 
 				// echo "INSERT INTO `simpleton`.`karyawan` (`id`, `npk`, `nama`, `bagian`,`limit_belanja`, `join_date`) VALUES (NULL, '$v1', '$v2', '$v3', '$v4','$v5');\n";
-				$this->db->query("INSERT INTO `simpleton`.`karyawan` (`id`, `npk`, `nama`, `bagian`,`limit_belanja`) VALUES (NULL, '$v1', '$v2', '$v3', '$v4');");
-
-				// $this->db->query("INSERT INTO `simpleton`.`karyawan` (`id`, `npk`, `nama`, `bagian`,`limit_belanja`, `join_date`) VALUES (NULL, '$v1', '$v2', '$v3', '$v4','$v5');");
+				$this->db->query("INSERT INTO `simpleton`.`karyawan` (`id`, `npk`, `nama`, `bagian`,`limit_belanja`, `join_date`) VALUES (NULL, '$v1', '$v2', '$v3', '$v4','$v5');");
 			}
 
 			if ($this->db->trans_status() === FALSE)
@@ -257,4 +357,3 @@ class Kasir extends CI_Controller {
 	}
 
 }
-

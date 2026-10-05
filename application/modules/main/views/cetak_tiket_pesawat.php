@@ -75,6 +75,12 @@ switch ($maskapai) {
 
     break;
 
+  case 'Trans Nusa':
+  # code...
+    $gambar = base_url("assets/tiket/img/trans_nusa.png");
+
+    break;
+
   default:
     # code...
     break;
@@ -172,7 +178,7 @@ Jadwal Keberangkatan Penerbangan<br></h1>
       </td>
       <td style="vertical-align: top; width: 179px; text-align: center;">Penumpang<br>
       </td>
-      <td style="vertical-align: top; width: 221px; text-align: center;">No KTP<br>
+      <td style="vertical-align: top; width: 221px; text-align: center;">No Tiket<br>
       </td>
       <td style="vertical-align: top; text-align: center;">Fasilitas ( Bagasi )<br>
       <br>

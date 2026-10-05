@@ -35,6 +35,8 @@ class Ajax extends CI_Controller {
             echo $row->nama;
             echo ":";
             echo $row->harga;
+            echo ":";
+            echo $row->ppn;
         }
     }
 
@@ -80,6 +82,14 @@ class Ajax extends CI_Controller {
         echo(json_encode($query->result()));
     }
 
+    public function kodebooking_list()
+    {
+        $this->db->select('concat(maskapai,"-",kode_booking) as nama');
+        $this->db->from('penjualan_tiket_pesawat');
+        $query = $this->db->get();
+        echo(json_encode($query->result()));
+    }
+    
     public function produk_list()
     {
         $this->db->select('concat(nama,"-",barcode) as produk');
@@ -157,14 +167,14 @@ class Ajax extends CI_Controller {
         }else{
             $lastmonth = null;
             $y = null;
-            
+
             if(date('n')==1){
                 $lastmonth = 12;
                 $y = date('Y')-1;
             }else{
                 $lastmonth = date('n')-1;
             }
-            
+
             if($lastmonth<10){
                 $lastmonth = "0".$lastmonth;
             }
@@ -176,8 +186,6 @@ class Ajax extends CI_Controller {
             }
         }
 
-        // echo $startdate;
-
         $this->db->select('SUM(jumlah) as jumlah');		
         $this->db->from('penjualan');		
         $this->db->where('id_karyawan', $npk);
@@ -185,7 +193,6 @@ class Ajax extends CI_Controller {
         // $this->db->where('tgl <', $npk);
         // $this->db->like('tgl', $bulan); 		
         $query = $this->db->get();		
-        // print_r($query);
         foreach ($query->result() as $row)		
         {		
             echo $row->jumlah;		
@@ -221,16 +228,12 @@ class Ajax extends CI_Controller {
 
     public function checkout()
     {
-        // $this->db->select('penjualan.qty,stok.nama,penjualan.harga,penjualan.jumlah');
-        // $this->db->from('penjualan,stok');
-        // $this->db->where('penjualan.kode', 'stok.barcode'); 
-        // $this->db->where('penjualan.nota', $nota); 
-        $nota = $_REQUEST['no'];
+        $nota = $this->input->post('no', TRUE);
         $query = $this->db->query("
             SELECT penjualan.qty,stok.nama,penjualan.harga,penjualan.jumlah FROM penjualan,stok
             where penjualan.kode = stok.barcode and
-            penjualan.nota = '$nota' order by penjualan.id asc
-        ");
+            penjualan.nota = ? order by penjualan.id asc
+        ", array($nota));
 
         foreach ($query->result() as $row)
         {
@@ -252,6 +255,164 @@ class Ajax extends CI_Controller {
 
     }
 
+    public function data_harian()
+    {
+        $date = $this->uri->segment(4);
+        if (!is_string($date) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) ||
+            date('Y-m-d', strtotime($date)) !== $date) {
+            show_error('Tanggal laporan tidak valid.', 400);
+        }
+
+        $start = $date.' 00:00:00';
+        $end = date('Y-m-d', strtotime($date.' +1 day')).' 00:00:00';
+        $rows = $this->db->query("
+            SELECT sale.nota, sale.id_karyawan AS npk, employee.nama, employee.bagian,
+                sale.kode AS barcode, product.nama AS item, sale.harga, sale.qty, sale.jumlah,
+                sale.metode_pembayaran
+            FROM penjualan sale
+            LEFT JOIN stok product ON product.barcode = sale.kode
+            LEFT JOIN karyawan employee ON employee.npk = sale.id_karyawan
+            WHERE sale.tgl >= ? AND sale.tgl < ?
+            ORDER BY sale.tgl ASC, sale.id ASC
+        ", array($start, $end))->result_array();
+        $this->_sales_csv(
+            array('nota', 'npk', 'nama', 'bagian', 'barcode', 'item', 'harga', 'qty', 'jumlah',
+                'metode_pembayaran'),
+            $rows,
+            'data_harian_'.$date.'.csv',
+            $this->uri->segment(5) === 'd'
+        );
+    }
+
+    public function data_perorangan()
+    {
+        $period = $this->uri->segment(4);
+        $npk = $this->uri->segment(5);
+        $range = $this->_sales_month_range($period);
+        if ($range === FALSE) {
+            show_error('Periode laporan tidak valid.', 400);
+        }
+        if (!is_string($npk) || $npk === '' || strlen($npk) > 10) {
+            $this->_sales_csv(array('tanggal', 'nota', 'npk', 'nama', 'total_belanja'), array(), 'data_perorangan.csv', $this->uri->segment(6) === 'd');
+            return;
+        }
+
+        $rows = $this->db->query("
+            SELECT DATE(sale.tgl) AS tanggal, sale.nota, sale.id_karyawan AS npk,
+                employee.nama, SUM(sale.jumlah) AS total_belanja
+            FROM penjualan sale
+            LEFT JOIN karyawan employee ON employee.npk = sale.id_karyawan
+            WHERE sale.id_karyawan = ? AND sale.tgl >= ? AND sale.tgl < ?
+            GROUP BY DATE(sale.tgl), sale.nota, sale.id_karyawan, employee.nama
+            ORDER BY MIN(sale.tgl) ASC, sale.nota ASC
+        ", array($npk, $range['start'], $range['end']))->result_array();
+        $this->_sales_csv(
+            array('tanggal', 'nota', 'npk', 'nama', 'total_belanja'),
+            $rows,
+            'data_perorangan_'.$period.'_'.$npk.'.csv',
+            $this->uri->segment(6) === 'd'
+        );
+    }
+
+    public function data_bulanan()
+    {
+        $period = $this->uri->segment(4);
+        $range = $this->_sales_month_range($period);
+        if ($range === FALSE) {
+            show_error('Periode laporan tidak valid.', 400);
+        }
+
+        $rows = $this->db->query("
+            SELECT sale.id_karyawan AS npk, employee.nama, employee.bagian, SUM(sale.jumlah) AS jumlah
+            FROM penjualan sale
+            LEFT JOIN karyawan employee ON employee.npk = sale.id_karyawan
+            WHERE sale.tgl >= ? AND sale.tgl < ?
+            GROUP BY sale.id_karyawan, employee.nama, employee.bagian
+            ORDER BY employee.bagian ASC, employee.nama ASC
+        ", array($range['start'], $range['end']))->result_array();
+        $this->_sales_csv(
+            array('npk', 'nama', 'bagian', 'jumlah'),
+            $rows,
+            'data_bulanan_'.$period.'.csv',
+            $this->uri->segment(5) === 'd'
+        );
+    }
+
+    public function data_tahunan()
+    {
+        $year = $this->uri->segment(4);
+        if (!is_string($year) || !preg_match('/^\d{4}$/', $year) ||
+            (int) $year < 2000 || (int) $year > 2100) {
+            show_error('Tahun laporan tidak valid.', 400);
+        }
+
+        $start = $year.'-01-01 00:00:00';
+        $end = ((int) $year + 1).'-01-01 00:00:00';
+        $rows = $this->db->query("
+            SELECT DATE_FORMAT(sale.tgl, '%Y-%m') AS periode,
+                COUNT(DISTINCT CONCAT(DATE(sale.tgl), ':', sale.nota)) AS jumlah_transaksi,
+                SUM(sale.qty) AS qty_terjual,
+                SUM(sale.jumlah) AS jumlah_penjualan
+            FROM penjualan sale
+            WHERE sale.tgl >= ? AND sale.tgl < ?
+            GROUP BY DATE_FORMAT(sale.tgl, '%Y-%m')
+            ORDER BY periode ASC
+        ", array($start, $end))->result_array();
+        $this->_sales_csv(
+            array('periode', 'jumlah_transaksi', 'qty_terjual', 'jumlah_penjualan'),
+            $rows,
+            'data_tahunan_'.$year.'.csv',
+            $this->uri->segment(5) === 'd'
+        );
+    }
+
+    private function _sales_month_range($period)
+    {
+        if (!is_string($period) || !preg_match('/^(\d{4})-(\d{2})$/', $period, $matches)) {
+            return FALSE;
+        }
+        $year = (int) $matches[1];
+        $month = (int) $matches[2];
+        if ($year < 2000 || $year > 2100 || $month < 1 || $month > 12) {
+            return FALSE;
+        }
+
+        if ($month === 1) {
+            $start = sprintf('%04d-12-17 00:00:00', $year - 1);
+            $end = sprintf('%04d-01-21 00:00:00', $year);
+        } elseif ($month === 12) {
+            $start = sprintf('%04d-11-21 00:00:00', $year);
+            $end = sprintf('%04d-12-17 00:00:00', $year);
+        } else {
+            $previous_month = $month - 1;
+            $start = sprintf('%04d-%02d-21 00:00:00', $year, $previous_month);
+            $end = sprintf('%04d-%02d-21 00:00:00', $year, $month);
+        }
+
+        return array('start' => $start, 'end' => $end);
+    }
+
+    private function _sales_csv($headers, $rows, $filename, $download)
+    {
+        $stream = fopen('php://temp', 'r+');
+        fputcsv($stream, $headers);
+        foreach ($rows as $row) {
+            $values = array();
+            foreach ($headers as $header) {
+                $values[] = isset($row[$header]) ? $row[$header] : '';
+            }
+            fputcsv($stream, $values);
+        }
+        rewind($stream);
+        $csv = stream_get_contents($stream);
+        fclose($stream);
+
+        $this->output->set_content_type('text/csv', 'utf-8');
+        if ($download) {
+            $this->output->set_header('Content-Disposition: attachment; filename="'.$filename.'"');
+        }
+        $this->output->set_output($csv);
+    }
 
     public function rekap_harian(){
         $tgl = date('Y-m-d');
@@ -297,6 +458,79 @@ class Ajax extends CI_Controller {
             // print_r($row);
         }
     }
+
+    public function rekap_perorangan(){
+        $tgl = $this->uri->segment(4);
+        $npk = $this->uri->segment(5);
+
+        $startdate = null;
+        $startm = null;
+        $starty = null;
+        $stopdate = null;
+        $stopy = null;
+
+        if($tgl="1"){
+            $y = date('Y');
+            $starty = $y - 1;
+            $stopy = $y;
+            $startm = '12';
+            $startdate = $starty."-".$startm."-21";
+            $stopdate = $stopy."-".$tgl."-20";
+        }else{
+            $y = date('Y');
+            $starty = $y;
+            $stopy = $y;
+            $startm = $tgl - 1;
+            $startdate = $starty."-".$startm."-21";
+            $stopdate = $stopy."-".$tgl."-20";
+        }
+
+        $query = $this->db->query("
+            SELECT penjualan.nota,karyawan.npk,karyawan.nama,karyawan.bagian,stok.barcode,stok.nama as item,penjualan.harga,penjualan.qty,penjualan.jumlah
+            FROM penjualan,stok,karyawan
+            WHERE penjualan.kode = stok.barcode AND
+            karyawan.npk = penjualan.id_karyawan AND
+            karyawan.npk = '$npk' AND
+            penjualan.tgl >= '%$startdate%' AND 
+            penjualan.tgl <= '%$stopdate%' 
+            ORDER BY penjualan.id ASC
+        ");
+
+        if($this->uri->segment(6)=="d"){
+            header('Content-Type: aplication/vnd-ms-excel; charset=utf-8');
+            header('Content-Disposition: attachment; filename=data_harian_'.$tgl.'.xls');
+            echo "nota\tnpk\tnama\tbagian\tbarcode\titem\tharga\tqty\tjumlah\n";
+
+            foreach ($query->result() as $row)
+            {
+                echo $row->nota; echo "\t";
+                echo $row->npk; echo "\t";
+                echo $row->nama; echo "\t";
+                echo $row->bagian; echo "\t";
+                echo $row->barcode; echo "\t";
+                echo $row->item; echo "\t";
+                echo $row->harga; echo "\t";
+                echo $row->qty; echo "\t";
+                echo $row->jumlah; echo "\n";
+            }
+        }else{
+            echo "nota,npk,nama,bagian,barcode,item,harga,qty,jumlah\n";
+
+            foreach ($query->result() as $row)
+            {
+                echo $row->nota; echo ",";
+                echo $row->npk; echo ",";
+                echo $row->nama; echo ",";
+                echo $row->bagian; echo ",";
+                echo $row->barcode; echo ",";
+                echo $row->item; echo ",";
+                echo $row->harga; echo ",";
+                echo $row->qty; echo ",";
+                echo $row->jumlah; echo "\n";
+            }
+        }
+    }
+
     // SELECT sum(jumlah) AS total FROM penjualan WHERE MONTH(tgl) = 9
     // SELECT CAST(tgl AS DATE) AS DATE, sum(jumlah) as summ FROM penjualan GROUP BY CAST(tgl AS DATE) ORDER BY 1
 
@@ -312,4 +546,5 @@ class Ajax extends CI_Controller {
             echo '<option value="'.$row->user.'">'.$row->user.'</option>';
         }        
     }
+
 }

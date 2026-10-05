@@ -35,6 +35,7 @@ class Tiket extends CI_Controller {
 			// base_url("assets/jexcel/js/excel-formula.min.js"),			
 			base_url("assets/jexcel/js/numeral.min.js"),			
             base_url("assets/easyautocomplete/jquery.easy-autocomplete.min.js"),	
+			base_url("assets/kasir/config.js"),			
 			base_url("assets/tiket/tiket.js"),			
 		];
 
@@ -82,6 +83,7 @@ class Tiket extends CI_Controller {
         $data1 = json_decode($data_json1);
         $data2 = json_decode($data_json2);
 
+		// $data1[0][1] = str_replace(" 00:00:00","",$data1[0][1]);
 		$data1[0][3] = str_replace(" 00:00:00","",$data1[0][3]);
 
         print_r($data1);

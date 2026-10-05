@@ -109,8 +109,14 @@ $(document).ready(function () {
                         id_karyawan: $("#npk").val(),
                         foto: imageDataURL,
                     }
-                }).done(function (msg) {
-                    console.log(msg);
+                }).done(function (response) {
+                    if (response && response.success) {
+                        alert("Foto karyawan berhasil disimpan.");
+                    } else {
+                        alert("Foto karyawan gagal disimpan.");
+                    }
+                }).fail(function () {
+                    alert("Foto karyawan gagal disimpan. Periksa koneksi dan coba lagi.");
                 });
 
 

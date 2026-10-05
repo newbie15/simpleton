@@ -13,7 +13,7 @@ Departure Flight<br>
       <td colspan="2" rowspan="4" style="vertical-align: top; width: 179px; text-align: center;">logo maskapai<br>
 disini<br>
       </td>
-      <td colspan="2" rowspan="1" style="vertical-align: top; height: 50px; width: 250px;">Sabtu 30 Juni 2018<br>
+      <td colspan="2" rowspan="1" style="vertical-align: top; height: 50px; width: 250px;"><span id="tanggal"><?php echo $tanggal; ?></span><br>
       </td>
       <td style="vertical-align: top; height: 50px; width: 221px; text-align: center;">Airline Booking Code (PNR)<br>
       </td>
@@ -21,9 +21,9 @@ disini<br>
       </td>
     </tr>
     <tr>
-      <td style="vertical-align: top; height: 40px; width: 225px; text-align: center;">09:00<br>
+      <td style="vertical-align: top; height: 40px; width: 225px; text-align: center;"><span id="jam"><?php echo $jam; ?></span><br>
       </td>
-      <td style="vertical-align: top; height: 40px; width: 250px;">Surabaya (SUB)<br>
+      <td style="vertical-align: top; height: 40px; width: 250px;"><span id="asal"><?php echo $asal; ?></span><br>
 Juanda - Terminal 1<br>
       </td>
       <td style="vertical-align: top; height: 40px; width: 221px;"><br>
@@ -44,7 +44,7 @@ Juanda - Terminal 1<br>
     <tr>
       <td style="vertical-align: top; width: 225px; height: 68px; text-align: center;">14:15<br>
       </td>
-      <td style="vertical-align: top; width: 250px; height: 68px;">Palu (PLW)<br>
+      <td style="vertical-align: top; width: 250px; height: 68px;"><span id="tujuan"><?php echo $asal; ?></span><br>
 Mutiara Sis Aljufri<br>
       </td>
       <td style="vertical-align: top; width: 221px; height: 68px;"><br>
@@ -79,118 +79,20 @@ Mutiara Sis Aljufri<br>
       <br>
       </td>
     </tr>
+<?php
+
+?>
     <tr>
       <td style="vertical-align: top; width: 59px; text-align: center;">1<br>
       </td>
-      <td colspan="3" rowspan="1" style="vertical-align: top; width: 179px; text-align: center;"><br>
+      <td colspan="3" rowspan="1" style="vertical-align: top; width: 179px; text-align: center;"><span id="nama"><?php echo $nama; ?></span><br>
       </td>
       <td style="vertical-align: top; width: 221px; text-align: center;">dewasa<br>
       </td>
-      <td style="vertical-align: top; text-align: center;">20 Kg<br>
+      <td style="vertical-align: top; text-align: center;"><span id="fasilitas"><?php echo $fasilitas; ?></span><br>
       </td>
     </tr>
-    <tr>
-      <td style="vertical-align: top; text-align: center;">2<br>
-      </td>
-      <td colspan="3" rowspan="1" style="vertical-align: top; text-align: center;"><br>
-      </td>
-      <td style="vertical-align: top; text-align: center;">anak-anak<br>
-      </td>
-      <td style="vertical-align: top; text-align: center;">20 Kg<br>
-      </td>
-    </tr>
-    <tr>
-      <td style="vertical-align: top; text-align: center;">3<br>
-      </td>
-      <td colspan="3" rowspan="1" style="vertical-align: top; text-align: center;"><br>
-      </td>
-      <td style="vertical-align: top; text-align: center;">infant<br>
-      </td>
-      <td style="vertical-align: top; text-align: center;"><br>
-      </td>
-    </tr>
-    <tr>
-      <td style="vertical-align: top; text-align: center;">4<br>
-      </td>
-      <td colspan="3" rowspan="1" style="vertical-align: top; text-align: center;"><br>
-      </td>
-      <td style="vertical-align: top; text-align: center;"><br>
-      </td>
-      <td style="vertical-align: top; text-align: center;"><br>
-      </td>
-    </tr>
-    <tr>
-      <td style="vertical-align: top; text-align: center;">5<br>
-      </td>
-      <td colspan="3" rowspan="1" style="vertical-align: top; text-align: center;"><br>
-      </td>
-      <td style="vertical-align: top; text-align: center;"><br>
-      </td>
-      <td style="vertical-align: top; text-align: center;"><br>
-      </td>
-    </tr>
-    <tr>
-      <td style="vertical-align: top; text-align: center;">6<br>
-      </td>
-      <td colspan="3" rowspan="1" style="vertical-align: top; text-align: center;"><br>
-      </td>
-      <td style="vertical-align: top; text-align: center;"><br>
-      </td>
-      <td style="vertical-align: top; text-align: center;"><br>
-      </td>
-    </tr>
-    <tr>
-      <td style="vertical-align: top; text-align: center;">7<br>
-      </td>
-      <td colspan="3" rowspan="1" style="vertical-align: top; text-align: center;"><br>
-      </td>
-      <td style="vertical-align: top; text-align: center;"><br>
-      </td>
-      <td style="vertical-align: top; text-align: center;"><br>
-      </td>
-    </tr>
-    <tr>
-      <td style="vertical-align: top;"><br>
-      </td>
-      <td style="vertical-align: top;"><br>
-      </td>
-      <td style="vertical-align: top;"><br>
-      </td>
-      <td style="vertical-align: top;"><br>
-      </td>
-      <td style="vertical-align: top;"><br>
-      </td>
-      <td style="vertical-align: top;"><br>
-      </td>
-    </tr>
-    <tr>
-      <td style="vertical-align: top;"><br>
-      </td>
-      <td style="vertical-align: top;"><br>
-      </td>
-      <td style="vertical-align: top;"><br>
-      </td>
-      <td style="vertical-align: top;"><br>
-      </td>
-      <td style="vertical-align: top;"><br>
-      </td>
-      <td style="vertical-align: top;"><br>
-      </td>
-    </tr>
-    <tr>
-      <td style="vertical-align: top;"><br>
-      </td>
-      <td style="vertical-align: top;"><br>
-      </td>
-      <td style="vertical-align: top;"><br>
-      </td>
-      <td style="vertical-align: top;"><br>
-      </td>
-      <td style="vertical-align: top;"><br>
-      </td>
-      <td style="vertical-align: top;"><br>
-      </td>
-    </tr>
+
   </tbody>
 </table>
 
