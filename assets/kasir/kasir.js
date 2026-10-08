@@ -125,6 +125,18 @@ $(document).ready(function(){
     $("#barcode").easyAutocomplete(options2);
     var no = 1;
     var total = 0;
+    var checkoutInProgress = false;
+    var pendingCheckout = null;
+
+    function updatePaymentFields() {
+        var method = $("#metode_pembayaran").val();
+        $("#cash-payment-fields").toggle(method === "tunai");
+        $("#edc-payment-fields").toggle(method === "edc");
+        $("#transfer-payment-fields").toggle(method === "transfer");
+    }
+
+    $("#metode_pembayaran").on("change", updatePaymentFields);
+    updatePaymentFields();
 
     $("#nkasir").load("http://localhost/simpleton/index.php/main/ajax/daftar_kasir", function (response, status) {
         if (status !== "success") {
@@ -358,10 +370,16 @@ $(document).ready(function(){
         }
     });
 
-    function checkout(){
+    function openCheckout(){
+        if (checkoutInProgress) {
+            return;
+        }
+        if (pendingCheckout) {
+            $("#checkout-modal").modal("show");
+            return;
+        }
         var npk = $.trim($("#npk").val());
         var cashier = $("#nkasir").val();
-        var paymentMethod = $("#metode_pembayaran").val();
         if(npk === ""){
             alert("Isi dulu NPK.");
             return;
@@ -378,29 +396,91 @@ $(document).ready(function(){
             alert("Keranjang belanja masih kosong.");
             return;
         }
-        var epoch = Math.floor((new Date()).getTime() / 1000);
-        var now = new Date().toLocaleString();
-        var nota = npk + "-" + epoch;
-        var cashierName = cashier || "KMS";
-        var items = cartRows.map(function (row) {
-            return {
-                barcode: row[0],
-                qty: row[3],
-                ppn: pajak_active ? row[6] : 0
-            };
-        });
 
+        $("#checkout-summary").text(
+            "Anggota: " + ($("#nkaryawan").text() || npk) +
+            " (" + npk + ") | Kasir: " + cashier +
+            " | " + $("#ttx").text()
+        );
+        updatePaymentFields();
+        $("#checkout-modal").modal("show");
+    }
+
+    function submitCheckout() {
+        if (checkoutInProgress) {
+            return;
+        }
+
+        if (!pendingCheckout) {
+            var npk = $.trim($("#npk").val());
+            var cashier = $("#nkasir").val();
+            var paymentMethod = $("#metode_pembayaran").val();
+            var data = $("#my").jexcel("getData") || [];
+            var cartRows = data.filter(function (row) {
+                return row && $.trim(String(row[0] || "")) !== "";
+            });
+            if (cartRows.length === 0) {
+                alert("Keranjang belanja masih kosong.");
+                return;
+            }
+
+            var amountPaid = paymentMethod === "tunai"
+                ? parseFloat($("#nominal-bayar").val())
+                : totl;
+            var referenceNumber = $.trim($("#nomor-referensi").val());
+            var targetBank = $.trim($("#bank-tujuan").val());
+            if (paymentMethod === "tunai" && (!isFinite(amountPaid) || amountPaid <= 0)) {
+                alert("Masukkan jumlah uang tunai yang diterima.");
+                $("#nominal-bayar").focus();
+                return;
+            }
+            if (paymentMethod === "edc" && referenceNumber === "") {
+                alert("Masukkan nomor referensi atau approval EDC.");
+                $("#nomor-referensi").focus();
+                return;
+            }
+            if (paymentMethod === "transfer" && targetBank === "") {
+                alert("Masukkan nama bank tujuan.");
+                $("#bank-tujuan").focus();
+                return;
+            }
+
+            var timestamp = (new Date()).getTime();
+            var nota = npk + "-" + timestamp + "-" + Math.floor(Math.random() * 1000000);
+            var items = cartRows.map(function (row) {
+                return {
+                    barcode: row[0],
+                    qty: row[3],
+                    ppn: pajak_active ? row[5] : 0
+                };
+            });
+            pendingCheckout = {
+                rows: cartRows,
+                npk: npk,
+                cashierName: cashier,
+                paymentMethod: paymentMethod,
+                now: new Date().toLocaleString(),
+                payload: {
+                    no: nota,
+                    id_user: cashier,
+                    id_karyawan: npk,
+                    metode_pembayaran: paymentMethod,
+                    nominal_bayar: amountPaid,
+                    kode_voucher: $.trim($("#checkout-voucher").val()),
+                    nomor_referensi: referenceNumber,
+                    bank_tujuan: targetBank,
+                    items_json: JSON.stringify(items)
+                }
+            };
+        }
+
+        checkoutInProgress = true;
+        $("#confirm-checkout").prop("disabled", true).text("Menyimpan...");
         $.ajax({
             method: "POST",
             url: "http://localhost/simpleton/index.php/main/kasir/checkout",
             dataType: "json",
-            data: {
-                no: nota,
-                id_user: cashierName,
-                id_karyawan: npk,
-                metode_pembayaran: paymentMethod,
-                items_json: JSON.stringify(items)
-            }
+            data: pendingCheckout.payload
         }).done(function (response) {
             if (!response || !response.success) {
                 var message = response && response.message
@@ -409,38 +489,86 @@ $(document).ready(function(){
                 if (response && response.errors && response.errors.length) {
                     message += "\n\n" + response.errors.join("\n");
                 }
+                pendingCheckout = null;
+                $("[data-checkout-field]").find("input").prop("disabled", false);
+                $("#checkout-retry-notice").hide().text("");
+                $("#confirm-checkout").text("Simpan Transaksi");
                 alert(message);
                 return;
             }
+            var completedCheckout = pendingCheckout;
+            pendingCheckout = null;
+            $("[data-checkout-field]").find("input").prop("disabled", false);
+            $("#checkout-retry-notice").hide().text("");
+            $("#checkout-modal").modal("hide");
             var receiptUrl = pajak_active
                 ? "http://localhost/simpleton/assets/kasir/notabaru.html"
                 : "http://localhost/simpleton/assets/kasir/nota.html";
             var receipt = window.open(receiptUrl, "targetWindow", "toolbar=no,location=no,status=no,menubar=no,scrollbars=yes,resizable=yes,width=250,height=500");
+            dx = [];
+            $("#my").jexcel("setData", dx, true);
+            updatettl();
+            checklimit();
             if (!receipt) {
-                alert("Transaksi berhasil dicatat, tetapi jendela nota diblokir browser. Nomor nota: " + nota);
+                alert("Transaksi berhasil dicatat, tetapi jendela nota diblokir browser. Nomor nota: " + completedCheckout.payload.no);
                 return;
             }
-            receipt.pass_data = cartRows;
-            receipt.npk = npk;
+            receipt.pass_data = completedCheckout.rows;
+            receipt.npk = completedCheckout.npk;
             receipt.nkar = $("#nkaryawan").html();
             receipt.akar = $("#akaryawan").html();
-            receipt.tgl = now;
-            receipt.no = nota;
-            receipt.nkasir = cashierName;
-            receipt.metodePembayaran = paymentMethod;
-        }).fail(function () {
-            alert("Checkout tidak mendapat respons server. Status pencatatan belum dapat dipastikan; periksa transaksi sebelum mencoba lagi.");
+            receipt.tgl = completedCheckout.now;
+            receipt.no = completedCheckout.payload.no;
+            receipt.nkasir = completedCheckout.cashierName;
+            receipt.metodePembayaran = completedCheckout.paymentMethod;
+            receipt.totalTagihan = response.data ? response.data.total_tagihan : totl;
+            receipt.diskonVoucher = response.data ? response.data.diskon_voucher : 0;
+            receipt.kembalian = response.data ? response.data.kembalian : 0;
+            receipt.nominalBayar = completedCheckout.payload.nominal_bayar;
+        }).fail(function (request) {
+            if (request.status === 409 && request.responseJSON) {
+                pendingCheckout = null;
+                $("[data-checkout-field]").find("input").prop("disabled", false);
+                $("#checkout-retry-notice").hide().text("");
+                $("#confirm-checkout").text("Simpan Transaksi");
+                alert(request.responseJSON.message || "Nomor transaksi sudah digunakan.");
+                return;
+            }
+            $("#checkout-retry-notice")
+                .text("Respons server tidak diterima. Status transaksi belum dapat dipastikan. Gunakan tombol ulang untuk mengirim nota yang sama; jangan ubah data transaksi.")
+                .show();
+            $("[data-checkout-field]").find("input").prop("disabled", true);
+            $("#confirm-checkout").text("Coba Ulang dengan Nota yang Sama");
+        }).always(function () {
+            checkoutInProgress = false;
+            $("#confirm-checkout").prop("disabled", false);
         });
     }
 
-    $("#checkout").click(function(){
-        checkout();
+    $("#checkout").on("click", openCheckout);
+    $("#confirm-checkout").on("click", submitCheckout);
+    $("#clear-cart").on("click", function () {
+        if (pendingCheckout) {
+            alert("Transaksi belum dipastikan. Selesaikan atau ulangi checkout dengan nota yang sama terlebih dahulu.");
+            return;
+        }
+        if (dx.length > 0 && !window.confirm("Kosongkan semua barang di keranjang?")) {
+            return;
+        }
+        dx = [];
+        $("#my").jexcel("setData", dx, true);
+        updatettl();
+        checklimit();
     });
 
     $(document).bind('keydown', function (e) {
-        var unicode = e.keyCode;
-        if (unicode == 120) {
-            checkout();
+        if (e.keyCode === 120) {
+            e.preventDefault();
+            if ($("#checkout-modal").hasClass("in")) {
+                submitCheckout();
+            } else {
+                openCheckout();
+            }
         }
     });
 

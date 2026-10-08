@@ -79,14 +79,34 @@ class Kasir extends CI_Controller {
 		$payment_method = trim((string) $this->input->post('metode_pembayaran', TRUE));
 		$items_json = $this->input->post('items_json', FALSE);
 		$items = is_string($items_json) ? json_decode($items_json, TRUE) : NULL;
-		$allowed_methods = array('potong_gaji', 'tunai', 'qris');
+		$allowed_methods = array('potong_gaji', 'tunai', 'qris', 'edc', 'transfer');
+
+		// Data pembayaran tambahan
+		$nominal_bayar  = (float) $this->input->post('nominal_bayar', TRUE);
+		$kode_voucher   = trim((string) $this->input->post('kode_voucher', TRUE));
+		$nomor_ref      = trim((string) $this->input->post('nomor_referensi', TRUE));
+		$bank_tujuan    = trim((string) $this->input->post('bank_tujuan', TRUE));
 
 		if ($nota === '' || strlen($nota) > 64 ||
-			$id_user === '' || strlen($id_user) > 11 ||
-			$id_karyawan === '' || strlen($id_karyawan) > 11 ||
+			$id_user === '' || strlen($id_user) > 32 ||
+			$id_karyawan === '' || strlen($id_karyawan) > 32 ||
 			!in_array($payment_method, $allowed_methods, TRUE) ||
 			!is_array($items) || count($items) === 0) {
 			$this->_checkout_json(FALSE, 'Data checkout tidak valid. Periksa NPK, kasir, metode pembayaran, dan keranjang.');
+			return;
+		}
+
+		// Validasi field spesifik per metode pembayaran
+		if ($payment_method === 'tunai' && $nominal_bayar <= 0) {
+			$this->_checkout_json(FALSE, 'Pembayaran tunai memerlukan nominal yang dibayarkan.');
+			return;
+		}
+		if ($payment_method === 'edc' && $nomor_ref === '') {
+			$this->_checkout_json(FALSE, 'Pembayaran EDC memerlukan nomor referensi/approval.');
+			return;
+		}
+		if ($payment_method === 'transfer' && $bank_tujuan === '') {
+			$this->_checkout_json(FALSE, 'Pembayaran transfer memerlukan nama bank tujuan.');
 			return;
 		}
 
@@ -113,6 +133,10 @@ class Kasir extends CI_Controller {
 				'qty' => (int) $qty,
 				'ppn' => (float) $ppn
 			);
+		}
+
+		if ($this->_respond_existing_checkout($nota, $id_user, $id_karyawan)) {
+			return;
 		}
 
 		$previous_db_debug = $this->db->db_debug;
@@ -148,14 +172,49 @@ class Kasir extends CI_Controller {
 				$errors[] = $product->nama.' (barcode '.$product->barcode.') belum memiliki HPP valid.';
 				continue;
 			}
-			if ((int) $product->jumlah < $item['qty']) {
-				$errors[] = $product->nama.' (barcode '.$product->barcode.') stok tidak cukup. Stok tersedia: '.(int) $product->jumlah.'.';
-				continue;
+
+			$qty_needed = $item['qty'];
+			$stok_pcs = (int) $product->jumlah;
+
+			// Cek konversi dus->pcs jika stok pcs tidak cukup
+			$unbox_actions = array();
+			if ($stok_pcs < $qty_needed) {
+				$conversions = $this->db->query("
+					SELECT pc.barcode_dus, pc.rasio,
+						s.id AS dus_id, s.jumlah AS stok_dus, s.barcode AS dus_barcode
+					FROM product_conversions pc
+					JOIN stok s ON s.barcode = pc.barcode_dus
+					WHERE pc.barcode_pcs = ?
+					ORDER BY pc.rasio DESC, s.id ASC
+					FOR UPDATE
+				", array($product->barcode))->result();
+				$remaining_pcs = $qty_needed - $stok_pcs;
+				foreach ($conversions as $conversion) {
+					$ratio = (int) $conversion->rasio;
+					$package_stock = (int) $conversion->stok_dus;
+					if ($ratio < 1 || $package_stock < 1 || $remaining_pcs < 1) {
+						continue;
+					}
+					$packages_needed = (int) ceil($remaining_pcs / $ratio);
+					$packages_to_open = min($package_stock, $packages_needed);
+					$unbox_actions[] = array(
+						'dus_id' => (int) $conversion->dus_id,
+						'dus_dipotong' => $packages_to_open,
+						'rasio' => $ratio,
+					);
+					$remaining_pcs -= $packages_to_open * $ratio;
+				}
+				if ($remaining_pcs > 0) {
+					$errors[] = $product->nama.' stok tidak cukup untuk memenuhi '.$qty_needed.' pcs. Stok pcs tersedia: '.$stok_pcs.'.';
+					continue;
+				}
 			}
+
 			$resolved_items[] = array(
-				'product' => $product,
-				'qty' => $item['qty'],
-				'ppn' => $item['ppn']
+				'product'      => $product,
+				'qty'          => $item['qty'],
+				'ppn'          => $item['ppn'],
+				'unbox_actions' => $unbox_actions,
 			);
 		}
 
@@ -174,31 +233,220 @@ class Kasir extends CI_Controller {
 
 		date_default_timezone_set('Asia/Jakarta');
 		$sale_time = date('Y-m-d H:i:s');
+
+		// Hitung total tagihan & siapkan record pembayaran
+		$total_tagihan = 0;
+		foreach ($resolved_items as $item) {
+			$subtotal = (int) $item['product']->harga * $item['qty'];
+			if ($item['ppn'] > 0) {
+				$subtotal += $subtotal * (float) $item['ppn'];
+			}
+			$total_tagihan += $subtotal;
+		}
+
+		// Validasi voucher (opsional)
+		$diskon_voucher = 0.0;
+		$voucher_id_used = NULL;
+		if ($kode_voucher !== '') {
+			$voucher_result = $this->_apply_voucher($kode_voucher, $total_tagihan);
+			if (!$voucher_result['valid']) {
+				$this->db->trans_rollback();
+				$this->db->db_debug = $previous_db_debug;
+				$this->_checkout_json(FALSE, $voucher_result['message']);
+				return;
+			}
+			$diskon_voucher = $voucher_result['diskon'];
+			$voucher_id_used = $voucher_result['voucher_id'];
+			$total_tagihan = max(0, $total_tagihan - $diskon_voucher);
+		}
+
+		// Validasi kembalian untuk tunai
+		if ($payment_method === 'tunai' && $nominal_bayar < $total_tagihan) {
+			$this->db->trans_rollback();
+			$this->db->db_debug = $previous_db_debug;
+			$this->_checkout_json(FALSE, 'Uang tunai yang dibayarkan ('.number_format($nominal_bayar).')'
+				.' kurang dari total tagihan ('.number_format($total_tagihan).').');
+			return;
+		}
+
+		$kembalian = ($payment_method === 'tunai') ? max(0, $nominal_bayar - $total_tagihan) : 0;
+
+		// Simpan tiap baris penjualan & kurangi stok
 		foreach ($resolved_items as $item) {
 			$product = $item['product'];
 			$qty = $item['qty'];
-			$this->db->set('jumlah', 'jumlah - '.$qty, FALSE)
-				->where('id', (int) $product->id)
-				->update('stok');
+
+			if (count($item['unbox_actions']) > 0) {
+				foreach ($item['unbox_actions'] as $unbox_action) {
+					$this->db->set('jumlah', 'jumlah - '.(int) $unbox_action['dus_dipotong'], FALSE)
+						->where('id', $unbox_action['dus_id'])
+						->where('jumlah >=', (int) $unbox_action['dus_dipotong'])
+						->update('stok');
+					if ($this->db->affected_rows() !== 1) {
+						$errors[] = $product->nama.' stok kemasan berubah selama checkout. Muat ulang keranjang dan coba lagi.';
+						break;
+					}
+				}
+				if (count($errors) > 0) {
+					break;
+				}
+				$remaining_pcs = (int) $product->jumlah;
+				foreach ($item['unbox_actions'] as $unbox_action) {
+					$remaining_pcs += (int) $unbox_action['rasio'] * (int) $unbox_action['dus_dipotong'];
+				}
+				$remaining_pcs -= $qty;
+				$this->db->set('jumlah', $remaining_pcs, TRUE)
+					->where('id', (int) $product->id)
+					->update('stok');
+			} else {
+				$this->db->set('jumlah', 'jumlah - '.$qty, FALSE)
+					->where('id', (int) $product->id)
+					->where('jumlah >=', $qty)
+					->update('stok');
+				if ($this->db->affected_rows() !== 1) {
+					$errors[] = $product->nama.' stok berubah selama checkout. Muat ulang keranjang dan coba lagi.';
+					break;
+				}
+			}
+
 			$this->db->insert('penjualan', array(
-				'nota' => $nota,
-				'id_user' => $id_user,
-				'id_karyawan' => $id_karyawan,
-				'tgl' => $sale_time,
-				'kode' => $product->barcode,
-				'harga' => (int) $product->harga,
-				'qty' => $qty,
-				'jumlah' => (int) $product->harga * $qty,
-				'ppn' => $item['ppn'],
-				'hpp' => $product->average_cost,
-				'metode_pembayaran' => $payment_method
+				'nota'             => $nota,
+				'id_user'          => $id_user,
+				'id_karyawan'      => $id_karyawan,
+				'tgl'              => $sale_time,
+				'kode'             => $product->barcode,
+				'harga'            => (int) $product->harga,
+				'qty'              => $qty,
+				'jumlah'           => (int) $product->harga * $qty,
+				'ppn'              => $item['ppn'],
+				'hpp'              => $product->average_cost,
+				'metode_pembayaran' => $payment_method,
 			));
+		}
+
+		if (count($errors) > 0) {
+			$this->db->trans_rollback();
+			$this->db->db_debug = $previous_db_debug;
+			$this->_checkout_json(FALSE, 'Transaksi gagal dan belum tercatat.', $errors);
+			return;
+		}
+
+		// Simpan header pembayaran ke penjualan_pembayaran
+		$this->db->insert('penjualan_pembayaran', array(
+			'nota'              => $nota,
+			'metode_pembayaran' => $payment_method,
+			'total_tagihan'     => $total_tagihan,
+			'nominal_bayar'     => ($payment_method === 'tunai') ? $nominal_bayar : $total_tagihan,
+			'kembalian'         => $kembalian,
+			'kode_voucher'      => $kode_voucher !== '' ? $kode_voucher : NULL,
+			'diskon_voucher'    => $diskon_voucher,
+			'nomor_referensi'   => $nomor_ref !== '' ? $nomor_ref : NULL,
+			'bank_tujuan'       => $bank_tujuan !== '' ? $bank_tujuan : NULL,
+			'id_user'           => $id_user,
+			'id_karyawan'       => $id_karyawan,
+			'waktu_transaksi'   => $sale_time,
+		));
+
+		// Catat penggunaan voucher jika ada
+		if ($voucher_id_used !== NULL) {
+			$this->db->query(
+				'UPDATE `vouchers` SET `terpakai` = `terpakai` + 1 WHERE `id` = ?',
+				array($voucher_id_used)
+			);
+			$this->db->insert('voucher_usages', array(
+				'voucher_id'     => $voucher_id_used,
+				'nota'           => $nota,
+				'npk_anggota'    => $id_karyawan,
+				'nominal_diskon' => $diskon_voucher,
+				'used_at'        => $sale_time,
+			));
+		}
+
+		$this->load->library('accounting');
+		$sale_totals = $this->db->query("
+			SELECT COALESCE(SUM(jumlah), 0) AS gross_sales,
+				COALESCE(SUM(jumlah * ppn), 0) AS tax_total,
+				COALESCE(SUM(hpp * qty), 0) AS cogs_total
+			FROM penjualan
+			WHERE nota = ?
+		", array($nota))->row();
+		$payment_account = $payment_method === 'tunai' ? '1101' :
+			($payment_method === 'potong_gaji' ? '1103' : '1102');
+		$journal_lines = array();
+		$payment_amount = round((float) $total_tagihan, 2);
+		$discount_amount = round((float) $diskon_voucher, 2);
+		$tax_amount = round((float) $sale_totals->tax_total, 2);
+		$gross_amount = round((float) $sale_totals->gross_sales, 2);
+		if ($payment_amount > 0) {
+			$journal_lines[] = array(
+				'account' => $payment_account,
+				'debit' => $payment_amount,
+				'credit' => 0,
+				'memo' => 'Pembayaran nota '.$nota
+			);
+		}
+		if ($discount_amount > 0) {
+			$journal_lines[] = array(
+				'account' => '4202',
+				'debit' => $discount_amount,
+				'credit' => 0,
+				'memo' => 'Voucher '.$kode_voucher.' untuk nota '.$nota
+			);
+		}
+		if ($gross_amount > 0) {
+			$journal_lines[] = array(
+				'account' => '4101',
+				'debit' => 0,
+				'credit' => $gross_amount,
+				'memo' => 'Penjualan nota '.$nota
+			);
+		}
+		if ($tax_amount > 0) {
+			$journal_lines[] = array(
+				'account' => '2103',
+				'debit' => 0,
+				'credit' => $tax_amount,
+				'memo' => 'PPN keluaran nota '.$nota
+			);
+		}
+		$cogs_amount = round((float) $sale_totals->cogs_total, 2);
+		if ($cogs_amount > 0) {
+			$journal_lines[] = array(
+				'account' => '5101',
+				'debit' => $cogs_amount,
+				'credit' => 0,
+				'memo' => 'HPP nota '.$nota
+			);
+			$journal_lines[] = array(
+				'account' => '1104',
+				'debit' => 0,
+				'credit' => $cogs_amount,
+				'memo' => 'Pengurangan persediaan nota '.$nota
+			);
+		}
+		if (!$this->accounting->post_journal(
+			'POS',
+			$nota,
+			substr($sale_time, 0, 10),
+			'Penjualan POS '.$nota,
+			$id_user,
+			$journal_lines
+		)) {
+			$accounting_error = $this->accounting->error();
+			$this->db->trans_rollback();
+			$this->db->db_debug = $previous_db_debug;
+			log_message('error', 'Gagal memposting jurnal POS '.$nota.': '.$accounting_error);
+			$this->_checkout_json(FALSE, 'Transaksi gagal dicatat karena jurnal akuntansi tidak dapat dibuat.');
+			return;
 		}
 
 		if ($this->db->trans_status() === FALSE) {
 			$database_error = $this->db->error();
 			$this->db->trans_rollback();
 			$this->db->db_debug = $previous_db_debug;
+			if ($this->_respond_existing_checkout($nota, $id_user, $id_karyawan)) {
+				return;
+			}
 			$error_code = !empty($database_error['code']) ? $database_error['code'] : 'unknown';
 			$error_message = !empty($database_error['message']) ? $database_error['message'] : 'Database transaction failed.';
 			error_log('Checkout database error '.$error_code.': '.$error_message);
@@ -209,6 +457,9 @@ class Kasir extends CI_Controller {
 			$database_error = $this->db->error();
 			$this->db->trans_rollback();
 			$this->db->db_debug = $previous_db_debug;
+			if ($this->_respond_existing_checkout($nota, $id_user, $id_karyawan)) {
+				return;
+			}
 			$error_code = !empty($database_error['code']) ? $database_error['code'] : 'unknown';
 			$error_message = !empty($database_error['message']) ? $database_error['message'] : 'Database commit failed.';
 			error_log('Checkout database error '.$error_code.': '.$error_message);
@@ -216,17 +467,105 @@ class Kasir extends CI_Controller {
 			return;
 		}
 		$this->db->db_debug = $previous_db_debug;
-		$this->_checkout_json(TRUE, 'Transaksi berhasil dicatat.');
+		$this->_checkout_json(TRUE, 'Transaksi berhasil dicatat.', array(), array(
+			'kembalian'      => $kembalian,
+			'total_tagihan'  => $total_tagihan,
+			'diskon_voucher' => $diskon_voucher,
+		));
 	}
 
-	private function _checkout_json($success, $message, $errors = array())
+	private function _respond_existing_checkout($nota, $id_user, $id_karyawan)
+	{
+		$payment = $this->db->get_where('penjualan_pembayaran', array('nota' => $nota))->row();
+		if (!$payment) {
+			return FALSE;
+		}
+
+		$same_request_owner = $payment->id_user === $id_user && $payment->id_karyawan === $id_karyawan;
+		if (!$same_request_owner) {
+			$this->output->set_status_header(409);
+			$this->_checkout_json(FALSE, 'Nomor transaksi sudah digunakan untuk transaksi lain.');
+			return TRUE;
+		}
+
+		$this->_checkout_json(TRUE, 'Transaksi sudah tercatat.', array(), array(
+			'total_tagihan' => (float) $payment->total_tagihan,
+			'diskon_voucher' => (float) $payment->diskon_voucher,
+			'kembalian' => (float) $payment->kembalian,
+			'already_recorded' => TRUE,
+		));
+		return TRUE;
+	}
+
+	/**
+	 * Validasi dan hitung diskon voucher.
+	 * Return array: ['valid'=>bool, 'message'=>string, 'diskon'=>float, 'voucher_id'=>int|null]
+	 */
+	private function _apply_voucher($kode, $total_belanja)
+	{
+		$v = $this->db->query("
+			SELECT id, tipe, nilai, min_belanja, max_diskon, kuota, terpakai
+			FROM vouchers
+			WHERE kode = ? AND is_active = 1
+				AND tgl_mulai <= NOW() AND tgl_kadaluarsa >= NOW()
+			FOR UPDATE
+		", array($kode))->row();
+
+		if (!$v) {
+			return array('valid' => FALSE, 'message' => 'Voucher tidak valid atau sudah kedaluwarsa.', 'diskon' => 0, 'voucher_id' => NULL);
+		}
+		if ((int)$v->kuota > 0 && (int)$v->terpakai >= (int)$v->kuota) {
+			return array('valid' => FALSE, 'message' => 'Kuota voucher sudah habis.', 'diskon' => 0, 'voucher_id' => NULL);
+		}
+		if ($total_belanja < (float)$v->min_belanja) {
+			return array('valid' => FALSE, 'message' => 'Minimum belanja untuk voucher ini Rp '.number_format($v->min_belanja).'.', 'diskon' => 0, 'voucher_id' => NULL);
+		}
+
+		$diskon = 0.0;
+		if ($v->tipe === 'diskon_nominal') {
+			$diskon = (float) $v->nilai;
+		} elseif ($v->tipe === 'diskon_persen') {
+			$diskon = $total_belanja * (float) $v->nilai / 100.0;
+			if ($v->max_diskon !== NULL && $diskon > (float) $v->max_diskon) {
+				$diskon = (float) $v->max_diskon;
+			}
+		} elseif ($v->tipe === 'cashback') {
+			$diskon = (float) $v->nilai; // Cashback dicatat sebagai potongan pada sesi ini
+		}
+
+		return array('valid' => TRUE, 'message' => 'OK', 'diskon' => $diskon, 'voucher_id' => (int) $v->id);
+	}
+
+	/**
+	 * Endpoint: Validasi kode voucher sebelum checkout (AJAX GET)
+	 * URL: main/kasir/validate_voucher/[kode]/[total]
+	 */
+	public function validate_voucher($kode = '', $total = 0)
+	{
+		if ($this->input->method(TRUE) !== 'GET') { show_404(); }
+		$kode = trim((string) $kode);
+		$total = (float) $total;
+		if ($kode === '') {
+			$this->output->set_content_type('application/json')->set_output(json_encode(array('valid' => FALSE, 'message' => 'Kode voucher kosong.')));
+			return;
+		}
+		$result = $this->_apply_voucher($kode, $total);
+		$this->output->set_content_type('application/json')->set_output(json_encode(array(
+			'valid'   => $result['valid'],
+			'message' => $result['message'],
+			'diskon'  => $result['diskon'],
+		)));
+	}
+
+	private function _checkout_json($success, $message, $errors = array(), $data = array())
 	{
 		$this->output
 			->set_content_type('application/json')
 			->set_output(json_encode(array(
 				'success' => (bool) $success,
 				'message' => $message,
-				'errors' => $errors
+				'errors'  => $errors,
+				'data'    => $data,
 			)));
 	}
 

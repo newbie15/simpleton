@@ -276,7 +276,7 @@ class Examples extends CI_Controller {
 			base_url("assets/jexcel/js/excel-formula.min.js"),			
 			base_url("assets/jexcel/js/numeral.min.js"),			
 			base_url("assets/easyautocomplete/jquery.easy-autocomplete.min.js"),			
-			base_url("assets/kasir/kasir.js?v=20261004-cashier-default"),
+			base_url("assets/kasir/kasir.js?v=20261007-checkout-confirm"),
 		];
 		$data['m_penjualan'] = TRUE;
 
@@ -295,6 +295,8 @@ class Examples extends CI_Controller {
                   <option value="potong_gaji">Potong gaji</option>
                   <option value="tunai">Tunai / Cash</option>
                   <option value="qris">QRIS</option>
+                  <option value="edc">EDC (Debit/Kredit)</option>
+                  <option value="transfer">Transfer Bank</option>
                 </select>
               </div>
               <div class="form-group">
@@ -333,7 +335,8 @@ class Examples extends CI_Controller {
             </div>
             <div class="col-sm-3">
               <label>&nbsp;</label>
-              <button id="checkout" class="btn btn-info btn-block">Checkout [ F9 ]</button>
+              <button id="checkout" type="button" class="btn btn-info btn-block">Checkout [ F9 ]</button>
+              <button id="clear-cart" type="button" class="btn btn-default btn-block">Kosongkan Keranjang</button>
             </div>
           </div>
           <br>
@@ -368,6 +371,40 @@ class Examples extends CI_Controller {
 					>
 						<div id="my"></div>				
 					</div>
+          <div class="modal fade" id="checkout-modal" tabindex="-1" role="dialog" aria-labelledby="checkout-modal-title" data-backdrop="static" data-keyboard="false">
+            <div class="modal-dialog" role="document">
+              <div class="modal-content">
+                <div class="modal-header">
+                  <button type="button" class="close" data-dismiss="modal" aria-label="Tutup"><span aria-hidden="true">&times;</span></button>
+                  <h4 class="modal-title" id="checkout-modal-title">Konfirmasi Transaksi</h4>
+                </div>
+                <div class="modal-body">
+                  <p id="checkout-summary"></p>
+                  <div id="checkout-retry-notice" class="alert alert-warning" style="display:none;"></div>
+                  <div class="form-group" data-checkout-field>
+                    <label for="checkout-voucher">Kode voucher (opsional)</label>
+                    <input class="form-control" type="text" id="checkout-voucher" maxlength="32" autocomplete="off">
+                  </div>
+                  <div class="form-group" id="cash-payment-fields" data-checkout-field style="display:none;">
+                    <label for="nominal-bayar">Uang tunai diterima</label>
+                    <input class="form-control" type="number" id="nominal-bayar" min="0" step="100" inputmode="numeric">
+                  </div>
+                  <div class="form-group" id="edc-payment-fields" data-checkout-field style="display:none;">
+                    <label for="nomor-referensi">Nomor referensi / approval EDC</label>
+                    <input class="form-control" type="text" id="nomor-referensi" maxlength="64">
+                  </div>
+                  <div class="form-group" id="transfer-payment-fields" data-checkout-field style="display:none;">
+                    <label for="bank-tujuan">Bank tujuan</label>
+                    <input class="form-control" type="text" id="bank-tujuan" maxlength="64">
+                  </div>
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-default" data-dismiss="modal">Kembali</button>
+                  <button type="button" id="confirm-checkout" class="btn btn-primary">Simpan Transaksi</button>
+                </div>
+              </div>
+            </div>
+          </div>
 				</main>
 				
 		';
