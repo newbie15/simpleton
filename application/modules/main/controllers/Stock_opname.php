@@ -208,13 +208,16 @@ class Stock_opname extends CI_Controller
 			$this->_redirect_error('Opname ini tidak memiliki barang.', 'main/stock_opname/edit/'.$opname_id);
 		}
 
+		$stock_gain_value = 0;
+		$stock_loss_value = 0;
 		foreach ($items as $item) {
 			if ($item->counted_qty === NULL ||
-				((int) $item->counted_qty > 0 && $item->unit_cost === NULL)) {
+				(((int) $item->counted_qty > 0 || (int) $item->system_qty > 0) && $item->unit_cost === NULL)) {
 				$this->db->trans_rollback();
-				$this->_redirect_error('Lengkapi qty fisik dan harga pokok semua barang sebelum menyelesaikan opname.', 'main/stock_opname/edit/'.$opname_id);
+				$this->_redirect_error('Lengkapi qty fisik dan harga pokok barang yang memiliki stok sebelum menyelesaikan opname.', 'main/stock_opname/edit/'.$opname_id);
 			}
 			$adjustment = (int) $item->counted_qty - (int) $item->system_qty;
+			$adjustment_value = round(abs($adjustment) * (float) $item->unit_cost, 2);
 			$adjusted_qty = (int) $item->current_qty + $adjustment;
 			if ($adjusted_qty < 0) {
 				$this->db->trans_rollback();
@@ -229,12 +232,65 @@ class Stock_opname extends CI_Controller
 				VALUES (?, ?, ?, ?)
 				ON DUPLICATE KEY UPDATE barcode = VALUES(barcode), average_cost = VALUES(average_cost), updated_at = VALUES(updated_at)
 			", array((int) $item->product_id, $item->current_barcode, $unit_cost, date('Y-m-d H:i:s')));
+			if ($adjustment > 0) {
+				$stock_gain_value += $adjustment_value;
+			} elseif ($adjustment < 0) {
+				$stock_loss_value += $adjustment_value;
+			}
 		}
 
+		$finalized_at = date('Y-m-d H:i:s');
 		$this->db->where('id', (int) $opname_id)->update('stock_opnames', array(
 			'status' => 'finalized',
-			'finalized_at' => date('Y-m-d H:i:s')
+			'finalized_at' => $finalized_at
 		));
+		$journal_lines = array();
+		$stock_gain_value = round($stock_gain_value, 2);
+		$stock_loss_value = round($stock_loss_value, 2);
+		if ($stock_gain_value > 0) {
+			$journal_lines[] = array(
+				'account' => '1104',
+				'debit' => $stock_gain_value,
+				'credit' => 0,
+				'memo' => 'Penambahan persediaan opname '.$opname->opname_number
+			);
+			$journal_lines[] = array(
+				'account' => '4102',
+				'debit' => 0,
+				'credit' => $stock_gain_value,
+				'memo' => 'Selisih lebih opname '.$opname->opname_number
+			);
+		}
+		if ($stock_loss_value > 0) {
+			$journal_lines[] = array(
+				'account' => '6101',
+				'debit' => $stock_loss_value,
+				'credit' => 0,
+				'memo' => 'Selisih kurang opname '.$opname->opname_number
+			);
+			$journal_lines[] = array(
+				'account' => '1104',
+				'debit' => 0,
+				'credit' => $stock_loss_value,
+				'memo' => 'Pengurangan persediaan opname '.$opname->opname_number
+			);
+		}
+		if (count($journal_lines) > 0) {
+			$this->load->library('accounting');
+			if (!$this->accounting->post_journal(
+				'STOCK_OPNAME',
+				$opname_id,
+				substr($finalized_at, 0, 10),
+				'Penyesuaian stok opname '.$opname->opname_number,
+				'system',
+				$journal_lines
+			)) {
+				$accounting_error = $this->accounting->error();
+				$this->db->trans_rollback();
+				log_message('error', 'Gagal memposting jurnal opname '.$opname->opname_number.': '.$accounting_error);
+				$this->_redirect_error('Opname gagal diselesaikan karena jurnal akuntansi tidak dapat dibuat.', 'main/stock_opname/edit/'.$opname_id);
+			}
+		}
 		if ($this->db->trans_status() === FALSE) {
 			$this->_log_database_error('Gagal menyelesaikan stok opname '.$opname->opname_number);
 			$this->db->trans_rollback();
