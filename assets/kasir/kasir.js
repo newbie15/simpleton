@@ -238,12 +238,13 @@ $(document).ready(function(){
         image.setAttribute('src', "http://localhost/simpleton/assets/uploads/karyawan/" + encodeURIComponent(npk) + ".png?v=" + new Date().getTime());
     }
 
-    var sttime = null;
+    $("#npk").on("change blur", function(){
+        sttime = null;
+    });
+
     $("#npk").keypress(function(e){
-        if(sttime==null){
-            sttime =performance.now();
-        }
         if(e.which==13 && $(this).val()!=""){
+            var scanStartTime = performance.now();
             var t = $(this).val();
             console.log(t);
             var x = t.split("-");
@@ -251,12 +252,14 @@ $(document).ready(function(){
             $(this).val(npk);
             $("#foto_karyawan").hide().attr("src", "");
             $("#foto-karyawan-placeholder").text("Memuat foto...").show();
-            stotime = performance.now();
 
             $.ajax({
                 url: 'http://localhost/simpleton/index.php/main/ajax/karyawan/' + encodeURIComponent(npk),
                 // dataType: 'json',
                 success: function( resp ) {
+                    var scanEndTime = performance.now();
+                    var elapsedTime = scanEndTime - scanStartTime;
+
                     if(resp!=""){
                         var data = resp.split(":");
                         var nama = data[0];
@@ -269,6 +272,12 @@ $(document).ready(function(){
                         check_limit_belanja($("#npk").val());
                         check_jadwal_belanja($("#npk").val());
                         tampilkan_foto(npk);
+
+                        console.log(elapsedTime);
+                        if (elapsedTime > 100000 && npk != '1'){
+                            alert("hanya bisa berbelanja menggunakan kartu");
+                            location.reload();
+                        }
                     }else{
                         console.log("tidak ketemu");
                         $("#nkaryawan, #akaryawan, #limit, #limit_belanja").html("");
@@ -278,20 +287,10 @@ $(document).ready(function(){
                     }
                 },
                 error: function( req, status, err ) {
-                console.log( 'something went wrong', status, err );
+                    console.log( 'something went wrong', status, err );
                 }
             });
-
-            console.log(stotime-sttime);
-
-
-            if ((stotime - sttime)>100000 && npk != '1'){
-                alert("hanya bisa berbelanja menggunakan kartu");
-                location.reload();
-            }
-            sttime = null;
         }
-
     });
     
     $("#barcode").keypress(function(e){
