@@ -51,6 +51,10 @@ $(document).ready(function(){
     }
 
 
+    function formatRupiah(num) {
+        return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+    }
+
     function updatettl(){
         var total = 0;
         if (pajak_active) {
@@ -67,7 +71,7 @@ $(document).ready(function(){
                 total += element[2] * element[3];
             });
         }
-        $("#ttx").html("Total Rp " + total.toLocaleString());
+        $("#ttx").html("Total Rp " + formatRupiah(Math.round(total)));
         // $("#ttx").html("Total Rp " + pajek.toLocaleString());
         totl = total;
     }
