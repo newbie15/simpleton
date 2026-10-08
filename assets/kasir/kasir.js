@@ -20,17 +20,19 @@ $(document).ready(function(){
     });
 
     function check_limit_belanja(n){
-        $("#limit").load("http://localhost/simpleton/index.php/main/ajax/limit_belanja/" + n);
-
-        setTimeout(function(){
+        $("#limit").load("http://localhost/simpleton/index.php/main/ajax/limit_belanja/" + n, function(response, status, xhr) {
+            if (status !== "success") {
+                console.log("Failed to load limit_belanja");
+                return;
+            }
             var lb = parseInt($("#limit_belanja").html());
             var l = parseInt($("#limit").html());
 
-            if(l>lb){
+            if (!isNaN(l) && !isNaN(lb) && l > lb){
                 alert("belanja anda telah melebihi limit bulanan\n silahkan berbelanja bulan depan");
                 location.reload();
             }
-        },2000);
+        });
     }
 
     function check_jadwal_belanja(n) {
@@ -176,13 +178,37 @@ $(document).ready(function(){
                     // $( '#target').html( resp.people[0].name );
                     if (resp != "") {
                         var data = resp.split(":");
-                        var exist = $("#cart-list").html();
-                        var nama = data[0];
-                        var harga = data[1];
-                        var jumlah = harga * kuantiti;
-                        if(pajak_active){
-                            var ppn = data[2];
+
+                        // Validate barcode response format
+                        if (data.length < 2) {
+                            console.log("Invalid barcode response format: insufficient fields");
+                            alert("Data barcode tidak valid. Hubungi admin.");
+                            return;
                         }
+
+                        var nama = data[0] || "";
+                        var hargaStr = (data[1] || "").trim();
+                        var ppnStr = (data[2] || "").trim();
+
+                        // Validate numeric values
+                        var harga = parseFloat(hargaStr);
+                        if (isNaN(harga) || harga <= 0) {
+                            console.log("Invalid harga: " + hargaStr);
+                            alert("Harga barang tidak valid. Hubungi admin.");
+                            return;
+                        }
+
+                        if (pajak_active) {
+                            var ppn = parseFloat(ppnStr);
+                            if (isNaN(ppn) || ppn < 0) {
+                                console.log("Invalid ppn: " + ppnStr);
+                                alert("PPN barang tidak valid. Hubungi admin.");
+                                return;
+                            }
+                        }
+
+                        var exist = $("#cart-list").html();
+                        var jumlah = harga * kuantiti;
 
                         console.log(dx);
                         len = dx.length;
