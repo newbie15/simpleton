@@ -441,7 +441,9 @@ class Purchasing extends CI_Controller {
 		$data['items'] = $this->_get_order_items((int) $order_id);
 		$receipt_rows = $this->db
 			->select('gr.id, gr.receipt_number, gr.received_at, gr.supplier_document, gr.notes, '
-				.'gri.qty_received, gri.unit_price, poi.id AS order_item_id, poi.barcode, poi.product_name, poi.qty_ordered')
+				.'gr.ppn_nominal, gri.qty_received, gri.unit_price, gri.discount_type, '
+				.'gri.discount_value, gri.discount_amount, gri.subtotal, '
+				.'poi.id AS order_item_id, poi.barcode, poi.product_name, poi.qty_ordered')
 			->from('goods_receipts gr')
 			->join('goods_receipt_items gri', 'gri.goods_receipt_id = gr.id')
 			->join('purchase_order_items poi', 'poi.id = gri.purchase_order_item_id')
@@ -462,6 +464,8 @@ class Purchasing extends CI_Controller {
 				$receipt->supplier_document = $receipt_row->supplier_document;
 				$receipt->notes = $receipt_row->notes;
 				$receipt->total_qty = 0;
+				$receipt->subtotal_amount = 0;
+				$receipt->ppn_nominal = (float) $receipt_row->ppn_nominal;
 				$receipt->total_amount = 0;
 				$receipt->has_unpriced_items = FALSE;
 				$receipt->items = array();
@@ -484,14 +488,24 @@ class Purchasing extends CI_Controller {
 			$item->qty_received = $qty_this_receipt;
 			$item->qty_after = $qty_after;
 			$item->unit_price = $receipt_row->unit_price === NULL ? NULL : (int) $receipt_row->unit_price;
-			$item->line_total = $item->unit_price === NULL ? NULL : $qty_this_receipt * $item->unit_price;
+			$item->discount_type = $receipt_row->discount_type;
+			$item->discount_value = (float) $receipt_row->discount_value;
+			$item->discount_amount = (float) $receipt_row->discount_amount;
+			$gross_total = $item->unit_price === NULL ? NULL : $qty_this_receipt * $item->unit_price;
+			$item->line_total = $gross_total === NULL ? NULL :
+				((float) $receipt_row->subtotal > 0 || $gross_total === 0
+					? (float) $receipt_row->subtotal
+					: max(0, $gross_total - $item->discount_amount));
 			$receipts[$receipt_id]->items[] = $item;
 			$receipts[$receipt_id]->total_qty += $qty_this_receipt;
 			if ($item->line_total === NULL) {
 				$receipts[$receipt_id]->has_unpriced_items = TRUE;
 			} else {
-				$receipts[$receipt_id]->total_amount += $item->line_total;
+				$receipts[$receipt_id]->subtotal_amount += $item->line_total;
 			}
+		}
+		foreach ($receipts as $receipt) {
+			$receipt->total_amount = $receipt->subtotal_amount + $receipt->ppn_nominal;
 		}
 		$data['receipts'] = array_reverse(array_values($receipts));
 		$data['notice'] = $this->session->flashdata('purchasing_notice');
@@ -513,12 +527,18 @@ class Purchasing extends CI_Controller {
 
 		$quantities = $this->input->post('qty_received');
 		$unit_prices = $this->input->post('unit_price');
+		$discount_types = $this->input->post('discount_type');
+		$discount_values = $this->input->post('discount_value');
+		$ppn_nominal = $this->input->post('ppn_nominal');
 		$supplier_document = $this->input->post('supplier_document');
 		$notes = $this->input->post('receipt_notes');
 		if (!is_array($quantities) || !is_array($unit_prices) || !is_string($supplier_document) ||
+			!is_array($discount_types) || !is_array($discount_values) ||
+			!is_string($ppn_nominal) || !$this->_is_non_negative_amount(trim($ppn_nominal)) ||
 			!is_string($notes) || strlen($supplier_document) > 64) {
 			$this->_redirect_with_error('Data penerimaan tidak valid.', 'main/purchasing/receive/'.$order_id);
 		}
+		$ppn_nominal = round((float) trim($ppn_nominal), 2);
 		$supplier_document = trim($supplier_document);
 		$notes = trim($notes);
 		if ($supplier_document === '') {
@@ -540,16 +560,57 @@ class Purchasing extends CI_Controller {
 				if (!$this->_is_non_negative_integer($unit_price)) {
 					$this->_redirect_with_error('Harga satuan harus diisi dengan bilangan bulat nol atau lebih untuk setiap barang yang diterima.', 'main/purchasing/receive/'.$order_id);
 				}
+				$discount_type = isset($discount_types[$key]) && is_string($discount_types[$key])
+					? $discount_types[$key]
+					: '';
+				$discount_value = isset($discount_values[$key]) && is_string($discount_values[$key])
+					? trim($discount_values[$key])
+					: '';
+				if (!in_array($discount_type, array('none', 'percent', 'nominal'), TRUE) ||
+					!$this->_is_non_negative_amount($discount_value)) {
+					$this->_redirect_with_error('Jenis atau nilai diskon barang tidak valid.', 'main/purchasing/receive/'.$order_id);
+				}
+				$discount_value = round((float) $discount_value, 2);
+				$gross_total = (float) $qty * (int) $unit_price;
+				if ($gross_total > 9999999999999.99) {
+					$this->_redirect_with_error('Subtotal barang melampaui batas nilai yang dapat disimpan.', 'main/purchasing/receive/'.$order_id);
+				}
+				if ($discount_type === 'none') {
+					$discount_value = 0;
+					$discount_amount = 0;
+				} elseif ($discount_type === 'percent') {
+					if ($discount_value > 100) {
+						$this->_redirect_with_error('Diskon persen harus berada antara 0 dan 100.', 'main/purchasing/receive/'.$order_id);
+					}
+					$discount_amount = round($gross_total * $discount_value / 100, 2);
+				} else {
+					$discount_amount = $discount_value;
+					if ($discount_amount > $gross_total) {
+						$this->_redirect_with_error('Diskon nominal tidak boleh melebihi nilai kotor barang.', 'main/purchasing/receive/'.$order_id);
+					}
+				}
+				$line_subtotal = round($gross_total - $discount_amount, 2);
 				$received_items[] = array(
 					'item' => $item,
 					'qty' => (int) $qty,
-					'unit_price' => (int) $unit_price
+					'unit_price' => (int) $unit_price,
+					'discount_type' => $discount_type,
+					'discount_value' => $discount_value,
+					'discount_amount' => $discount_amount,
+					'subtotal' => $line_subtotal
 				);
 			}
 		}
 
 		if (count($received_items) === 0) {
 			$this->_redirect_with_error('Masukkan jumlah barang yang diterima minimal untuk satu item.', 'main/purchasing/receive/'.$order_id);
+		}
+		$receipt_subtotal = 0;
+		foreach ($received_items as $received) {
+			$receipt_subtotal += $received['subtotal'];
+		}
+		if ($receipt_subtotal + $ppn_nominal > 9999999999999.99) {
+			$this->_redirect_with_error('Total faktur melampaui batas nilai yang dapat disimpan.', 'main/purchasing/receive/'.$order_id);
 		}
 
 		$this->db->trans_begin();
@@ -558,10 +619,13 @@ class Purchasing extends CI_Controller {
 		$received_timestamp = time();
 		$received_at = date('Y-m-d H:i:s', $received_timestamp);
 		$receipt_number = 'GR-'.date('Ymd-His', $received_timestamp).'-'.strtoupper(random_string('alnum', 4));
+		$receipt_subtotal = 0;
+		$journal_lines = array();
 		$this->db->insert('goods_receipts', array(
 			'receipt_number' => $receipt_number,
 			'purchase_order_id' => (int) $order_id,
 			'supplier_document' => $supplier_document === '' ? NULL : $supplier_document,
+			'ppn_nominal' => $ppn_nominal,
 			'received_at' => $received_at,
 			'notes' => $notes
 		));
@@ -570,15 +634,82 @@ class Purchasing extends CI_Controller {
 		foreach ($received_items as $received) {
 			$item = $received['item'];
 			$qty = $received['qty'];
+			$stock = $this->db->query(
+				'SELECT jumlah FROM stok WHERE id = ? FOR UPDATE',
+				array((int) $item->product_id)
+			)->row();
+			$cost = $this->db->query(
+				'SELECT average_cost FROM inventory_costs WHERE product_id = ? AND barcode = ? FOR UPDATE',
+				array((int) $item->product_id, $item->barcode)
+			)->row();
+			if (!$stock || !$cost) {
+				$this->db->trans_rollback();
+				$this->_redirect_with_error('Data stok atau HPP tidak ditemukan. Penerimaan tidak disimpan.', 'main/purchasing/receive/'.$order_id);
+			}
 			$this->db->insert('goods_receipt_items', array(
 				'goods_receipt_id' => $receipt_id,
 				'purchase_order_item_id' => (int) $item->id,
 				'qty_received' => $qty,
-				'unit_price' => $received['unit_price']
+				'unit_price' => $received['unit_price'],
+				'discount_type' => $received['discount_type'],
+				'discount_value' => $received['discount_value'],
+				'discount_amount' => $received['discount_amount'],
+				'subtotal' => $received['subtotal']
 			));
+			$old_quantity = (int) $stock->jumlah;
+			$old_cost_total = $old_quantity * (float) $cost->average_cost;
+			$new_average_cost = round(
+				($old_cost_total + (float) $received['subtotal']) / ($old_quantity + $qty),
+				4
+			);
+			$this->db->query("
+				UPDATE inventory_costs
+				SET average_cost = ?, updated_at = ?
+				WHERE product_id = ? AND barcode = ?
+			", array($new_average_cost, $received_at, (int) $item->product_id, $item->barcode));
 			$this->db->set('jumlah', 'jumlah + '.$qty, FALSE)
 				->where('id', (int) $item->product_id)
 				->update('stok');
+			$receipt_subtotal += (float) $received['subtotal'];
+			if ($received['subtotal'] > 0) {
+				$journal_lines[] = array(
+					'account' => '1104',
+					'debit' => $received['subtotal'],
+					'credit' => 0,
+					'memo' => 'Persediaan penerimaan '.$receipt_number.' '.$item->barcode
+				);
+			}
+		}
+		if ($ppn_nominal > 0) {
+			$journal_lines[] = array(
+				'account' => '1105',
+				'debit' => $ppn_nominal,
+				'credit' => 0,
+				'memo' => 'PPN masukan penerimaan '.$receipt_number
+			);
+		}
+		$invoice_total = round($receipt_subtotal + $ppn_nominal, 2);
+		if ($invoice_total > 0) {
+			$journal_lines[] = array(
+				'account' => '2101',
+				'debit' => 0,
+				'credit' => $invoice_total,
+				'memo' => 'Hutang supplier penerimaan '.$receipt_number
+			);
+		}
+		$this->load->library('accounting');
+		if (!$this->accounting->post_journal(
+			'PURCHASING',
+			$receipt_id,
+			substr($received_at, 0, 10),
+			'Penerimaan supplier '.$supplier_document,
+			'system',
+			$journal_lines
+		)) {
+			$accounting_error = $this->accounting->error();
+			$this->db->trans_rollback();
+			log_message('error', 'Gagal memposting jurnal penerimaan '.$receipt_number.': '.$accounting_error);
+			$this->_redirect_with_error('Penerimaan gagal disimpan karena jurnal akuntansi tidak dapat dibuat.', 'main/purchasing/receive/'.$order_id);
 		}
 
 		if ($this->db->trans_status() === FALSE) {
@@ -672,6 +803,11 @@ class Purchasing extends CI_Controller {
 	{
 		return is_string($value) && preg_match('/^\d+$/', $value) &&
 			(int) $value <= 2147483647;
+	}
+
+	private function _is_non_negative_amount($value)
+	{
+		return is_string($value) && preg_match('/^\d{1,13}(?:\.\d{1,2})?$/', $value);
 	}
 
 	private function _log_database_error($context)

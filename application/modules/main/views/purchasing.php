@@ -364,11 +364,18 @@
 							<input class="form-control" id="receipt_notes" name="receipt_notes">
 						</div>
 					</div>
+					<div class="col-md-6">
+						<div class="form-group">
+							<label for="ppn_nominal">PPN faktur (Rp)</label>
+							<input class="form-control" id="ppn_nominal" name="ppn_nominal" type="number" min="0" step="0.01" value="0.00" required>
+							<p class="help-block">Masukkan nominal PPN sesuai faktur supplier, bukan persentase.</p>
+						</div>
+					</div>
 				</div>
 				<div class="table-responsive">
 					<table class="table table-bordered">
 						<thead>
-							<tr><th>Barcode</th><th>Barang</th><th>Qty diminta</th><th>Sudah diterima</th><th>Sisa permintaan</th><th>Datang sekarang</th><th>Harga satuan</th><th>Subtotal</th><th>Perbandingan</th></tr>
+							<tr><th>Barcode</th><th>Barang</th><th>Qty diminta</th><th>Sudah diterima</th><th>Sisa permintaan</th><th>Datang sekarang</th><th>Harga satuan</th><th>Tipe diskon</th><th>Nilai diskon</th><th>Subtotal</th><th>Perbandingan</th></tr>
 						</thead>
 						<tbody>
 							<?php foreach ($items as $item) {
@@ -384,17 +391,27 @@
 									<td><?php echo number_format(max(0, $remaining)); ?></td>
 									<td><input class="form-control receipt-quantity" type="number" min="0" step="1" name="qty_received[<?php echo (int) $item->id; ?>]" value="0"></td>
 									<td><input class="form-control receipt-unit-price" type="number" min="0" step="1" name="unit_price[<?php echo (int) $item->id; ?>]" value="" placeholder="Harga aktual"></td>
+									<td>
+										<select class="form-control receipt-discount-type" name="discount_type[<?php echo (int) $item->id; ?>]">
+											<option value="none">Tidak ada</option>
+											<option value="percent">Persen (%)</option>
+											<option value="nominal">Nominal (Rp)</option>
+										</select>
+									</td>
+									<td><input class="form-control receipt-discount-value" type="number" min="0" step="0.01" name="discount_value[<?php echo (int) $item->id; ?>]" value="0.00"></td>
 									<td class="receipt-line-total">-</td>
 									<td><?php echo html_escape($comparison); ?></td>
 								</tr>
 							<?php } ?>
 						</tbody>
 						<tfoot>
-							<tr><th colspan="7" class="text-right">Total penerimaan ini</th><th id="receipt-total">Rp 0</th><th></th></tr>
+							<tr><th colspan="9" class="text-right">Subtotal setelah diskon</th><th id="receipt-subtotal">Rp 0</th><th></th></tr>
+							<tr><th colspan="9" class="text-right">PPN faktur</th><th id="receipt-ppn">Rp 0</th><th></th></tr>
+							<tr><th colspan="9" class="text-right">Total tagihan faktur</th><th id="receipt-total">Rp 0</th><th></th></tr>
 						</tfoot>
 					</table>
 				</div>
-				<p class="help-block">Isi harga beli aktual per unit untuk setiap barang yang datang. Subtotal dan total tagihan dihitung dari jumlah diterima x harga satuan. Jumlah lebih dari sisa PO tetap menambah stok sesuai barang yang benar-benar diterima.</p>
+				<p class="help-block">Isi harga beli aktual, diskon per baris (persen atau nominal), dan PPN rupiah sesuai faktur. Jumlah lebih dari sisa PO tetap menambah stok sesuai barang yang benar-benar diterima.</p>
 			</form>
 		</div>
 	</div>
@@ -402,7 +419,7 @@
 	<div class="box box-default">
 		<div class="box-header with-border"><h3 class="box-title">Riwayat Penerimaan</h3></div>
 		<div class="box-body">
-			<p class="help-block">Rincian menunjukkan jumlah sebelum penerimaan, jumlah transaksi, akumulasi, harga satuan, dan subtotal. Riwayat lama yang belum memiliki harga akan ditandai.</p>
+			<p class="help-block">Rincian menunjukkan jumlah sebelum penerimaan, jumlah transaksi, akumulasi, harga, diskon, subtotal, dan nominal PPN faktur. Riwayat lama yang belum memiliki harga akan ditandai.</p>
 			<table class="table table-striped table-bordered">
 				<thead><tr><th>No. penerimaan</th><th>Tanggal</th><th>Surat jalan</th><th>Total qty diterima</th><th>Total tagihan</th><th>Catatan</th><th>Rincian barang</th></tr></thead>
 				<tbody>
@@ -413,13 +430,21 @@
 							<td><?php echo html_escape($receipt->received_at); ?></td>
 							<td><?php echo $receipt->supplier_document !== NULL && $receipt->supplier_document !== '' ? html_escape($receipt->supplier_document) : '-'; ?></td>
 							<td><?php echo number_format((int) $receipt->total_qty); ?></td>
-							<td><?php echo $receipt->has_unpriced_items ? 'Belum lengkap' : 'Rp '.number_format((float) $receipt->total_amount, 0, ',', '.'); ?></td>
+							<td>
+								<?php if ($receipt->has_unpriced_items) { ?>
+									Belum lengkap
+								<?php } else { ?>
+									Subtotal Rp <?php echo number_format((float) $receipt->subtotal_amount, 2, ',', '.'); ?><br>
+									PPN Rp <?php echo number_format((float) $receipt->ppn_nominal, 2, ',', '.'); ?><br>
+									<strong>Total Rp <?php echo number_format((float) $receipt->total_amount, 2, ',', '.'); ?></strong>
+								<?php } ?>
+							</td>
 							<td><?php echo $receipt->notes !== NULL && $receipt->notes !== '' ? html_escape($receipt->notes) : '-'; ?></td>
 							<td>
 								<div class="table-responsive">
 									<table class="table table-condensed table-bordered">
 										<thead>
-											<tr><th>Barcode</th><th>Barang</th><th>Qty PO</th><th>Sebelumnya</th><th>Diterima kali ini</th><th>Akumulasi</th><th>Harga satuan</th><th>Subtotal</th></tr>
+											<tr><th>Barcode</th><th>Barang</th><th>Qty PO</th><th>Sebelumnya</th><th>Diterima kali ini</th><th>Akumulasi</th><th>Harga satuan</th><th>Diskon</th><th>Subtotal setelah diskon</th></tr>
 										</thead>
 										<tbody>
 											<?php foreach ($receipt->items as $receipt_item) { ?>
@@ -431,7 +456,18 @@
 													<td><?php echo number_format($receipt_item->qty_received); ?></td>
 													<td><?php echo number_format($receipt_item->qty_after); ?></td>
 													<td><?php echo $receipt_item->unit_price === NULL ? 'Belum dicatat' : 'Rp '.number_format($receipt_item->unit_price, 0, ',', '.'); ?></td>
-													<td><?php echo $receipt_item->line_total === NULL ? '-' : 'Rp '.number_format((float) $receipt_item->line_total, 0, ',', '.'); ?></td>
+													<td>
+														<?php
+														if ($receipt_item->discount_type === 'percent') {
+															echo number_format($receipt_item->discount_value, 2, ',', '.').'% (Rp '.number_format($receipt_item->discount_amount, 2, ',', '.').')';
+														} elseif ($receipt_item->discount_type === 'nominal') {
+															echo 'Rp '.number_format($receipt_item->discount_amount, 2, ',', '.');
+														} else {
+															echo '-';
+														}
+														?>
+													</td>
+													<td><?php echo $receipt_item->line_total === NULL ? '-' : 'Rp '.number_format((float) $receipt_item->line_total, 2, ',', '.'); ?></td>
 												</tr>
 											<?php } ?>
 										</tbody>
@@ -453,10 +489,15 @@
 		var supplierDocument = document.getElementById('supplier_document');
 		var quantityInputs = form.querySelectorAll('.receipt-quantity');
 		var priceInputs = form.querySelectorAll('.receipt-unit-price');
+		var discountTypeInputs = form.querySelectorAll('.receipt-discount-type');
+		var discountValueInputs = form.querySelectorAll('.receipt-discount-value');
+		var ppnInput = document.getElementById('ppn_nominal');
+		var subtotalElement = document.getElementById('receipt-subtotal');
+		var ppnElement = document.getElementById('receipt-ppn');
 		var totalElement = document.getElementById('receipt-total');
 
 		function formatRupiah(value) {
-			return 'Rp ' + Math.round(value).toLocaleString('id-ID');
+			return 'Rp ' + Number(value || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 		}
 
 		function updateReceiptTotal() {
@@ -465,13 +506,21 @@
 				var quantity = parseInt(quantityInputs[i].value, 10) || 0;
 				var price = parseInt(priceInputs[i].value, 10);
 				var hasPrice = !isNaN(price) && price >= 0;
-				var subtotal = quantity > 0 && hasPrice ? quantity * price : 0;
+				var gross = quantity > 0 && hasPrice ? quantity * price : 0;
+				var discountValue = parseFloat(discountValueInputs[i].value) || 0;
+				var discount = discountTypeInputs[i].value === 'percent'
+					? Math.round(gross * discountValue) / 100
+					: (discountTypeInputs[i].value === 'nominal' ? discountValue : 0);
+				var subtotal = Math.max(0, gross - discount);
 				quantityInputs[i].closest('tr').querySelector('.receipt-line-total').textContent =
 					quantity > 0 && hasPrice ? formatRupiah(subtotal) : '-';
 				total += subtotal;
 				priceInputs[i].required = quantity > 0;
 			}
-			totalElement.textContent = formatRupiah(total);
+			var ppn = parseFloat(ppnInput.value) || 0;
+			subtotalElement.textContent = formatRupiah(total);
+			ppnElement.textContent = formatRupiah(ppn);
+			totalElement.textContent = formatRupiah(total + ppn);
 		}
 
 		form.addEventListener('input', updateReceiptTotal);
@@ -503,7 +552,10 @@
 			priceInputs[i].addEventListener('input', function () {
 				this.setCustomValidity('');
 			});
+			discountTypeInputs[i].addEventListener('change', updateReceiptTotal);
+			discountValueInputs[i].addEventListener('input', updateReceiptTotal);
 		}
+		ppnInput.addEventListener('input', updateReceiptTotal);
 		updateReceiptTotal();
 	}());
 	</script>
