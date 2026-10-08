@@ -2,7 +2,8 @@
 $front_end_active = isset($m_penjualan) || isset($m_tiket);
 $back_end_active = isset($m_stok) || isset($m_stock_opname) || isset($m_purchasing) ||
 	isset($m_supplier) || isset($m_user) || isset($m_karyawan) || isset($m_kartu) ||
-	isset($m_foto) || isset($m_update) || isset($m_rekap);
+	isset($m_foto) || isset($m_update) || isset($m_rekap) || isset($m_product_conversion) ||
+	isset($m_sales_return) || isset($m_supplier_return) || isset($m_accounting);
 ?>
 <li class="header">Main Menu</li>
 
@@ -44,6 +45,26 @@ $back_end_active = isset($m_stok) || isset($m_stock_opname) || isset($m_purchasi
 		<li<?php if (isset($m_purchasing)) { ?> class="active"<?php } ?>>
 			<a href="<?php echo site_url('main/purchasing'); ?>">
 				<i class="fa fa-truck"></i> <span>Purchasing</span>
+			</a>
+		</li>
+		<li<?php if (isset($m_product_conversion)) { ?> class="active"<?php } ?>>
+			<a href="<?php echo site_url('main/product_conversion'); ?>">
+				<i class="fa fa-cubes"></i> <span>Konversi Kemasan</span>
+			</a>
+		</li>
+		<li<?php if (isset($m_sales_return)) { ?> class="active"<?php } ?>>
+			<a href="<?php echo site_url('main/sales_return'); ?>">
+				<i class="fa fa-reply"></i> <span>Retur Penjualan</span>
+			</a>
+		</li>
+		<li<?php if (isset($m_supplier_return)) { ?> class="active"<?php } ?>>
+			<a href="<?php echo site_url('main/supplier_return'); ?>">
+				<i class="fa fa-reply-all"></i> <span>Retur Supplier</span>
+			</a>
+		</li>
+		<li<?php if (isset($m_accounting)) { ?> class="active"<?php } ?>>
+			<a href="<?php echo site_url('main/accounting'); ?>">
+				<i class="fa fa-book"></i> <span>Accounting</span>
 			</a>
 		</li>
 		<li<?php if (isset($m_supplier)) { ?> class="active"<?php } ?>>
