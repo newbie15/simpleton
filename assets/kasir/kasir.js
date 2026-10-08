@@ -55,12 +55,13 @@ $(document).ready(function(){
         var total = 0;
         if (pajak_active) {
             var pajek = 0;
+            var pjk;
             dx.forEach(element => {
                 console.log(element);
                 pjk = ((parseFloat(element[2]) * parseFloat(element[3]) * parseFloat(element[5])));
                 total += (parseFloat(element[2]) * parseFloat(element[3])) + pjk;
                 pajek += pjk;
-            });                
+            });
         }else{
             dx.forEach(element => {
                 total += element[2] * element[3];
@@ -156,6 +157,7 @@ $(document).ready(function(){
     function add(kode,kuantiti){
         var sama = 0;
         var index = 0;
+        var len, ln, last, pajak;
         dx.forEach(element => {
             // console.log(element[0]);
             if (kode == element[0]){
@@ -350,37 +352,28 @@ $(document).ready(function(){
         // alert(e.which);
     });
 
-    if(pajak_active){
-        $('#my').jexcel({
-            data: dx,
-            columns: [
-                { type: 'text' },
-                { type: 'text' },
-                { type: 'numeric' },
-                { type: 'numeric' },
-                { type: 'numeric' },
-                { type: 'numeric' },
-                { type: 'numeric' },
-            ],
-            colHeaders: ['kode', 'nama barang', 'harga','kuantiti', 'jumlah', 'ppn', 'pajak'],
-            // colWidths: [400, 100, 200],
-            colWidths: [100, 250, 150, 75, 150, 75, 150],
-        });    
-    }else{
-        $('#my').jexcel({
-            data: dx,
-            columns: [
-                { type: 'text' },
-                { type: 'text' },
-                { type: 'numeric' },
-                { type: 'numeric' },
-                { type: 'numeric' },
-            ],
-            colHeaders: ['kode', 'nama barang', 'harga','kuantiti', 'jumlah'],
-            // colWidths: [400, 100, 200],
-            colWidths: [100, 250, 150, 75, 150],
-        });    
+    var baseColumns = [
+        { type: 'text' },
+        { type: 'text' },
+        { type: 'numeric' },
+        { type: 'numeric' },
+        { type: 'numeric' },
+    ];
+    var baseColHeaders = ['kode', 'nama barang', 'harga','kuantiti', 'jumlah'];
+    var baseColWidths = [100, 250, 150, 75, 150];
+
+    if (pajak_active) {
+        baseColumns.push({ type: 'numeric' }, { type: 'numeric' });
+        baseColHeaders.push('ppn', 'pajak');
+        baseColWidths.push(75, 150);
     }
+
+    $('#my').jexcel({
+        data: dx,
+        columns: baseColumns,
+        colHeaders: baseColHeaders,
+        colWidths: baseColWidths,
+    });
 
     $('#my').jexcel('updateSettings', {
         cells: function (cell, col, row) {
@@ -431,72 +424,139 @@ $(document).ready(function(){
         $("#checkout-modal").modal("show");
     }
 
+    function buildCheckoutPayload() {
+        var npk = $.trim($("#npk").val());
+        var cashier = $("#nkasir").val();
+        var paymentMethod = $("#metode_pembayaran").val();
+        var data = $("#my").jexcel("getData") || [];
+        var cartRows = data.filter(function (row) {
+            return row && $.trim(String(row[0] || "")) !== "";
+        });
+        if (cartRows.length === 0) {
+            alert("Keranjang belanja masih kosong.");
+            return null;
+        }
+        var amountPaid = paymentMethod === "tunai"
+            ? parseFloat($("#nominal-bayar").val())
+            : totl;
+        var referenceNumber = $.trim($("#nomor-referensi").val());
+        var targetBank = $.trim($("#bank-tujuan").val());
+        if (paymentMethod === "tunai" && (!isFinite(amountPaid) || amountPaid <= 0)) {
+            alert("Masukkan jumlah uang tunai yang diterima.");
+            $("#nominal-bayar").focus();
+            return null;
+        }
+        if (paymentMethod === "edc" && referenceNumber === "") {
+            alert("Masukkan nomor referensi atau approval EDC.");
+            $("#nomor-referensi").focus();
+            return null;
+        }
+        if (paymentMethod === "transfer" && targetBank === "") {
+            alert("Masukkan nama bank tujuan.");
+            $("#bank-tujuan").focus();
+            return null;
+        }
+        var timestamp = (new Date()).getTime();
+        var nota = npk + "-" + timestamp + "-" + Math.floor(Math.random() * 1000000);
+        var items = cartRows.map(function (row) {
+            return {
+                barcode: row[0],
+                qty: row[3],
+                ppn: pajak_active ? row[5] : 0
+            };
+        });
+        return {
+            rows: cartRows,
+            npk: npk,
+            cashierName: cashier,
+            paymentMethod: paymentMethod,
+            now: new Date().toLocaleString(),
+            payload: {
+                no: nota,
+                id_user: cashier,
+                id_karyawan: npk,
+                metode_pembayaran: paymentMethod,
+                nominal_bayar: amountPaid,
+                kode_voucher: $.trim($("#checkout-voucher").val()),
+                nomor_referensi: referenceNumber,
+                bank_tujuan: targetBank,
+                items_json: JSON.stringify(items)
+            }
+        };
+    }
+
+    function handleCheckoutSuccess(response, completedCheckout) {
+        if (!response || !response.success) {
+            var message = response && response.message
+                ? response.message
+                : "Transaksi gagal dan belum tercatat.";
+            if (response && response.errors && response.errors.length) {
+                message += "\n\n" + response.errors.join("\n");
+            }
+            pendingCheckout = null;
+            $("[data-checkout-field]").find("input").prop("disabled", false);
+            $("#checkout-retry-notice").hide().text("");
+            $("#confirm-checkout").text("Simpan Transaksi");
+            alert(message);
+            return;
+        }
+        completedCheckout = pendingCheckout;
+        pendingCheckout = null;
+        $("[data-checkout-field]").find("input").prop("disabled", false);
+        $("#checkout-retry-notice").hide().text("");
+        $("#checkout-modal").modal("hide");
+        var receiptUrl = pajak_active
+            ? "http://localhost/simpleton/assets/kasir/notabaru.html"
+            : "http://localhost/simpleton/assets/kasir/nota.html";
+        var receipt = window.open(receiptUrl, "targetWindow", "toolbar=no,location=no,status=no,menubar=no,scrollbars=yes,resizable=yes,width=250,height=500");
+        dx = [];
+        $("#my").jexcel("setData", dx, true);
+        updatettl();
+        checklimit();
+        if (!receipt) {
+            alert("Transaksi berhasil dicatat, tetapi jendela nota diblokir browser. Nomor nota: " + completedCheckout.payload.no);
+            return;
+        }
+        receipt.pass_data = completedCheckout.rows;
+        receipt.npk = completedCheckout.npk;
+        receipt.nkar = $("#nkaryawan").html();
+        receipt.akar = $("#akaryawan").html();
+        receipt.tgl = completedCheckout.now;
+        receipt.no = completedCheckout.payload.no;
+        receipt.nkasir = completedCheckout.cashierName;
+        receipt.metodePembayaran = completedCheckout.paymentMethod;
+        receipt.totalTagihan = response.data ? response.data.total_tagihan : totl;
+        receipt.diskonVoucher = response.data ? response.data.diskon_voucher : 0;
+        receipt.kembalian = response.data ? response.data.kembalian : 0;
+        receipt.nominalBayar = completedCheckout.payload.nominal_bayar;
+    }
+
+    function handleCheckoutFailure(request) {
+        if (request.status === 409 && request.responseJSON) {
+            pendingCheckout = null;
+            $("[data-checkout-field]").find("input").prop("disabled", false);
+            $("#checkout-retry-notice").hide().text("");
+            $("#confirm-checkout").text("Simpan Transaksi");
+            alert(request.responseJSON.message || "Nomor transaksi sudah digunakan.");
+            return;
+        }
+        $("#checkout-retry-notice")
+            .text("Respons server tidak diterima. Status transaksi belum dapat dipastikan. Gunakan tombol ulang untuk mengirim nota yang sama; jangan ubah data transaksi.")
+            .show();
+        $("[data-checkout-field]").find("input").prop("disabled", true);
+        $("#confirm-checkout").text("Coba Ulang dengan Nota yang Sama");
+    }
+
     function submitCheckout() {
         if (checkoutInProgress) {
             return;
         }
 
         if (!pendingCheckout) {
-            var npk = $.trim($("#npk").val());
-            var cashier = $("#nkasir").val();
-            var paymentMethod = $("#metode_pembayaran").val();
-            var data = $("#my").jexcel("getData") || [];
-            var cartRows = data.filter(function (row) {
-                return row && $.trim(String(row[0] || "")) !== "";
-            });
-            if (cartRows.length === 0) {
-                alert("Keranjang belanja masih kosong.");
+            pendingCheckout = buildCheckoutPayload();
+            if (!pendingCheckout) {
                 return;
             }
-
-            var amountPaid = paymentMethod === "tunai"
-                ? parseFloat($("#nominal-bayar").val())
-                : totl;
-            var referenceNumber = $.trim($("#nomor-referensi").val());
-            var targetBank = $.trim($("#bank-tujuan").val());
-            if (paymentMethod === "tunai" && (!isFinite(amountPaid) || amountPaid <= 0)) {
-                alert("Masukkan jumlah uang tunai yang diterima.");
-                $("#nominal-bayar").focus();
-                return;
-            }
-            if (paymentMethod === "edc" && referenceNumber === "") {
-                alert("Masukkan nomor referensi atau approval EDC.");
-                $("#nomor-referensi").focus();
-                return;
-            }
-            if (paymentMethod === "transfer" && targetBank === "") {
-                alert("Masukkan nama bank tujuan.");
-                $("#bank-tujuan").focus();
-                return;
-            }
-
-            var timestamp = (new Date()).getTime();
-            var nota = npk + "-" + timestamp + "-" + Math.floor(Math.random() * 1000000);
-            var items = cartRows.map(function (row) {
-                return {
-                    barcode: row[0],
-                    qty: row[3],
-                    ppn: pajak_active ? row[5] : 0
-                };
-            });
-            pendingCheckout = {
-                rows: cartRows,
-                npk: npk,
-                cashierName: cashier,
-                paymentMethod: paymentMethod,
-                now: new Date().toLocaleString(),
-                payload: {
-                    no: nota,
-                    id_user: cashier,
-                    id_karyawan: npk,
-                    metode_pembayaran: paymentMethod,
-                    nominal_bayar: amountPaid,
-                    kode_voucher: $.trim($("#checkout-voucher").val()),
-                    nomor_referensi: referenceNumber,
-                    bank_tujuan: targetBank,
-                    items_json: JSON.stringify(items)
-                }
-            };
         }
 
         checkoutInProgress = true;
@@ -507,63 +567,9 @@ $(document).ready(function(){
             dataType: "json",
             data: pendingCheckout.payload
         }).done(function (response) {
-            if (!response || !response.success) {
-                var message = response && response.message
-                    ? response.message
-                    : "Transaksi gagal dan belum tercatat.";
-                if (response && response.errors && response.errors.length) {
-                    message += "\n\n" + response.errors.join("\n");
-                }
-                pendingCheckout = null;
-                $("[data-checkout-field]").find("input").prop("disabled", false);
-                $("#checkout-retry-notice").hide().text("");
-                $("#confirm-checkout").text("Simpan Transaksi");
-                alert(message);
-                return;
-            }
-            var completedCheckout = pendingCheckout;
-            pendingCheckout = null;
-            $("[data-checkout-field]").find("input").prop("disabled", false);
-            $("#checkout-retry-notice").hide().text("");
-            $("#checkout-modal").modal("hide");
-            var receiptUrl = pajak_active
-                ? "http://localhost/simpleton/assets/kasir/notabaru.html"
-                : "http://localhost/simpleton/assets/kasir/nota.html";
-            var receipt = window.open(receiptUrl, "targetWindow", "toolbar=no,location=no,status=no,menubar=no,scrollbars=yes,resizable=yes,width=250,height=500");
-            dx = [];
-            $("#my").jexcel("setData", dx, true);
-            updatettl();
-            checklimit();
-            if (!receipt) {
-                alert("Transaksi berhasil dicatat, tetapi jendela nota diblokir browser. Nomor nota: " + completedCheckout.payload.no);
-                return;
-            }
-            receipt.pass_data = completedCheckout.rows;
-            receipt.npk = completedCheckout.npk;
-            receipt.nkar = $("#nkaryawan").html();
-            receipt.akar = $("#akaryawan").html();
-            receipt.tgl = completedCheckout.now;
-            receipt.no = completedCheckout.payload.no;
-            receipt.nkasir = completedCheckout.cashierName;
-            receipt.metodePembayaran = completedCheckout.paymentMethod;
-            receipt.totalTagihan = response.data ? response.data.total_tagihan : totl;
-            receipt.diskonVoucher = response.data ? response.data.diskon_voucher : 0;
-            receipt.kembalian = response.data ? response.data.kembalian : 0;
-            receipt.nominalBayar = completedCheckout.payload.nominal_bayar;
+            handleCheckoutSuccess(response, pendingCheckout);
         }).fail(function (request) {
-            if (request.status === 409 && request.responseJSON) {
-                pendingCheckout = null;
-                $("[data-checkout-field]").find("input").prop("disabled", false);
-                $("#checkout-retry-notice").hide().text("");
-                $("#confirm-checkout").text("Simpan Transaksi");
-                alert(request.responseJSON.message || "Nomor transaksi sudah digunakan.");
-                return;
-            }
-            $("#checkout-retry-notice")
-                .text("Respons server tidak diterima. Status transaksi belum dapat dipastikan. Gunakan tombol ulang untuk mengirim nota yang sama; jangan ubah data transaksi.")
-                .show();
-            $("[data-checkout-field]").find("input").prop("disabled", true);
-            $("#confirm-checkout").text("Coba Ulang dengan Nota yang Sama");
+            handleCheckoutFailure(request);
         }).always(function () {
             checkoutInProgress = false;
             $("#confirm-checkout").prop("disabled", false);

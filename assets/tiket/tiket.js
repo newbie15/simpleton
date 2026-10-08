@@ -23,13 +23,14 @@ $(document).ready(function(){
             var t = $(this).val();
             var x = t.split("-");
             console.log(x.length);
-            if (x.length < 2) {
-                $(this).val(x[0]);
-            } else {
-                $(this).val(x[1]);
+            var bookingCode = x.length > 1 ? x[x.length - 1].trim() : $.trim(x[0]);
+            if (!bookingCode) {
+                console.log("Booking code kosong setelah parsing");
+                return;
             }
+            $(this).val(bookingCode);
 
-            console.log("kode booking:",$(this).val());
+            console.log("kode booking:", bookingCode);
 
             refresh_penumpang();
             refresh();
@@ -66,7 +67,7 @@ $(document).ready(function(){
                 columns: [
                     // { type: 'autocomplete', url: BASE_URL+'station/ajax/' + $("#pabrik").val() },
                     { type: 'text' },
-                    { type: 'text' }, 
+                    { type: 'text' },
                     { type: 'text' },
                     { type: 'text' },
                 ]
@@ -83,7 +84,7 @@ $(document).ready(function(){
                 kode_booking: $("#kodebooking").val(),
             }
         }).done(function (msg) {
-            var data1,data2;
+            var data1 = [],data2 = [];
             if(msg!="[]"){
                 console.log(msg);
                 data = JSON.parse(msg);
@@ -92,22 +93,17 @@ $(document).ready(function(){
                 data2 = data[0];
                 console.log(data1);
                 console.log(data2);
-
                 data1 = data1.slice(0,6);
                 data2 = data2.slice(6,10);
                 console.log("data1 new", data1);
                 console.log("data2 new", data2);
-
                 var x = [];
                 var y = [];
-
                 x[0] = data1;
                 y[0] = data2;
                 console.log(x);
                 data1 = x;
                 data2 = y;
-            }else{
-
             }
 
 
