@@ -125,18 +125,21 @@ class Ajax extends CI_Controller {
     }
     public function jadwal_belanja(){
         $npk = $this->uri->segment(4);
+        if (!is_string($npk) || $npk === '' || strlen($npk) > 10) {
+            show_error('NPK tidak valid.', 400);
+        }
 
-        $this->db->select('join_date');		
-        $this->db->from('karyawan');		
+        $this->db->select('join_date');
+        $this->db->from('karyawan');
         $this->db->where('npk', $npk);
 
         $tgl = null;
-        $query = $this->db->get();		
-        foreach ($query->result() as $row)		
-        {		
-            $tgl = $row->join_date;		
+        $query = $this->db->get();
+        foreach ($query->result() as $row)
+        {
+            $tgl = $row->join_date;
         }
-        
+
         $now = time(); // or your date as well
         $your_date = strtotime($tgl);
         $datediff = $now - $your_date;
@@ -155,8 +158,12 @@ class Ajax extends CI_Controller {
     }
 
     public function limit_belanja(){
+        $npk = $this->uri->segment(4);
+        if (!is_string($npk) || $npk === '' || strlen($npk) > 10) {
+            show_error('NPK tidak valid.', 400);
+        }
+
         $tahun = date('y');		
-        $npk = $this->uri->segment(4);		
         // $bulan = date('-m-');
         $bulan = date('m');		
         $tgl = date('d');
@@ -415,22 +422,25 @@ class Ajax extends CI_Controller {
     }
 
     public function rekap_harian(){
+        date_default_timezone_set('Asia/Jakarta');
         $tgl = date('Y-m-d');
+        $start = $tgl.' 00:00:00';
+        $end = date('Y-m-d', strtotime($tgl.' +1 day')).' 00:00:00';
         $query = $this->db->query("
             SELECT penjualan.nota,karyawan.npk,karyawan.nama,karyawan.bagian,stok.barcode,stok.nama as item,penjualan.harga,penjualan.qty,penjualan.jumlah
             FROM penjualan,stok,karyawan
             WHERE penjualan.kode = stok.barcode AND
             karyawan.npk = penjualan.id_karyawan AND
-            penjualan.tgl LIKE '%$tgl%' 
+            penjualan.tgl >= ? AND penjualan.tgl < ?
             ORDER BY penjualan.id ASC
-        ");
+        ", array($start, $end));
 
         // echo "
         //     SELECT penjualan.nota,karyawan.npk,karyawan.nama,karyawan.bagian,stok.barcode,stok.nama,penjualan.harga,penjualan.qty,penjualan.jumlah
         //     FROM penjualan,stok,karyawan
         //     WHERE penjualan.kode = stok.barcode AND
         //     karyawan.npk = penjualan.id_karyawan AND
-        //     penjualan.tgl LIKE '%tgl%' 
+        //     penjualan.tgl LIKE '%tgl%'
         //     ORDER BY penjualan.id ASC
 
         // ";
@@ -460,8 +470,20 @@ class Ajax extends CI_Controller {
     }
 
     public function rekap_perorangan(){
-        $tgl = $this->uri->segment(4);
+        $seg_periode = $this->uri->segment(4);
         $npk = $this->uri->segment(5);
+
+        // Periode dipakai untuk rentang tanggal sekaligus nama file unduhan.
+        if (!is_string($seg_periode) || !preg_match('/^\d{1,2}$/', $seg_periode)) {
+            show_error('Periode laporan tidak valid.', 400);
+        }
+        $tgl = (int) $seg_periode;
+        if ($tgl < 1 || $tgl > 12) {
+            show_error('Periode laporan tidak valid.', 400);
+        }
+        if (!is_string($npk) || $npk === '' || strlen($npk) > 10) {
+            show_error('NPK tidak valid.', 400);
+        }
 
         $startdate = null;
         $startm = null;
@@ -469,13 +491,13 @@ class Ajax extends CI_Controller {
         $stopdate = null;
         $stopy = null;
 
-        if($tgl="1"){
+        if($tgl==1){
             $y = date('Y');
             $starty = $y - 1;
             $stopy = $y;
             $startm = '12';
             $startdate = $starty."-".$startm."-21";
-            $stopdate = $stopy."-".$tgl."-20";
+            $stopdate = $stopy."-".sprintf('%02d', $tgl)."-20";
         }else{
             $y = date('Y');
             $starty = $y;
@@ -490,44 +512,40 @@ class Ajax extends CI_Controller {
             FROM penjualan,stok,karyawan
             WHERE penjualan.kode = stok.barcode AND
             karyawan.npk = penjualan.id_karyawan AND
-            karyawan.npk = '$npk' AND
-            penjualan.tgl >= '%$startdate%' AND 
-            penjualan.tgl <= '%$stopdate%' 
+            karyawan.npk = ? AND
+            penjualan.tgl >= ? AND
+            penjualan.tgl <= ?
             ORDER BY penjualan.id ASC
-        ");
+        ", array($npk, $startdate.' 00:00:00', $stopdate.' 23:59:59'));
 
-        if($this->uri->segment(6)=="d"){
-            header('Content-Type: aplication/vnd-ms-excel; charset=utf-8');
+        $columns = array('nota', 'npk', 'nama', 'bagian', 'barcode', 'item', 'harga', 'qty', 'jumlah');
+        $rows = array();
+        foreach ($query->result_array() as $row) {
+            $rows[] = $row;
+        }
+
+        $download = ($this->uri->segment(6) == "d");
+        if ($download) {
+            header('Content-Type: application/vnd-ms-excel; charset=utf-8');
             header('Content-Disposition: attachment; filename=data_harian_'.$tgl.'.xls');
-            echo "nota\tnpk\tnama\tbagian\tbarcode\titem\tharga\tqty\tjumlah\n";
+            $this->_format_report($columns, $rows, "\t");
+        } else {
+            $this->_format_report($columns, $rows, ",");
+        }
+    }
 
-            foreach ($query->result() as $row)
-            {
-                echo $row->nota; echo "\t";
-                echo $row->npk; echo "\t";
-                echo $row->nama; echo "\t";
-                echo $row->bagian; echo "\t";
-                echo $row->barcode; echo "\t";
-                echo $row->item; echo "\t";
-                echo $row->harga; echo "\t";
-                echo $row->qty; echo "\t";
-                echo $row->jumlah; echo "\n";
+    /**
+     * Cetak laporan sebagai baris terpisah dengan pemisah tertentu.
+     */
+    private function _format_report($columns, $rows, $separator)
+    {
+        echo implode($separator, $columns)."\n";
+        foreach ($rows as $row) {
+            $values = array();
+            foreach ($columns as $column) {
+                $values[] = isset($row[$column]) ? $row[$column] : '';
             }
-        }else{
-            echo "nota,npk,nama,bagian,barcode,item,harga,qty,jumlah\n";
-
-            foreach ($query->result() as $row)
-            {
-                echo $row->nota; echo ",";
-                echo $row->npk; echo ",";
-                echo $row->nama; echo ",";
-                echo $row->bagian; echo ",";
-                echo $row->barcode; echo ",";
-                echo $row->item; echo ",";
-                echo $row->harga; echo ",";
-                echo $row->qty; echo ",";
-                echo $row->jumlah; echo "\n";
-            }
+            echo implode($separator, $values)."\n";
         }
     }
 
