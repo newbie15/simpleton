@@ -73,66 +73,22 @@ class Kasir extends CI_Controller {
 			show_404();
 		}
 
-		$nota = trim((string) $this->input->post('no', TRUE));
-		$id_user = trim((string) $this->input->post('id_user', TRUE));
-		$id_karyawan = trim((string) $this->input->post('id_karyawan', TRUE));
-		$payment_method = trim((string) $this->input->post('metode_pembayaran', TRUE));
-		$items_json = $this->input->post('items_json', FALSE);
-		$items = is_string($items_json) ? json_decode($items_json, TRUE) : NULL;
-		$allowed_methods = array('potong_gaji', 'tunai', 'qris', 'edc', 'transfer');
-
-		// Data pembayaran tambahan
-		$nominal_bayar  = (float) $this->input->post('nominal_bayar', TRUE);
-		$kode_voucher   = trim((string) $this->input->post('kode_voucher', TRUE));
-		$nomor_ref      = trim((string) $this->input->post('nomor_referensi', TRUE));
-		$bank_tujuan    = trim((string) $this->input->post('bank_tujuan', TRUE));
-
-		if ($nota === '' || strlen($nota) > 64 ||
-			$id_user === '' || strlen($id_user) > 32 ||
-			$id_karyawan === '' || strlen($id_karyawan) > 32 ||
-			!in_array($payment_method, $allowed_methods, TRUE) ||
-			!is_array($items) || count($items) === 0) {
-			$this->_checkout_json(FALSE, 'Data checkout tidak valid. Periksa NPK, kasir, metode pembayaran, dan keranjang.');
+		$input = $this->_checkout_input();
+		if ($input === FALSE) {
 			return;
 		}
+		$nota = $input['nota'];
+		$id_user = $input['id_user'];
+		$id_karyawan = $input['id_karyawan'];
+		$payment_method = $input['payment_method'];
+		$nominal_bayar = $input['nominal_bayar'];
+		$kode_voucher = $input['kode_voucher'];
+		$nomor_ref = $input['nomor_referensi'];
+		$bank_tujuan = $input['bank_tujuan'];
 
-		// Validasi field spesifik per metode pembayaran
-		if ($payment_method === 'tunai' && $nominal_bayar <= 0) {
-			$this->_checkout_json(FALSE, 'Pembayaran tunai memerlukan nominal yang dibayarkan.');
+		$clean_items = $this->_clean_cart_items($input['items']);
+		if ($clean_items === FALSE) {
 			return;
-		}
-		if ($payment_method === 'edc' && $nomor_ref === '') {
-			$this->_checkout_json(FALSE, 'Pembayaran EDC memerlukan nomor referensi/approval.');
-			return;
-		}
-		if ($payment_method === 'transfer' && $bank_tujuan === '') {
-			$this->_checkout_json(FALSE, 'Pembayaran transfer memerlukan nama bank tujuan.');
-			return;
-		}
-
-		$clean_items = array();
-		$seen_barcodes = array();
-		foreach ($items as $item) {
-			if (!is_array($item) || !isset($item['barcode'], $item['qty'])) {
-				$this->_checkout_json(FALSE, 'Data barang pada keranjang tidak valid.');
-				return;
-			}
-			$barcode = trim((string) $item['barcode']);
-			$qty = (string) $item['qty'];
-			$ppn = isset($item['ppn']) ? $item['ppn'] : 0;
-			if ($barcode === '' || strlen($barcode) > 64 ||
-				!preg_match('/^[1-9][0-9]*$/', $qty) ||
-				!is_numeric($ppn) || (float) $ppn < 0 ||
-				isset($seen_barcodes[$barcode])) {
-				$this->_checkout_json(FALSE, 'Barcode atau qty barang pada keranjang tidak valid.');
-				return;
-			}
-			$seen_barcodes[$barcode] = TRUE;
-			$clean_items[] = array(
-				'barcode' => $barcode,
-				'qty' => (int) $qty,
-				'ppn' => (float) $ppn
-			);
 		}
 
 		if ($this->_respond_existing_checkout($nota, $id_user, $id_karyawan)) {
@@ -146,6 +102,234 @@ class Kasir extends CI_Controller {
 			$this->_checkout_json(FALSE, 'Transaksi gagal dan belum tercatat. Database tidak dapat memulai penyimpanan.');
 			return;
 		}
+
+		$resolution = $this->_resolve_checkout_items($clean_items);
+		if (count($resolution['errors']) > 0) {
+			$database_error = $this->db->error();
+			$this->db->trans_rollback();
+			$this->db->db_debug = $previous_db_debug;
+			if (!empty($database_error['code'])) {
+				error_log('Checkout database error '.$database_error['code'].': '.$database_error['message']);
+				$this->_checkout_json(FALSE, 'Transaksi gagal dan belum tercatat (database error '.$database_error['code'].').');
+				return;
+			}
+			$this->_checkout_json(FALSE, 'Transaksi gagal dan belum tercatat.', $resolution['errors']);
+			return;
+		}
+		$resolved_items = $resolution['items'];
+
+		date_default_timezone_set('Asia/Jakarta');
+		$sale_time = date('Y-m-d H:i:s');
+
+		// Hitung total tagihan & siapkan record pembayaran
+		$total_tagihan = $this->_checkout_subtotal($resolved_items);
+
+		// Validasi voucher (opsional)
+		$diskon_voucher = 0.0;
+		$voucher_id_used = NULL;
+		if ($kode_voucher !== '') {
+			$voucher_result = $this->_apply_voucher($kode_voucher, $total_tagihan);
+			if (!$voucher_result['valid']) {
+				$this->db->trans_rollback();
+				$this->db->db_debug = $previous_db_debug;
+				$this->_checkout_json(FALSE, $voucher_result['message']);
+				return;
+			}
+			$diskon_voucher = $voucher_result['diskon'];
+			$voucher_id_used = $voucher_result['voucher_id'];
+			$total_tagihan = max(0, $total_tagihan - $diskon_voucher);
+		}
+
+		$is_cash = ($payment_method === 'tunai' || $payment_method === 'cash');
+
+		// Validasi kembalian untuk tunai
+		if ($is_cash && $nominal_bayar < $total_tagihan) {
+			$this->db->trans_rollback();
+			$this->db->db_debug = $previous_db_debug;
+			$this->_checkout_json(FALSE, 'Uang tunai yang dibayarkan ('.number_format($nominal_bayar).')'
+				.' kurang dari total tagihan ('.number_format($total_tagihan).').');
+			return;
+		}
+
+		$kembalian = $is_cash ? max(0, $nominal_bayar - $total_tagihan) : 0;
+
+		// Simpan tiap baris penjualan & kurangi stok
+		$errors = $this->_persist_sale_lines($resolved_items, $nota, $id_user, $id_karyawan, $sale_time, $payment_method);
+
+		if (count($errors) > 0) {
+			$this->db->trans_rollback();
+			$this->db->db_debug = $previous_db_debug;
+			$this->_checkout_json(FALSE, 'Transaksi gagal dan belum tercatat.', $errors);
+			return;
+		}
+
+		// Simpan header pembayaran ke penjualan_pembayaran
+		$this->db->insert('penjualan_pembayaran', array(
+			'nota'              => $nota,
+			'metode_pembayaran' => $payment_method,
+			'total_tagihan'     => $total_tagihan,
+			'nominal_bayar'     => $is_cash ? $nominal_bayar : $total_tagihan,
+			'kembalian'         => $kembalian,
+			'kode_voucher'      => $kode_voucher !== '' ? $kode_voucher : NULL,
+			'diskon_voucher'    => $diskon_voucher,
+			'nomor_referensi'   => $nomor_ref !== '' ? $nomor_ref : NULL,
+			'bank_tujuan'       => $bank_tujuan !== '' ? $bank_tujuan : NULL,
+			'id_user'           => $id_user,
+			'id_karyawan'       => $id_karyawan,
+			'waktu_transaksi'   => $sale_time,
+		));
+
+		// Catat penggunaan voucher jika ada
+		if ($voucher_id_used !== NULL) {
+			$this->db->query(
+				'UPDATE `vouchers` SET `terpakai` = `terpakai` + 1 WHERE `id` = ?',
+				array($voucher_id_used)
+			);
+			$this->db->insert('voucher_usages', array(
+				'voucher_id'     => $voucher_id_used,
+				'nota'           => $nota,
+				'npk_anggota'    => $id_karyawan,
+				'nominal_diskon' => $diskon_voucher,
+				'used_at'        => $sale_time,
+			));
+		}
+
+		$journal_error = $this->_post_checkout_journal($nota, $payment_method, $id_user, $sale_time, $total_tagihan, $diskon_voucher, $kode_voucher);
+		if ($journal_error !== NULL) {
+			$this->db->trans_rollback();
+			$this->db->db_debug = $previous_db_debug;
+			log_message('error', 'Gagal memposting jurnal POS '.$nota.': '.$journal_error);
+			$this->_checkout_json(FALSE, 'Transaksi gagal dicatat karena jurnal akuntansi tidak dapat dibuat.');
+			return;
+		}
+
+		if ($this->db->trans_status() === FALSE) {
+			$database_error = $this->db->error();
+			$this->db->trans_rollback();
+			$this->db->db_debug = $previous_db_debug;
+			if ($this->_respond_existing_checkout($nota, $id_user, $id_karyawan)) {
+				return;
+			}
+			$error_code = !empty($database_error['code']) ? $database_error['code'] : 'unknown';
+			$error_message = !empty($database_error['message']) ? $database_error['message'] : 'Database transaction failed.';
+			error_log('Checkout database error '.$error_code.': '.$error_message);
+			$this->_checkout_json(FALSE, 'Transaksi gagal dan belum tercatat (database error '.$error_code.').');
+			return;
+		}
+		if (!$this->db->trans_commit()) {
+			$database_error = $this->db->error();
+			$this->db->trans_rollback();
+			$this->db->db_debug = $previous_db_debug;
+			if ($this->_respond_existing_checkout($nota, $id_user, $id_karyawan)) {
+				return;
+			}
+			$error_code = !empty($database_error['code']) ? $database_error['code'] : 'unknown';
+			$error_message = !empty($database_error['message']) ? $database_error['message'] : 'Database commit failed.';
+			error_log('Checkout database error '.$error_code.': '.$error_message);
+			$this->_checkout_json(FALSE, 'Transaksi gagal dan belum tercatat (database error '.$error_code.').');
+			return;
+		}
+		$this->db->db_debug = $previous_db_debug;
+		$this->_checkout_json(TRUE, 'Transaksi berhasil dicatat.', array(), array(
+			'kembalian'      => $kembalian,
+			'total_tagihan'  => $total_tagihan,
+			'diskon_voucher' => $diskon_voucher,
+		));
+	}
+
+	/**
+	 * Ambil & validasi input checkout. Return array data siap pakai, atau FALSE jika respons error sudah dikirim.
+	 */
+	private function _checkout_input()
+	{
+		$nota = trim((string) $this->input->post('no', TRUE));
+		$id_user = trim((string) $this->input->post('id_user', TRUE));
+		$id_karyawan = trim((string) $this->input->post('id_karyawan', TRUE));
+		$payment_method = trim((string) $this->input->post('metode_pembayaran', TRUE));
+		$items_json = $this->input->post('items_json', FALSE);
+		$items = is_string($items_json) ? json_decode($items_json, TRUE) : NULL;
+		$allowed_methods = array('potong_gaji', 'tunai', 'cash', 'qris', 'edc', 'transfer');
+
+		// Data pembayaran tambahan
+		$nominal_bayar  = (float) $this->input->post('nominal_bayar', TRUE);
+		$kode_voucher   = trim((string) $this->input->post('kode_voucher', TRUE));
+		$nomor_ref      = trim((string) $this->input->post('nomor_referensi', TRUE));
+		$bank_tujuan    = trim((string) $this->input->post('bank_tujuan', TRUE));
+
+		if ($nota === '' || strlen($nota) > 64 ||
+			$id_user === '' || strlen($id_user) > 32 ||
+			$id_karyawan === '' || strlen($id_karyawan) > 32 ||
+			!in_array($payment_method, $allowed_methods, TRUE) ||
+			!is_array($items) || count($items) === 0) {
+			$this->_checkout_json(FALSE, 'Data checkout tidak valid. Periksa NPK, kasir, metode pembayaran, dan keranjang.');
+			return FALSE;
+		}
+
+		// Validasi field spesifik per metode pembayaran
+		$is_cash = ($payment_method === 'tunai' || $payment_method === 'cash');
+		if ($is_cash && $nominal_bayar <= 0) {
+			$this->_checkout_json(FALSE, 'Pembayaran tunai memerlukan nominal yang dibayarkan.');
+			return FALSE;
+		}
+		if ($payment_method === 'edc' && $nomor_ref === '') {
+			$this->_checkout_json(FALSE, 'Pembayaran EDC memerlukan nomor referensi/approval.');
+			return FALSE;
+		}
+		if ($payment_method === 'transfer' && $bank_tujuan === '') {
+			$this->_checkout_json(FALSE, 'Pembayaran transfer memerlukan nama bank tujuan.');
+			return FALSE;
+		}
+
+		return array(
+			'nota'             => $nota,
+			'id_user'          => $id_user,
+			'id_karyawan'      => $id_karyawan,
+			'payment_method'   => $payment_method,
+			'nominal_bayar'    => $nominal_bayar,
+			'kode_voucher'     => $kode_voucher,
+			'nomor_referensi'  => $nomor_ref,
+			'bank_tujuan'      => $bank_tujuan,
+			'items'            => $items,
+		);
+	}
+
+	/**
+	 * Bersihkan & validasi baris keranjang. Return array item bersih, atau FALSE jika respons error sudah dikirim.
+	 */
+	private function _clean_cart_items($items)
+	{
+		$clean_items = array();
+		$seen_barcodes = array();
+		foreach ($items as $item) {
+			if (!is_array($item) || !isset($item['barcode'], $item['qty'])) {
+				$this->_checkout_json(FALSE, 'Data barang pada keranjang tidak valid.');
+				return FALSE;
+			}
+			$barcode = trim((string) $item['barcode']);
+			$qty = (string) $item['qty'];
+			$ppn = isset($item['ppn']) ? $item['ppn'] : 0;
+			if ($barcode === '' || strlen($barcode) > 64 ||
+				!preg_match('/^[1-9][0-9]*$/', $qty) ||
+				!is_numeric($ppn) || (float) $ppn < 0 ||
+				isset($seen_barcodes[$barcode])) {
+				$this->_checkout_json(FALSE, 'Barcode atau qty barang pada keranjang tidak valid.');
+				return FALSE;
+			}
+			$seen_barcodes[$barcode] = TRUE;
+			$clean_items[] = array(
+				'barcode' => $barcode,
+				'qty' => (int) $qty,
+				'ppn' => (float) $ppn
+			);
+		}
+		return $clean_items;
+	}
+
+	/**
+	 * Resolve tiap item ke produk & stok (termasuk rencana buka dus). Return ['items'=>[], 'errors'=>[]].
+	 */
+	private function _resolve_checkout_items($clean_items)
+	{
 		$resolved_items = array();
 		$errors = array();
 		foreach ($clean_items as $item) {
@@ -218,23 +402,14 @@ class Kasir extends CI_Controller {
 			);
 		}
 
-		if (count($errors) > 0) {
-			$database_error = $this->db->error();
-			$this->db->trans_rollback();
-			$this->db->db_debug = $previous_db_debug;
-			if (!empty($database_error['code'])) {
-				error_log('Checkout database error '.$database_error['code'].': '.$database_error['message']);
-				$this->_checkout_json(FALSE, 'Transaksi gagal dan belum tercatat (database error '.$database_error['code'].').');
-				return;
-			}
-			$this->_checkout_json(FALSE, 'Transaksi gagal dan belum tercatat.', $errors);
-			return;
-		}
+		return array('items' => $resolved_items, 'errors' => $errors);
+	}
 
-		date_default_timezone_set('Asia/Jakarta');
-		$sale_time = date('Y-m-d H:i:s');
-
-		// Hitung total tagihan & siapkan record pembayaran
+	/**
+	 * Hitung total tagihan (harga * qty + PPN per baris).
+	 */
+	private function _checkout_subtotal($resolved_items)
+	{
 		$total_tagihan = 0;
 		foreach ($resolved_items as $item) {
 			$subtotal = (int) $item['product']->harga * $item['qty'];
@@ -243,35 +418,15 @@ class Kasir extends CI_Controller {
 			}
 			$total_tagihan += $subtotal;
 		}
+		return $total_tagihan;
+	}
 
-		// Validasi voucher (opsional)
-		$diskon_voucher = 0.0;
-		$voucher_id_used = NULL;
-		if ($kode_voucher !== '') {
-			$voucher_result = $this->_apply_voucher($kode_voucher, $total_tagihan);
-			if (!$voucher_result['valid']) {
-				$this->db->trans_rollback();
-				$this->db->db_debug = $previous_db_debug;
-				$this->_checkout_json(FALSE, $voucher_result['message']);
-				return;
-			}
-			$diskon_voucher = $voucher_result['diskon'];
-			$voucher_id_used = $voucher_result['voucher_id'];
-			$total_tagihan = max(0, $total_tagihan - $diskon_voucher);
-		}
-
-		// Validasi kembalian untuk tunai
-		if ($payment_method === 'tunai' && $nominal_bayar < $total_tagihan) {
-			$this->db->trans_rollback();
-			$this->db->db_debug = $previous_db_debug;
-			$this->_checkout_json(FALSE, 'Uang tunai yang dibayarkan ('.number_format($nominal_bayar).')'
-				.' kurang dari total tagihan ('.number_format($total_tagihan).').');
-			return;
-		}
-
-		$kembalian = ($payment_method === 'tunai') ? max(0, $nominal_bayar - $total_tagihan) : 0;
-
-		// Simpan tiap baris penjualan & kurangi stok
+	/**
+	 * Kurangi stok (termasuk buka dus) dan tulis baris penjualan. Return daftar error.
+	 */
+	private function _persist_sale_lines($resolved_items, $nota, $id_user, $id_karyawan, $sale_time, $payment_method)
+	{
+		$errors = array();
 		foreach ($resolved_items as $item) {
 			$product = $item['product'];
 			$qty = $item['qty'];
@@ -323,45 +478,14 @@ class Kasir extends CI_Controller {
 				'metode_pembayaran' => $payment_method,
 			));
 		}
+		return $errors;
+	}
 
-		if (count($errors) > 0) {
-			$this->db->trans_rollback();
-			$this->db->db_debug = $previous_db_debug;
-			$this->_checkout_json(FALSE, 'Transaksi gagal dan belum tercatat.', $errors);
-			return;
-		}
-
-		// Simpan header pembayaran ke penjualan_pembayaran
-		$this->db->insert('penjualan_pembayaran', array(
-			'nota'              => $nota,
-			'metode_pembayaran' => $payment_method,
-			'total_tagihan'     => $total_tagihan,
-			'nominal_bayar'     => ($payment_method === 'tunai') ? $nominal_bayar : $total_tagihan,
-			'kembalian'         => $kembalian,
-			'kode_voucher'      => $kode_voucher !== '' ? $kode_voucher : NULL,
-			'diskon_voucher'    => $diskon_voucher,
-			'nomor_referensi'   => $nomor_ref !== '' ? $nomor_ref : NULL,
-			'bank_tujuan'       => $bank_tujuan !== '' ? $bank_tujuan : NULL,
-			'id_user'           => $id_user,
-			'id_karyawan'       => $id_karyawan,
-			'waktu_transaksi'   => $sale_time,
-		));
-
-		// Catat penggunaan voucher jika ada
-		if ($voucher_id_used !== NULL) {
-			$this->db->query(
-				'UPDATE `vouchers` SET `terpakai` = `terpakai` + 1 WHERE `id` = ?',
-				array($voucher_id_used)
-			);
-			$this->db->insert('voucher_usages', array(
-				'voucher_id'     => $voucher_id_used,
-				'nota'           => $nota,
-				'npk_anggota'    => $id_karyawan,
-				'nominal_diskon' => $diskon_voucher,
-				'used_at'        => $sale_time,
-			));
-		}
-
+	/**
+	 * Posting jurnal POS. Return pesan error, atau NULL jika sukses.
+	 */
+	private function _post_checkout_journal($nota, $payment_method, $id_user, $sale_time, $total_tagihan, $diskon_voucher, $kode_voucher)
+	{
 		$this->load->library('accounting');
 		$sale_totals = $this->db->query("
 			SELECT COALESCE(SUM(jumlah), 0) AS gross_sales,
@@ -370,8 +494,7 @@ class Kasir extends CI_Controller {
 			FROM penjualan
 			WHERE nota = ?
 		", array($nota))->row();
-		$payment_account = $payment_method === 'tunai' ? '1101' :
-			($payment_method === 'potong_gaji' ? '1103' : '1102');
+		$payment_account = self::_payment_account($payment_method);
 		$journal_lines = array();
 		$payment_amount = round((float) $total_tagihan, 2);
 		$discount_amount = round((float) $diskon_voucher, 2);
@@ -432,46 +555,9 @@ class Kasir extends CI_Controller {
 			$id_user,
 			$journal_lines
 		)) {
-			$accounting_error = $this->accounting->error();
-			$this->db->trans_rollback();
-			$this->db->db_debug = $previous_db_debug;
-			log_message('error', 'Gagal memposting jurnal POS '.$nota.': '.$accounting_error);
-			$this->_checkout_json(FALSE, 'Transaksi gagal dicatat karena jurnal akuntansi tidak dapat dibuat.');
-			return;
+			return $this->accounting->error();
 		}
-
-		if ($this->db->trans_status() === FALSE) {
-			$database_error = $this->db->error();
-			$this->db->trans_rollback();
-			$this->db->db_debug = $previous_db_debug;
-			if ($this->_respond_existing_checkout($nota, $id_user, $id_karyawan)) {
-				return;
-			}
-			$error_code = !empty($database_error['code']) ? $database_error['code'] : 'unknown';
-			$error_message = !empty($database_error['message']) ? $database_error['message'] : 'Database transaction failed.';
-			error_log('Checkout database error '.$error_code.': '.$error_message);
-			$this->_checkout_json(FALSE, 'Transaksi gagal dan belum tercatat (database error '.$error_code.').');
-			return;
-		}
-		if (!$this->db->trans_commit()) {
-			$database_error = $this->db->error();
-			$this->db->trans_rollback();
-			$this->db->db_debug = $previous_db_debug;
-			if ($this->_respond_existing_checkout($nota, $id_user, $id_karyawan)) {
-				return;
-			}
-			$error_code = !empty($database_error['code']) ? $database_error['code'] : 'unknown';
-			$error_message = !empty($database_error['message']) ? $database_error['message'] : 'Database commit failed.';
-			error_log('Checkout database error '.$error_code.': '.$error_message);
-			$this->_checkout_json(FALSE, 'Transaksi gagal dan belum tercatat (database error '.$error_code.').');
-			return;
-		}
-		$this->db->db_debug = $previous_db_debug;
-		$this->_checkout_json(TRUE, 'Transaksi berhasil dicatat.', array(), array(
-			'kembalian'      => $kembalian,
-			'total_tagihan'  => $total_tagihan,
-			'diskon_voucher' => $diskon_voucher,
-		));
+		return NULL;
 	}
 
 	private function _respond_existing_checkout($nota, $id_user, $id_karyawan)
@@ -555,6 +641,27 @@ class Kasir extends CI_Controller {
 			'message' => $result['message'],
 			'diskon'  => $result['diskon'],
 		)));
+	}
+
+	/**
+	 * Peta kode akun kas/bank berdasarkan metode pembayaran.
+	 * 1101 = kas tunai, 1102 = bank/EDC, 1103 = piutang karyawan (potong gaji).
+	 */
+	private static function _payment_account($payment_method)
+	{
+		switch ($payment_method) {
+			case 'tunai':
+			case 'cash':
+				return '1101';
+			case 'potong_gaji':
+				return '1103';
+			case 'edc':
+			case 'transfer':
+			case 'qris':
+				return '1102';
+			default:
+				return '1102';
+		}
 	}
 
 	private function _checkout_json($success, $message, $errors = array(), $data = array())

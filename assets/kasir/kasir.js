@@ -137,7 +137,7 @@ $(document).ready(function(){
 
     function updatePaymentFields() {
         var method = $("#metode_pembayaran").val();
-        $("#cash-payment-fields").toggle(method === "tunai");
+        $("#cash-payment-fields").toggle(method === "cash");
         $("#edc-payment-fields").toggle(method === "edc");
         $("#transfer-payment-fields").toggle(method === "transfer");
     }
@@ -230,7 +230,7 @@ $(document).ready(function(){
                         last = '=C' + ln + '*D' + ln;
                         if(pajak_active){
                             pajak = '=E' +ln + '*F' + ln;
-                            dx.push([kode, nama, harga, kuantiti, last, ppn, pajak]);    
+                            dx.push([kode, nama, harga, kuantiti, last, ppn, pajak]);
                         }else{
                             dx.push([kode, nama, harga, kuantiti, last]);
                         }
@@ -324,7 +324,7 @@ $(document).ready(function(){
             });
         }
     });
-    
+
     $("#barcode").keypress(function(e){
         if(e.which==13 && $(this).val()!=""){
             var t = $(this).val();
@@ -392,6 +392,55 @@ $(document).ready(function(){
         }
     });
 
+    function updatePaymentDisplay() {
+        var voucherCode = $.trim($("#checkout-voucher").val());
+        var baseTotl = totl;
+        var diskon = 0;
+
+        // Simplified voucher check - adjust if needed based on your backend
+        // For now, assume voucher validation happens server-side
+        var finalTotl = baseTotl - diskon;
+
+        // Display total amount due (small display)
+        $("#payment-total-display").html(formatRupiah(Math.round(finalTotl)));
+
+        // Display total amount due (large display)
+        $("#payment-total-large").html(formatRupiah(Math.round(finalTotl)));
+
+        // Calculate change
+        var nominalBayar = parseFloat($("#nominal-bayar").val()) || 0;
+        var kembalian = nominalBayar - finalTotl;
+
+        // Update status text
+        var paymentMethod = $("#metode_pembayaran").val();
+        var statusText = "Masukkan nominal pembayaran";
+
+        if (paymentMethod === "cash") {
+            if (nominalBayar > 0) {
+                if (kembalian >= 0) {
+                    statusText = "✓ Pembayaran OK - Kembalian: Rp " + formatRupiah(Math.round(kembalian));
+                } else {
+                    statusText = "✗ Kurang bayar: Rp " + formatRupiah(Math.round(Math.abs(kembalian)));
+                }
+            }
+        } else if (paymentMethod === "edc") {
+            statusText = "Menunggu referensi EDC...";
+        } else if (paymentMethod === "transfer") {
+            statusText = "Menunggu konfirmasi bank tujuan...";
+        }
+        $("#payment-status-text").html(statusText);
+
+        // Display kembalian (small display - only for cash)
+        if (kembalian >= 0) {
+            $("#payment-kembalian-display").html(formatRupiah(Math.round(kembalian))).css("color", "green");
+        } else {
+            $("#payment-kembalian-display").html("- " + formatRupiah(Math.round(Math.abs(kembalian)))).css("color", "red");
+        }
+    }
+
+    $("#nominal-bayar").on("input change", updatePaymentDisplay);
+    $("#checkout-voucher").on("input change", updatePaymentDisplay);
+
     function openCheckout(){
         if (checkoutInProgress) {
             return;
@@ -426,6 +475,7 @@ $(document).ready(function(){
         );
         updatePaymentFields();
         $("#checkout-modal").modal("show");
+        updatePaymentDisplay();
     }
 
     function buildCheckoutPayload() {
@@ -440,12 +490,12 @@ $(document).ready(function(){
             alert("Keranjang belanja masih kosong.");
             return null;
         }
-        var amountPaid = paymentMethod === "tunai"
+        var amountPaid = paymentMethod === "cash"
             ? parseFloat($("#nominal-bayar").val())
             : totl;
         var referenceNumber = $.trim($("#nomor-referensi").val());
         var targetBank = $.trim($("#bank-tujuan").val());
-        if (paymentMethod === "tunai" && (!isFinite(amountPaid) || amountPaid <= 0)) {
+        if (paymentMethod === "cash" && (!isFinite(amountPaid) || amountPaid <= 0)) {
             alert("Masukkan jumlah uang tunai yang diterima.");
             $("#nominal-bayar").focus();
             return null;

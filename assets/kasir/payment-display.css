@@ -1,0 +1,118 @@
+/* Payment Display Styling */
+.payment-display-section {
+    background: #f5f5f5;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    padding: 20px;
+    margin: 20px 0;
+}
+
+.payment-display-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding: 15px;
+    background: white;
+    border-radius: 6px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.payment-display-label {
+    font-size: 16px;
+    font-weight: 600;
+    color: #333;
+    min-width: 150px;
+}
+
+.payment-display-value {
+    font-size: 24px;
+    font-weight: 700;
+    color: #007bff;
+    text-align: right;
+    min-width: 200px;
+}
+
+.payment-display-value.total {
+    color: #0056b3;
+    font-size: 28px;
+}
+
+.payment-display-value.change {
+    font-size: 26px;
+}
+
+.payment-input-group {
+    margin: 20px 0;
+}
+
+.payment-input-group label {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 8px;
+}
+
+.payment-input-group input {
+    width: 100%;
+    padding: 12px;
+    font-size: 16px;
+    border: 2px solid #ddd;
+    border-radius: 6px;
+    transition: border-color 0.3s;
+}
+
+.payment-input-group input:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25);
+}
+
+.payment-summary {
+    background: #e7f3ff;
+    border-left: 4px solid #007bff;
+    padding: 15px;
+    margin: 20px 0;
+    border-radius: 4px;
+}
+
+.payment-summary h4 {
+    margin: 0 0 10px 0;
+    color: #0056b3;
+    font-size: 16px;
+}
+
+.payment-summary p {
+    margin: 5px 0;
+    color: #333;
+    font-size: 14px;
+}
+
+/* Large display for visibility */
+.payment-large-display {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 30px;
+    border-radius: 8px;
+    text-align: center;
+    margin: 20px 0;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+}
+
+.payment-large-display .label {
+    font-size: 14px;
+    opacity: 0.9;
+    margin-bottom: 5px;
+}
+
+.payment-large-display .value {
+    font-size: 36px;
+    font-weight: 700;
+    margin: 10px 0;
+}
+
+.payment-large-display .rupiah {
+    font-size: 18px;
+    opacity: 0.95;
+}

@@ -381,13 +381,37 @@ class Examples extends CI_Controller {
                 <div class="modal-body">
                   <p id="checkout-summary"></p>
                   <div id="checkout-retry-notice" class="alert alert-warning" style="display:none;"></div>
+
+                  <!-- Payment Display Section -->
+                  <div id="payment-display-section" style="margin-bottom: 20px; padding: 15px; background-color: #f9f9f9; border-radius: 4px;">
+                    <div class="form-group" data-checkout-field>
+                      <label for="metode_pembayaran">Metode Pembayaran</label>
+                      <select class="form-control" id="metode_pembayaran">
+                        <option value="">-- Pilih metode pembayaran --</option>
+                        <option value="cash">Tunai</option>
+                        <option value="edc">Kartu Kredit/Debit (EDC)</option>
+                        <option value="transfer">Transfer Bank</option>
+                      </select>
+                    </div>
+
+                    <div style="background-color: white; padding: 12px; border-radius: 4px; text-align: center; margin-bottom: 15px;">
+                      <div style="font-size: 12px; color: #666; margin-bottom: 5px;">Total Pembayaran</div>
+                      <div id="payment-total-display" style="font-size: 24px; font-weight: bold; color: #2c3e50;">Rp 0</div>
+                    </div>
+                  </div>
+                  <!-- End Payment Display Section -->
+
                   <div class="form-group" data-checkout-field>
                     <label for="checkout-voucher">Kode voucher (opsional)</label>
                     <input class="form-control" type="text" id="checkout-voucher" maxlength="32" autocomplete="off">
                   </div>
-                  <div class="form-group" id="cash-payment-fields" data-checkout-field style="display:none;">
+                   <div class="form-group" id="cash-payment-fields" data-checkout-field style="display:none;">
                     <label for="nominal-bayar">Uang tunai diterima</label>
                     <input class="form-control" type="number" id="nominal-bayar" min="0" step="100" inputmode="numeric">
+                    <div style="margin-top: 12px; padding: 12px; background-color: #ecf0f1; border-radius: 4px;">
+                      <div style="font-size: 12px; color: #666; margin-bottom: 5px;">Kembalian</div>
+                      <div id="payment-kembalian-display" style="font-size: 20px; font-weight: bold; color: #27ae60;">Rp 0</div>
+                    </div>
                   </div>
                   <div class="form-group" id="edc-payment-fields" data-checkout-field style="display:none;">
                     <label for="nomor-referensi">Nomor referensi / approval EDC</label>
