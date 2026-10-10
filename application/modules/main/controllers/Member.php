@@ -80,7 +80,8 @@ class Member extends CI_Controller
 
 			$data['purchases'] = $this->db->query("
 				SELECT sale.nota, MAX(sale.tgl) AS purchased_at, COUNT(*) AS item_count,
-					COALESCE(MAX(payment.total_tagihan), SUM(sale.jumlah)) AS amount
+					COALESCE(MAX(payment.total_tagihan), SUM(sale.jumlah)) AS amount,
+					COALESCE(NULLIF(MAX(payment.metode_pembayaran), ''), NULLIF(MAX(sale.metode_pembayaran), ''), 'tidak_tercatat') AS payment_method
 				FROM penjualan sale
 				LEFT JOIN penjualan_pembayaran payment ON payment.nota = sale.nota
 				WHERE sale.id_karyawan = ?
@@ -97,13 +98,12 @@ class Member extends CI_Controller
 					$receipts[] = $purchase->nota;
 				}
 				$purchase_items = $this->db
-					->select('sale.nota, sale.kode, MAX(stock.nama) AS product_name, SUM(sale.qty) AS quantity')
+					->select('sale.id, sale.nota, sale.kode, (SELECT MAX(stock.nama) FROM stok stock WHERE stock.barcode = sale.kode) AS product_name, sale.harga, sale.qty AS quantity, sale.jumlah', FALSE)
 					->from('penjualan sale')
-					->join('stok stock', 'stock.barcode = sale.kode', 'left')
 					->where_in('sale.nota', $receipts)
 					->where('sale.id_karyawan', $npk)
-					->group_by(array('sale.nota', 'sale.kode'))
 					->order_by('sale.nota', 'DESC')
+					->order_by('sale.id', 'ASC')
 					->get()
 					->result();
 				$items_by_receipt = array();

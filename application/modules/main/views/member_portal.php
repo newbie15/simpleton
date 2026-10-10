@@ -111,13 +111,22 @@
 					<?php foreach ($purchases as $purchase): ?>
 					<article class="entry">
 						<div class="entry-head">
-							<div><h3><?php echo html_escape($purchase->nota); ?></h3><p class="muted"><?php echo html_escape(date('d/m/Y H:i', strtotime($purchase->purchased_at))); ?> · <?php echo (int) $purchase->item_count; ?> baris barang</p></div>
+							<div>
+								<h3><?php echo html_escape($purchase->nota); ?></h3>
+								<p class="muted"><?php echo html_escape(date('d/m/Y H:i', strtotime($purchase->purchased_at))); ?> · <?php echo (int) $purchase->item_count; ?> baris barang</p>
+								<p class="muted">Pembayaran: <?php echo html_escape(ucwords(str_replace('_', ' ', $purchase->payment_method))); ?></p>
+							</div>
 							<strong>Rp <?php echo number_format((float) $purchase->amount, 0, ',', '.'); ?></strong>
 						</div>
 						<?php if (count($purchase->items) > 0): ?>
 						<details><summary>Lihat barang</summary><ul>
 							<?php foreach ($purchase->items as $item): ?>
-							<li><?php echo html_escape($item->product_name ? $item->product_name : $item->kode); ?> × <?php echo number_format((float) $item->quantity, 0, ',', '.'); ?></li>
+							<li>
+								<?php echo html_escape($item->product_name ? $item->product_name : $item->kode); ?>:
+								Rp <?php echo number_format((float) $item->harga, 0, ',', '.'); ?> ×
+								<?php echo number_format((float) $item->quantity, 0, ',', '.'); ?> =
+								Rp <?php echo number_format((float) $item->jumlah, 0, ',', '.'); ?>
+							</li>
 							<?php endforeach; ?>
 						</ul></details>
 						<?php endif; ?>
