@@ -120,6 +120,25 @@ class Kasir extends CI_Controller {
 
 		date_default_timezone_set('Asia/Jakarta');
 		$sale_time = date('Y-m-d H:i:s');
+		if (($payment_method === 'tunai' || $payment_method === 'cash') &&
+			$this->db->table_exists('acc_cash_funds') &&
+			$this->db->table_exists('acc_cash_closings')) {
+			$cashier_fund = $this->db->query("
+				SELECT id FROM acc_cash_funds
+				WHERE fund_slot = 'cashier' AND is_active = 1
+				FOR UPDATE
+			")->row();
+			$cashier_closed = $cashier_fund ? $this->db->get_where('acc_cash_closings', array(
+				'fund_id' => (int) $cashier_fund->id,
+				'closing_date' => substr($sale_time, 0, 10)
+			))->row() : NULL;
+			if ($cashier_closed) {
+				$this->db->trans_rollback();
+				$this->db->db_debug = $previous_db_debug;
+				$this->_checkout_json(FALSE, 'Laci kasir sudah ditutup untuk hari ini. Hubungi pengurus untuk membuka layanan kasir berikutnya.');
+				return;
+			}
+		}
 
 		// Hitung total tagihan & siapkan record pembayaran
 		$total_tagihan = $this->_checkout_subtotal($resolved_items);

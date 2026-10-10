@@ -13,6 +13,7 @@ $config['pages'] = array(
 	'sales_return' => array('label' => 'Retur Penjualan', 'uri' => 'main/sales_return'),
 	'supplier_return' => array('label' => 'Retur Supplier', 'uri' => 'main/supplier_return'),
 	'accounting' => array('label' => 'Accounting', 'uri' => 'main/accounting'),
+	'petty_cash' => array('label' => 'Kas & Petty Cash', 'uri' => 'main/petty_cash'),
 	'suppliers' => array('label' => 'Supplier', 'uri' => 'main/purchasing/suppliers'),
 	'users' => array('label' => 'Manajemen User', 'uri' => 'auth/index'),
 	'karyawan' => array('label' => 'Karyawan', 'uri' => 'main/examples/karyawan'),

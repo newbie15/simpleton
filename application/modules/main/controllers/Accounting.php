@@ -70,7 +70,7 @@ class Accounting extends CI_Controller
 					$net_income -= $account->debit - $account->credit;
 				}
 			}
-			if (in_array($account->code, array('1101', '1102'), TRUE)) {
+			if (in_array($account->code, array('1101', '1102', '1106', '1107'), TRUE)) {
 				$cash_movement += $account->debit - $account->credit;
 			}
 		}
@@ -214,13 +214,13 @@ class Accounting extends CI_Controller
 				SELECT item.journal_id, SUM(item.debit) AS debit, SUM(item.credit) AS credit
 				FROM acc_journal_items item
 				JOIN acc_accounts cash_account ON cash_account.id = item.account_id
-				WHERE cash_account.code IN ('1101', '1102')
+				WHERE cash_account.code IN ('1101', '1102', '1106', '1107')
 				GROUP BY item.journal_id
 			) cash ON cash.journal_id = journal.id
 			JOIN acc_journal_items counterpart ON counterpart.journal_id = journal.id
 			JOIN acc_accounts account ON account.id = counterpart.account_id
 			WHERE journal.is_posted = 1 AND journal.date BETWEEN ? AND ?
-				AND account.code NOT IN ('1101', '1102')
+				AND account.code NOT IN ('1101', '1102', '1106', '1107')
 			GROUP BY journal.id, journal.date, journal.journal_number,
 				journal.reference_type, journal.description, account.id,
 				account.code, account.name, account.type
@@ -486,6 +486,18 @@ class Accounting extends CI_Controller
 				) missing
 			", array($start_date, $end_date))->row()->total
 		);
+		if ($this->db->table_exists('acc_cash_transactions')) {
+			$unposted['PETTY_CASH'] = (int) $this->db->query("
+				SELECT COUNT(*) AS total
+				FROM acc_cash_transactions cash_tx
+				LEFT JOIN acc_journals journal
+					ON journal.reference_type = 'PETTY_CASH'
+					AND journal.reference_id = CAST(cash_tx.id AS CHAR)
+				WHERE (cash_tx.status = 'pending'
+					OR (cash_tx.status = 'posted' AND journal.id IS NULL))
+					AND cash_tx.transaction_date BETWEEN ? AND ?
+			", array($start_date, $end_date))->row()->total;
+		}
 		$unbalanced = (int) $this->db->query("
 			SELECT COUNT(*) AS total FROM (
 				SELECT journal.id
@@ -516,7 +528,7 @@ class Accounting extends CI_Controller
 
 	private function _get_unposted_counts()
 	{
-		return array(
+		$counts = array(
 			'POS' => (int) $this->db->query("
 				SELECT COUNT(DISTINCT sale.nota) AS total
 				FROM penjualan sale
@@ -564,6 +576,18 @@ class Accounting extends CI_Controller
 				) missing_opnames
 			")->row()->total
 		);
+		if ($this->db->table_exists('acc_cash_transactions')) {
+			$counts['PETTY_CASH'] = (int) $this->db->query("
+				SELECT COUNT(*) AS total
+				FROM acc_cash_transactions cash_tx
+				LEFT JOIN acc_journals journal
+					ON journal.reference_type = 'PETTY_CASH'
+					AND journal.reference_id = CAST(cash_tx.id AS CHAR)
+				WHERE cash_tx.status = 'pending'
+					OR (cash_tx.status = 'posted' AND journal.id IS NULL)
+			")->row()->total;
+		}
+		return $counts;
 	}
 
 	private function _is_date($value)

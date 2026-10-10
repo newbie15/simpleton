@@ -1,0 +1,12 @@
+{
+    "php.version": "5.6",
+    "php.executablePath": "G:\\xampp\\php\\php.exe",
+    "php.executables": {
+        "5.6": "G:\\xampp\\php\\php.exe"
+    },
+    "php.problems.exclude": {
+        "application/third_party/": true
+    },
+    "intelephense.environment.phpVersion": "5.6",
+    "CodeGPT.apiKey": "CodeGPT Plus Beta"
+}

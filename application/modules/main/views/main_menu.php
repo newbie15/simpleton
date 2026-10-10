@@ -13,6 +13,7 @@ $back_end_items = array(
 	array('sales_return', 'Retur Penjualan', 'main/sales_return', 'fa-reply', isset($m_sales_return)),
 	array('supplier_return', 'Retur Supplier', 'main/supplier_return', 'fa-reply-all', isset($m_supplier_return)),
 	array('accounting', 'Accounting', 'main/accounting', 'fa-book', isset($m_accounting)),
+	array('petty_cash', 'Kas & Petty Cash', 'main/petty_cash', 'fa-money', isset($m_petty_cash)),
 	array('suppliers', 'Supplier', 'main/purchasing/suppliers', 'fa-building', isset($m_supplier)),
 	array('users', 'Manajemen User', 'auth/index', 'fa-user', isset($m_user) || isset($m_auth_index)),
 	array('karyawan', 'Karyawan', 'main/examples/karyawan', 'fa-users', isset($m_karyawan)),
@@ -65,7 +66,7 @@ foreach ($back_end_items as $item) {
 	isset($m_supplier) || isset($m_user) || isset($m_karyawan) || isset($m_kartu) ||
 	isset($m_foto) || isset($m_update) || isset($m_rekap) || isset($m_product_conversion) ||
 	isset($m_vouchers) || isset($m_sales_return) || isset($m_supplier_return) || isset($m_accounting) ||
-	isset($m_auth_index)) ? ' active' : ''; ?>">
+	isset($m_petty_cash) || isset($m_auth_index)) ? ' active' : ''; ?>">
 	<a href="#"><i class="fa fa-cogs"></i> <span>Back End</span><i class="fa fa-angle-left pull-right"></i></a>
 	<ul class="treeview-menu">
 		<?php foreach ($back_end_items as $item): ?>

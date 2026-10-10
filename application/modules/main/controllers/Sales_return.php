@@ -240,6 +240,22 @@ class Sales_return extends CI_Controller
 			if (!in_array($payment_method, array('potong_gaji', 'tunai', 'qris', 'edc', 'transfer'), TRUE)) {
 				$errors[] = 'Metode pembayaran nota asal tidak tersedia; retur dibatalkan agar jurnal tidak salah klasifikasi.';
 			}
+			if ($payment_method === 'tunai' &&
+				$this->db->table_exists('acc_cash_funds') &&
+				$this->db->table_exists('acc_cash_closings')) {
+				$cashier_fund = $this->db->query("
+					SELECT id FROM acc_cash_funds
+					WHERE fund_slot = 'cashier' AND is_active = 1
+					FOR UPDATE
+				")->row();
+				$cashier_closed = $cashier_fund ? $this->db->get_where('acc_cash_closings', array(
+					'fund_id' => (int) $cashier_fund->id,
+					'closing_date' => substr($return_time, 0, 10)
+				))->row() : NULL;
+				if ($cashier_closed) {
+					$errors[] = 'Kasir sudah ditutup untuk tanggal retur. Pengembalian tunai harus diproses pada hari kasir yang masih terbuka.';
+				}
+			}
 			$payment_account = $payment_method === 'tunai' ? '1101' :
 				($payment_method === 'potong_gaji' ? '1103' : '1102');
 			$net_return = 0;

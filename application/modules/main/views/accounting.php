@@ -31,11 +31,13 @@
 <?php $unposted_total = array_sum($unposted); ?>
 <?php if ($unposted_total > 0) { ?>
 	<div class="alert alert-warning">
-		<strong>Perhatian:</strong> terdapat <?php echo number_format($unposted_total); ?> transaksi historis yang belum memiliki jurnal otomatis.
+		<strong>Perhatian:</strong> terdapat <?php echo number_format($unposted_total); ?> transaksi sumber atau permintaan kas yang belum terposting/masih menunggu persetujuan.
 		<?php foreach ($unposted as $source => $count) { ?>
-			<?php if ($count > 0) { ?><span><?php echo html_escape($source); ?>: <?php echo number_format($count); ?>; </span><?php } ?>
+			<?php if ($count > 0) { ?>
+				<span><?php echo html_escape($source === 'PETTY_CASH' ? 'Kas / petty cash' : $source); ?>: <?php echo number_format($count); ?>; </span>
+			<?php } ?>
 		<?php } ?>
-		<br>Jurnal otomatis berlaku untuk transaksi baru. Data historis tidak diposting otomatis karena informasi lama seperti metode pembayaran atau HPP dapat tidak lengkap.
+		<br>Transaksi POS, pembelian, retur, dan stok yang belum terposting menunjukkan data historis yang perlu ditinjau. Permintaan kas yang tertunda harus disetujui atau ditolak; transaksi kas posted seharusnya sudah memiliki jurnal.
 	</div>
 <?php } ?>
 
