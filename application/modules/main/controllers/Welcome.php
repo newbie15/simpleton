@@ -20,6 +20,13 @@ class Welcome extends CI_Controller {
 	 */
 	public function index()
 	{
+		$this->load->library('ion_auth');
+		if ($this->ion_auth->logged_in() && $this->ion_auth->in_group('members') && !$this->ion_auth->is_admin())
+		{
+			redirect('main/member', 'refresh');
+			return;
+		}
+
 		$data['judul_besar'] = 'Simpleton';
 		$data['judul_kecil'] = 'Version 1.0.0';
 		$data['output'] = '<div class="content body">

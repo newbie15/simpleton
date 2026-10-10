@@ -57,7 +57,41 @@
           <a href="#" class="sidebar-toggle" data-toggle="offcanvas" role="button">
             <span class="sr-only">Toggle navigation</span>
           </a>
-
+          <?php
+            $this->load->library('ion_auth');
+            if ($this->ion_auth->logged_in()):
+              $logged_in_user = $this->ion_auth->user()->row();
+              $logged_in_name = trim($logged_in_user->first_name . ' ' . $logged_in_user->last_name);
+              if ($logged_in_name === '') {
+                $logged_in_name = !empty($logged_in_user->npk) ? $logged_in_user->npk : $logged_in_user->username;
+              }
+              if ($logged_in_name === '') {
+                $logged_in_name = $logged_in_user->email;
+              }
+          ?>
+          <div class="navbar-custom-menu">
+            <ul class="nav navbar-nav">
+              <li class="dropdown user user-menu">
+                <a href="#" class="dropdown-toggle" data-toggle="dropdown">
+                  <i class="fa fa-user"></i>
+                  <span><?php echo html_escape($logged_in_name); ?></span>
+                  <i class="fa fa-angle-down"></i>
+                </a>
+                <ul class="dropdown-menu">
+                  <li class="user-header">
+                    <i class="fa fa-user fa-4x"></i>
+                    <p><?php echo html_escape($logged_in_name); ?></p>
+                  </li>
+                  <li class="user-footer">
+                    <div class="pull-right">
+                      <a href="<?php echo site_url('auth/logout'); ?>" class="btn btn-default btn-flat">Logout</a>
+                    </div>
+                  </li>
+                </ul>
+              </li>
+            </ul>
+          </div>
+          <?php endif; ?>
         </nav>
       </header>
       <!-- Left side column. contains the logo and sidebar -->

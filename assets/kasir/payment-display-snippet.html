@@ -5,7 +5,7 @@
     <h4 style="margin-top: 0; color: #333; font-size: 18px; border-bottom: 2px solid #007bff; padding-bottom: 10px;">
         Ringkasan Pembayaran
     </h4>
-    
+
     <!-- Total Tagihan -->
     <div class="payment-display-row">
         <div class="payment-display-label">Total Tagihan:</div>
@@ -13,13 +13,14 @@
             Rp <span id="payment-total-display">0</span>
         </div>
     </div>
-    
+
     <!-- Nominal Bayar (untuk metode tunai) -->
     <div class="payment-input-group" id="cash-payment-fields" style="display: none;">
         <label for="nominal-bayar">💰 Nominal Uang Diterima:</label>
-        <input type="number" id="nominal-bayar" name="nominal-bayar" placeholder="Masukkan jumlah uang" min="0" step="1000">
+        <input type="number" id="nominal-bayar" name="nominal-bayar" placeholder="Masukkan jumlah uang" min="0"
+            step="1000">
     </div>
-    
+
     <!-- Display Kembalian -->
     <div class="payment-display-row" id="cash-payment-fields" style="display: none;">
         <div class="payment-display-label">Kembalian:</div>
@@ -27,35 +28,36 @@
             Rp <span id="payment-kembalian-display">0</span>
         </div>
     </div>
-    
+
     <!-- EDC Payment Fields -->
     <div class="payment-input-group" id="edc-payment-fields" style="display: none;">
         <label for="nomor-referensi">🏧 Nomor Referensi / Approval:</label>
         <input type="text" id="nomor-referensi" name="nomor-referensi" placeholder="Masukkan nomor referensi EDC">
     </div>
-    
+
     <!-- Transfer Payment Fields -->
     <div class="payment-input-group" id="transfer-payment-fields" style="display: none;">
         <label for="bank-tujuan">🏦 Nama Bank Tujuan:</label>
         <input type="text" id="bank-tujuan" name="bank-tujuan" placeholder="Masukkan nama bank tujuan">
     </div>
-    
+
     <!-- Voucher / Diskon -->
     <div class="payment-input-group">
         <label for="checkout-voucher">🎟️ Kode Voucher (Opsional):</label>
         <input type="text" id="checkout-voucher" name="checkout-voucher" placeholder="Masukkan kode voucher jika ada">
     </div>
-    
+
     <!-- Payment Method Selection -->
     <div class="payment-input-group">
         <label for="metode_pembayaran">💳 Metode Pembayaran:</label>
-        <select id="metode_pembayaran" name="metode_pembayaran" class="form-control" style="padding: 10px; font-size: 16px;">
+        <select id="metode_pembayaran" name="metode_pembayaran" class="form-control"
+            style="padding: 10px; font-size: 16px;">
             <option value="tunai">Tunai</option>
             <option value="edc">EDC / Kartu Debit</option>
             <option value="transfer">Transfer Bank</option>
         </select>
     </div>
-    
+
     <!-- Large Display Summary -->
     <div class="payment-large-display">
         <div class="label">TOTAL PEMBAYARAN</div>
@@ -69,13 +71,13 @@
 
 <!-- Styling inline untuk baris duplikat (diperlukan karena ada 2 elemen dengan id cash-payment-fields) -->
 <style>
-#cash-payment-fields:nth-of-type(1) {
-    /* Input group version */
-}
+    #cash-payment-fields:nth-of-type(1) {
+        /* Input group version */
+    }
 
-#cash-payment-fields:nth-of-type(2) {
-    /* Display row version */
-}
+    #cash-payment-fields:nth-of-type(2) {
+        /* Display row version */
+    }
 </style>
 
 <!-- 

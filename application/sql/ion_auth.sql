@@ -31,9 +31,10 @@ CREATE TABLE `users` (
   `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
   `ip_address` varchar(15) NOT NULL,
   `username` varchar(100) NULL,
+  `npk` varchar(32) DEFAULT NULL,
   `password` varchar(255) NOT NULL,
   `salt` varchar(255) DEFAULT NULL,
-  `email` varchar(100) NOT NULL,
+  `email` varchar(100) DEFAULT NULL,
   `activation_code` varchar(40) DEFAULT NULL,
   `forgotten_password_code` varchar(40) DEFAULT NULL,
   `forgotten_password_time` int(11) unsigned DEFAULT NULL,
@@ -45,7 +46,10 @@ CREATE TABLE `users` (
   `last_name` varchar(50) DEFAULT NULL,
   `company` varchar(100) DEFAULT NULL,
   `phone` varchar(20) DEFAULT NULL,
-  PRIMARY KEY (`id`)
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `users_username_unique` (`username`),
+  UNIQUE KEY `users_email_unique` (`email`),
+  UNIQUE KEY `users_npk_unique` (`npk`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
@@ -78,6 +82,16 @@ CREATE TABLE `users_groups` (
 INSERT INTO `users_groups` (`id`, `user_id`, `group_id`) VALUES
      (1,1,1),
      (2,1,2);
+
+CREATE TABLE `group_pages` (
+  `group_id` mediumint(8) unsigned NOT NULL,
+  `page_key` varchar(64) NOT NULL,
+  PRIMARY KEY (`group_id`, `page_key`),
+  CONSTRAINT `fk_group_pages_groups` FOREIGN KEY (`group_id`) REFERENCES `groups` (`id`) ON DELETE CASCADE ON UPDATE NO ACTION
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+INSERT INTO `group_pages` (`group_id`, `page_key`)
+SELECT `id`, 'member_portal' FROM `groups` WHERE `name` = 'members';
 
 
 DROP TABLE IF EXISTS `login_attempts`;

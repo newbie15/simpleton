@@ -114,19 +114,7 @@ class Examples extends CI_Controller {
 	
 	}
 	public function user(){
-		$crud = new grocery_CRUD();
-
-		$crud->set_table('user');
-
-		$output = $crud->render();
-
-		//Config Halaman
-		$output->judul_besar = 'User';
-		$output->judul_kecil = 'menambah mengurangi user';
-		$output->m_user = TRUE;
-
-		$this->_example_output($output);
-
+		redirect('auth/index', 'refresh');
 	}
 
 	public function kartu(){
@@ -384,43 +372,72 @@ class Examples extends CI_Controller {
 
                   <!-- Payment Display Section -->
                   <div id="payment-display-section" style="margin-bottom: 20px; padding: 15px; background-color: #f9f9f9; border-radius: 4px;">
-                    <div class="form-group" data-checkout-field>
-                      <label for="metode_pembayaran">Metode Pembayaran</label>
-                      <select class="form-control" id="metode_pembayaran">
-                        <option value="">-- Pilih metode pembayaran --</option>
-                        <option value="cash">Tunai</option>
-                        <option value="edc">Kartu Kredit/Debit (EDC)</option>
+
+                    <!-- Metode pembayaran ditampilkan saja (dipilih di halaman kasir) -->
+                    <div style="background-color: white; padding: 12px; border-radius: 4px; text-align: center; margin-bottom: 12px;">
+                      <div style="font-size: 12px; color: #666; margin-bottom: 5px;">Metode Pembayaran</div>
+                      <div id="checkout-metode-display" style="display: none; font-size: 18px; font-weight: bold; color: #2c3e50;"></div>
+                      <select class="form-control" id="metode_pembayaran" name="metode_pembayaran" style="display: none;" tabindex="-1" aria-hidden="true">
+                        <option value="potong_gaji">Potong gaji</option>
+                        <option value="tunai">Tunai / Cash</option>
+                        <option value="qris">QRIS</option>
+                        <option value="edc">EDC (Debit/Kredit)</option>
                         <option value="transfer">Transfer Bank</option>
                       </select>
                     </div>
 
-                    <div style="background-color: white; padding: 12px; border-radius: 4px; text-align: center; margin-bottom: 15px;">
-                      <div style="font-size: 12px; color: #666; margin-bottom: 5px;">Total Pembayaran</div>
-                      <div id="payment-total-display" style="font-size: 24px; font-weight: bold; color: #2c3e50;">Rp 0</div>
+                    <!-- Voucher -->
+                    <div class="form-group" data-checkout-field>
+                      <label for="checkout-voucher">Kode voucher (opsional)</label>
+                      <div style="display: flex; gap: 8px;">
+                        <input class="form-control" type="text" id="checkout-voucher" maxlength="32" autocomplete="off" style="flex: 1;">
+                        <button type="button" id="check-voucher" class="btn btn-default">Cek</button>
+                      </div>
+                      <div id="voucher-status" class="help-block" style="margin: 6px 0 0;"></div>
+                    </div>
+
+                    <!-- Ringkasan nilai: total, diskon voucher, dibayar, kembalian -->
+                    <div style="background-color: white; padding: 14px; border-radius: 4px;">
+                      <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px;">
+                        <span style="font-size: 13px; color: #666;">Total Tagihan</span>
+                        <span id="payment-total-display" style="font-size: 20px; font-weight: bold; color: #2c3e50;">Rp 0</span>
+                      </div>
+                      <div id="payment-diskon-row" style="display: none; justify-content: space-between; align-items: baseline; margin-bottom: 8px;">
+                        <span style="font-size: 13px; color: #666;">Diskon Voucher</span>
+                        <span id="payment-diskon-display" style="font-size: 18px; font-weight: bold; color: #c0392b;">- Rp 0</span>
+                      </div>
+                      <div style="border-top: 1px dashed #ccc; margin: 10px 0;"></div>
+                      <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                        <span style="font-size: 13px; color: #666;">Total Bayar</span>
+                        <span id="payment-bayar-display" style="font-size: 26px; font-weight: bold; color: #2c3e50;">Rp 0</span>
+                      </div>
                     </div>
                   </div>
                   <!-- End Payment Display Section -->
 
-                  <div class="form-group" data-checkout-field>
-                    <label for="checkout-voucher">Kode voucher (opsional)</label>
-                    <input class="form-control" type="text" id="checkout-voucher" maxlength="32" autocomplete="off">
-                  </div>
-                   <div class="form-group" id="cash-payment-fields" data-checkout-field style="display:none;">
+                  <!-- Tunai: nominal diterima + kembalian -->
+                  <div class="form-group" id="cash-payment-fields" data-checkout-field style="display:none;">
                     <label for="nominal-bayar">Uang tunai diterima</label>
-                    <input class="form-control" type="number" id="nominal-bayar" min="0" step="100" inputmode="numeric">
-                    <div style="margin-top: 12px; padding: 12px; background-color: #ecf0f1; border-radius: 4px;">
-                      <div style="font-size: 12px; color: #666; margin-bottom: 5px;">Kembalian</div>
-                      <div id="payment-kembalian-display" style="font-size: 20px; font-weight: bold; color: #27ae60;">Rp 0</div>
+                    <input class="form-control" type="number" id="nominal-bayar" name="nominal_bayar" min="0" step="100" inputmode="numeric" style="font-size: 20px; height: 46px; font-weight: bold;">
+                    <div style="margin-top: 12px; padding: 12px; background-color: #ecf0f1; border-radius: 4px; display: flex; justify-content: space-between; align-items: baseline;">
+                      <span style="font-size: 13px; color: #666;">Kembalian</span>
+                      <span id="payment-kembalian-display" style="font-size: 24px; font-weight: bold; color: #27ae60;">Rp 0</span>
+                    </div>
+                    <div id="payment-status-text" class="help-block" style="margin: 6px 0 0;"></div>
+                  </div>
+
+                  <!-- EDC / Transfer / QRIS: satu input kode konfirmasi -->
+                  <div class="form-group" id="noncash-payment-fields" data-checkout-field style="display:none;">
+                    <label for="kode-konfirmasi" id="kode-konfirmasi-label">Kode konfirmasi</label>
+                    <input class="form-control" type="text" id="kode-konfirmasi" name="kode_konfirmasi" maxlength="64" autocomplete="off">
+                    <div id="bank-tujuan-wrap" style="display: none; margin-top: 12px;">
+                      <label for="bank-tujuan">Bank tujuan</label>
+                      <input class="form-control" type="text" id="bank-tujuan" name="bank_tujuan" maxlength="64">
                     </div>
                   </div>
-                  <div class="form-group" id="edc-payment-fields" data-checkout-field style="display:none;">
-                    <label for="nomor-referensi">Nomor referensi / approval EDC</label>
-                    <input class="form-control" type="text" id="nomor-referensi" maxlength="64">
-                  </div>
-                  <div class="form-group" id="transfer-payment-fields" data-checkout-field style="display:none;">
-                    <label for="bank-tujuan">Bank tujuan</label>
-                    <input class="form-control" type="text" id="bank-tujuan" maxlength="64">
-                  </div>
+
+                  <!-- Dipakai backend saat EDC; diisi otomatis dari kode konfirmasi -->
+                  <input type="hidden" id="nomor-referensi" name="nomor_referensi" value="">
                 </div>
                 <div class="modal-footer">
                   <button type="button" class="btn btn-default" data-dismiss="modal">Kembali</button>

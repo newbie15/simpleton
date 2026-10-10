@@ -64,9 +64,9 @@
           <!-- Sidebar user panel -->
           <!-- sidebar menu: : style can be found in sidebar.less -->
           <ul class="sidebar-menu">
-            <?php $this->load->view('main_menu', '', FALSE); ?>
+            <?php $this->load->view('main/main_menu', '', FALSE); ?>
             <?php if($this->ion_auth->logged_in()) { ?>
-            <?php $this->load->view('admin_menu', '', FALSE); ?>
+            <?php $this->load->view('main/admin_menu', '', FALSE); ?>
             <?php } ?>
           </ul>
         </section>
@@ -270,9 +270,6 @@
       <div class="control-sidebar-bg"></div>
     </div><!-- ./wrapper -->
 
-    <script>
-      $.widget.bridge('uibutton', $.ui.button);
-    </script>
     <!-- jQuery 2.1.4 -->
     <script src="<?= base_url('assets/adminlte/plugins/jQuery/jQuery-2.1.4.min.js') ?>"></script>
     <!-- Bootstrap 3.3.5 -->
@@ -301,8 +298,6 @@
     <script src="<?= base_url('assets/adminlte/plugins/fastclick/fastclick.min.js') ?>"></script>
     <!-- AdminLTE App -->
     <script src="<?= base_url('assets/adminlte/dist/js/app.min.js') ?>"></script>
-    <!-- AdminLTE dashboard demo (This is only for demo purposes) -->
-    <script src="<?= base_url('assets/adminlte/dist/js/pages/dashboard.js') ?>"></script>
     <!-- AdminLTE for demo purposes -->
     <script src="<?= base_url('assets/adminlte/dist/js/demo.js') ?>"></script>
   </body>

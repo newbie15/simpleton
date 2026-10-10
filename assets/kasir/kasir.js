@@ -135,15 +135,53 @@ $(document).ready(function(){
     var checkoutInProgress = false;
     var pendingCheckout = null;
 
-    function updatePaymentFields() {
-        var method = $("#metode_pembayaran").val();
-        $("#cash-payment-fields").toggle(method === "cash");
-        $("#edc-payment-fields").toggle(method === "edc");
-        $("#transfer-payment-fields").toggle(method === "transfer");
+    // Metode pembayaran dipilih di halaman kasir; modal hanya menampilkan & menyiapkan input.
+    function currentPaymentMethod() {
+        return $.trim($("#metode_pembayaran").val());
     }
 
+    function isCashMethod(method) {
+        return method === "tunai" || method === "cash";
+    }
+
+    function paymentMethodLabel(method) {
+        return {
+            potong_gaji: "Potong Gaji",
+            tunai: "Tunai / Cash",
+            cash: "Tunai / Cash",
+            qris: "QRIS",
+            edc: "EDC (Debit/Kredit)",
+            transfer: "Transfer Bank"
+        }[method] || "-";
+    }
+
+    // Diskon voucher dari server (0 jika belum/ tidak valid).
+    var activeVoucher = null;
+
+    function updatePaymentFields() {
+        var method = currentPaymentMethod();
+        var cash = isCashMethod(method);
+        var nonCash = (method === "edc" || method === "transfer" || method === "qris");
+
+        $("#cash-payment-fields").toggle(cash);
+        $("#noncash-payment-fields").toggle(nonCash);
+        $("#bank-tujuan-wrap").toggle(method === "transfer");
+
+        // Label kode konfirmasi menyesuaikan metode.
+        if (method === "edc") {
+            $("#kode-konfirmasi-label").text("Nomor referensi / approval EDC");
+        } else if (method === "qris") {
+            $("#kode-konfirmasi-label").text("Kode konfirmasi pembayaran QRIS");
+        } else if (method === "transfer") {
+            $("#kode-konfirmasi-label").text("Kode konfirmasi / nomor transfer");
+        }
+
+        $("#checkout-metode-display").text(paymentMethodLabel(method));
+        updatePaymentDisplay();
+    }
+
+    // Modal tidak menyediakan pilihan metode; perubahan tetap ikut select di halaman.
     $("#metode_pembayaran").on("change", updatePaymentFields);
-    updatePaymentFields();
 
     $("#nkasir").load("http://localhost/simpleton/index.php/main/ajax/daftar_kasir", function (response, status) {
         if (status !== "success") {
@@ -392,54 +430,111 @@ $(document).ready(function(){
         }
     });
 
+    // Total setelah diskon voucher (dihitung ulang tiap kali voucher berubah).
+    function checkoutGrandTotal() {
+        var diskon = activeVoucher ? activeVoucher.diskon : 0;
+        return Math.max(0, totl - diskon);
+    }
+
     function updatePaymentDisplay() {
-        var voucherCode = $.trim($("#checkout-voucher").val());
-        var baseTotl = totl;
-        var diskon = 0;
+        var method = currentPaymentMethod();
+        var cash = isCashMethod(method);
+        var diskon = activeVoucher ? activeVoucher.diskon : 0;
+        var finalTotl = checkoutGrandTotal();
 
-        // Simplified voucher check - adjust if needed based on your backend
-        // For now, assume voucher validation happens server-side
-        var finalTotl = baseTotl - diskon;
+        // Ringkasan nilai: total tagihan, diskon voucher, total bayar.
+        $("#payment-total-display").html("Rp " + formatRupiah(Math.round(totl)));
+        if (diskon > 0) {
+            $("#payment-diskon-row").css("display", "flex");
+            $("#payment-diskon-display").html("- Rp " + formatRupiah(Math.round(diskon)));
+        } else {
+            $("#payment-diskon-row").hide();
+        }
+        $("#payment-bayar-display").html("Rp " + formatRupiah(Math.round(finalTotl)));
 
-        // Display total amount due (small display)
-        $("#payment-total-display").html(formatRupiah(Math.round(finalTotl)));
-
-        // Display total amount due (large display)
-        $("#payment-total-large").html(formatRupiah(Math.round(finalTotl)));
-
-        // Calculate change
+        // Kembalian hanya relevan untuk pembayaran tunai.
         var nominalBayar = parseFloat($("#nominal-bayar").val()) || 0;
         var kembalian = nominalBayar - finalTotl;
+        var statusText = "";
 
-        // Update status text
-        var paymentMethod = $("#metode_pembayaran").val();
-        var statusText = "Masukkan nominal pembayaran";
-
-        if (paymentMethod === "cash") {
-            if (nominalBayar > 0) {
-                if (kembalian >= 0) {
-                    statusText = "✓ Pembayaran OK - Kembalian: Rp " + formatRupiah(Math.round(kembalian));
-                } else {
-                    statusText = "✗ Kurang bayar: Rp " + formatRupiah(Math.round(Math.abs(kembalian)));
-                }
+        if (cash) {
+            if (nominalBayar <= 0) {
+                statusText = "Masukkan nominal uang yang diterima.";
+            } else if (kembalian >= 0) {
+                statusText = "Kembalian Rp " + formatRupiah(Math.round(kembalian)) + ".";
+            } else {
+                statusText = "Masih kurang Rp " + formatRupiah(Math.round(Math.abs(kembalian))) + ".";
             }
-        } else if (paymentMethod === "edc") {
-            statusText = "Menunggu referensi EDC...";
-        } else if (paymentMethod === "transfer") {
-            statusText = "Menunggu konfirmasi bank tujuan...";
-        }
-        $("#payment-status-text").html(statusText);
 
-        // Display kembalian (small display - only for cash)
-        if (kembalian >= 0) {
-            $("#payment-kembalian-display").html(formatRupiah(Math.round(kembalian))).css("color", "green");
-        } else {
-            $("#payment-kembalian-display").html("- " + formatRupiah(Math.round(Math.abs(kembalian)))).css("color", "red");
+            $("#payment-kembalian-display")
+                .html("Rp " + formatRupiah(Math.round(Math.abs(kembalian))))
+                .css("color", kembalian >= 0 ? "#27ae60" : "#c0392b");
         }
+
+        $("#payment-status-text").text(statusText);
+    }
+
+    // ------------------------------------------------------------------
+    // Voucher: validasi ke server, tampilkan nominal diskon, hitung ulang.
+    // ------------------------------------------------------------------
+    function clearVoucher(message, isError) {
+        activeVoucher = null;
+        $("#voucher-status")
+            .text(message || "")
+            .css("color", isError ? "#c0392b" : "#666");
+        updatePaymentDisplay();
+    }
+
+    function applyVoucherFromServer(result) {
+        activeVoucher = { kode: $.trim($("#checkout-voucher").val()), diskon: result.diskon };
+        $("#voucher-status")
+            .text("Voucher berlaku. Potongan Rp " + formatRupiah(Math.round(result.diskon)) + ".")
+            .css("color", "#27ae60");
+        updatePaymentDisplay();
+    }
+
+    function checkVoucher() {
+        var kode = $.trim($("#checkout-voucher").val());
+        if (kode === "") {
+            clearVoucher("", false);
+            return;
+        }
+
+        $("#check-voucher").prop("disabled", true);
+        $("#voucher-status").text("Memeriksa voucher...").css("color", "#666");
+
+        $.ajax({
+            method: "GET",
+            url: "http://localhost/simpleton/index.php/main/kasir/validate_voucher/"
+                + encodeURIComponent(kode) + "/" + Math.round(totl),
+            dataType: "json"
+        }).done(function (result) {
+            if (!result || !result.valid) {
+                clearVoucher(result && result.message ? result.message : "Voucher tidak valid.", true);
+                return;
+            }
+            applyVoucherFromServer(result);
+        }).fail(function () {
+            clearVoucher("Gagal memeriksa voucher. Coba lagi.", true);
+        }).always(function () {
+            $("#check-voucher").prop("disabled", false);
+        });
     }
 
     $("#nominal-bayar").on("input change", updatePaymentDisplay);
-    $("#checkout-voucher").on("input change", updatePaymentDisplay);
+    $("#check-voucher").on("click", checkVoucher);
+    $("#checkout-voucher").on("keypress", function (e) {
+        if (e.which === 13) {
+            e.preventDefault();
+            checkVoucher();
+        }
+    });
+    // Edit kode voucher membatalkan hasil validasi sebelumnya.
+    $("#checkout-voucher").on("input", function () {
+        if (activeVoucher && $.trim($(this).val()) !== activeVoucher.kode) {
+            clearVoucher("Kode voucher berubah, tekan Cek untuk memvalidasi ulang.", false);
+        }
+    });
 
     function openCheckout(){
         if (checkoutInProgress) {
@@ -481,7 +576,7 @@ $(document).ready(function(){
     function buildCheckoutPayload() {
         var npk = $.trim($("#npk").val());
         var cashier = $("#nkasir").val();
-        var paymentMethod = $("#metode_pembayaran").val();
+        var paymentMethod = currentPaymentMethod();
         var data = $("#my").jexcel("getData") || [];
         var cartRows = data.filter(function (row) {
             return row && $.trim(String(row[0] || "")) !== "";
@@ -490,19 +585,30 @@ $(document).ready(function(){
             alert("Keranjang belanja masih kosong.");
             return null;
         }
-        var amountPaid = paymentMethod === "cash"
-            ? parseFloat($("#nominal-bayar").val())
-            : totl;
-        var referenceNumber = $.trim($("#nomor-referensi").val());
+
+        var cash = isCashMethod(paymentMethod);
+        var amountPaid = cash ? parseFloat($("#nominal-bayar").val()) : checkoutGrandTotal();
+        var kodeKonfirmasi = $.trim($("#kode-konfirmasi").val());
         var targetBank = $.trim($("#bank-tujuan").val());
-        if (paymentMethod === "cash" && (!isFinite(amountPaid) || amountPaid <= 0)) {
+
+        if (cash && (!isFinite(amountPaid) || amountPaid <= 0)) {
             alert("Masukkan jumlah uang tunai yang diterima.");
             $("#nominal-bayar").focus();
             return null;
         }
-        if (paymentMethod === "edc" && referenceNumber === "") {
+        if (paymentMethod === "edc" && kodeKonfirmasi === "") {
             alert("Masukkan nomor referensi atau approval EDC.");
-            $("#nomor-referensi").focus();
+            $("#kode-konfirmasi").focus();
+            return null;
+        }
+        if (paymentMethod === "qris" && kodeKonfirmasi === "") {
+            alert("Masukkan kode konfirmasi pembayaran QRIS.");
+            $("#kode-konfirmasi").focus();
+            return null;
+        }
+        if (paymentMethod === "transfer" && kodeKonfirmasi === "") {
+            alert("Masukkan kode konfirmasi / nomor transfer.");
+            $("#kode-konfirmasi").focus();
             return null;
         }
         if (paymentMethod === "transfer" && targetBank === "") {
@@ -510,6 +616,10 @@ $(document).ready(function(){
             $("#bank-tujuan").focus();
             return null;
         }
+
+        // Backend memakai nama nomor_referensi untuk semua pembayaran non-tunai.
+        $("#nomor-referensi").val(kodeKonfirmasi);
+
         var timestamp = (new Date()).getTime();
         var nota = npk + "-" + timestamp + "-" + Math.floor(Math.random() * 1000000);
         var items = cartRows.map(function (row) {
@@ -531,8 +641,8 @@ $(document).ready(function(){
                 id_karyawan: npk,
                 metode_pembayaran: paymentMethod,
                 nominal_bayar: amountPaid,
-                kode_voucher: $.trim($("#checkout-voucher").val()),
-                nomor_referensi: referenceNumber,
+                kode_voucher: activeVoucher ? activeVoucher.kode : "",
+                nomor_referensi: kodeKonfirmasi,
                 bank_tujuan: targetBank,
                 items_json: JSON.stringify(items)
             }

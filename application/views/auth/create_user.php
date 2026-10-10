@@ -24,8 +24,12 @@
     <?php echo form_input($last_name, '', 'class="form-control"');?>
   </div>
   <div class="form-group">
+    <label for="npk">NPK (opsional)</label>
+    <?php echo form_input($npk, '', 'class="form-control"');?>
+  </div>
+  <div class="form-group">
     <?php if($identity_column!=='email') { ?>
-    <label for="exampleInputPassword1"><?php echo lang('create_user_identity_label', 'identity');?></label>
+    <label for="identity">Username login</label>
     <?php echo form_error('identity'); echo form_input($identity);?>
     <?php } ?>
   </div>
@@ -34,7 +38,7 @@
     <?php echo form_input($company, '', 'class="form-control"');?>
   </div>
   <div class="form-group">
-    <label for="exampleInputPassword1"><?php echo lang('create_user_email_label', 'email');?></label>
+    <label for="exampleInputPassword1"><?php echo lang('create_user_email_label', 'email');?> (opsional)</label>
     <?php echo form_input($email, '', 'class="form-control"');?>
   </div>
   <div class="form-group">

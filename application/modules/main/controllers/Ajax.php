@@ -553,16 +553,34 @@ class Ajax extends CI_Controller {
     // SELECT CAST(tgl AS DATE) AS DATE, sum(jumlah) as summ FROM penjualan GROUP BY CAST(tgl AS DATE) ORDER BY 1
 
     public function daftar_kasir(){
-        $this->db->select('*');
-        $this->db->from('user');
-        
-        $query = $this->db->get();
+        $this->load->library('page_access');
+        if (!$this->page_access->can_access('penjualan')) {
+            show_error('Anda tidak memiliki akses untuk melihat daftar kasir.', 403);
+        }
+
+        $users_table = $this->config->item('tables', 'ion_auth')['users'];
+        $columns = array('id', 'username', 'email', 'first_name', 'last_name');
+        if ($this->db->field_exists('npk', $users_table)) {
+            $columns[] = 'npk';
+        }
+        $query = $this->db
+            ->select($columns)
+            ->where('active', 1)
+            ->order_by('first_name', 'asc')
+            ->get($users_table);
 
         echo '<option value="0">===pilih salah satu===</option>';
-        foreach ($query->result() as $row)
-        {
-            echo '<option value="'.$row->user.'">'.$row->user.'</option>';
-        }        
+        foreach ($query->result() as $row) {
+            $name = trim($row->first_name . ' ' . $row->last_name);
+            if ($name === '') {
+                $name = !empty($row->npk) ? $row->npk : $row->username;
+            }
+            if ($name === '') {
+                $name = $row->email;
+            }
+
+            echo '<option value="' . (int) $row->id . '">' . html_escape($name) . '</option>';
+        }
     }
 
 }

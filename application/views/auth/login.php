@@ -27,7 +27,16 @@
   <body class="hold-transition login-page">
   <!--<h1><?php echo lang('login_heading');?></h1>
   <p><?php echo lang('login_subheading');?></p>-->
-  <div id="infoMessage"><?php echo $message;?></div>
+  <?php if ($message): ?>
+    <div class="alert alert-danger login-alert" role="alert"><?php echo trim(str_replace(array('<p>', '</p>'), '', $message));?></div>
+  <style>
+    .login-alert {
+      max-width: 360px;
+      margin: 10px auto -10px;
+      text-align: center;
+    }
+  </style>
+  <?php endif; ?>
     <div class="login-box">
       <div class="login-logo">
         <a href="http://github.com/newbie15" target="_blank"><b>Sistem Koperasi<br/>Mitra Indah Sejahtera</b><br><h6>By : @newbie15</h6></a>
@@ -36,8 +45,8 @@
         <p class="login-box-msg">Login untuk memulai</p>
         <?php echo form_open("auth/login");?>
           <div class="form-group has-feedback">
-            <?php echo form_input($identity, '', 'type="email" class="form-control" placeholder="Email"');?>
-            <span class="glyphicon glyphicon-envelope form-control-feedback"></span>
+            <?php echo form_input($identity, '', 'type="text" class="form-control" placeholder="Username, email, atau NPK" autocomplete="username"');?>
+            <span class="glyphicon glyphicon-user form-control-feedback"></span>
           </div>
           <div class="form-group has-feedback">
             <?php echo form_input($password, '', 'type="password" class="form-control" placeholder="Password"');?>

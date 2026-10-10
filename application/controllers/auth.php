@@ -7,6 +7,7 @@ class Auth extends CI_Controller {
 		parent::__construct();
 		$this->load->database();
 		$this->load->library(array('ion_auth','form_validation'));
+		$this->load->library('page_access');
 		$this->load->helper(array('url','language'));
 
 		$this->form_validation->set_error_delimiters($this->config->item('error_start_delimiter', 'ion_auth'), $this->config->item('error_end_delimiter', 'ion_auth'));
@@ -44,7 +45,10 @@ class Auth extends CI_Controller {
             $data['judul_besar'] = 'Manage User';
             $data['judul_kecil'] = 'List';
 			$data['m_auth_index'] = TRUE;
-			$data['output'] = $this->data;
+			$data['output'] = array(
+				'message' => $this->data['message'],
+				'users' => $this->data['users'],
+			);
 			$data['view_file'] = 'auth/index';
 			$this->load->view('auth/main', $data, FALSE);
 		}
@@ -64,13 +68,44 @@ class Auth extends CI_Controller {
 			// check to see if the user is logging in
 			// check for "remember me"
 			$remember = (bool) $this->input->post('remember');
+			$identity = trim($this->input->post('identity'));
+			$tables = $this->config->item('tables', 'ion_auth');
+			$user = $this->db->select('username')
+				->where('username', $identity)
+				->limit(1)
+				->get($tables['users'])
+				->row();
+			if (!$user)
+			{
+				$user = $this->db->select('username')
+					->where('email', $identity)
+					->limit(1)
+					->get($tables['users'])
+					->row();
+			}
+			if (!$user && $this->db->field_exists('npk', $tables['users']))
+			{
+				$user = $this->db->select('username')
+					->where('npk', $identity)
+					->limit(1)
+					->get($tables['users'])
+					->row();
+			}
+			$login_identity = $user ? $user->username : $identity;
 
-			if ($this->ion_auth->login($this->input->post('identity'), $this->input->post('password'), $remember))
+			if ($this->ion_auth->login($login_identity, $this->input->post('password'), $remember))
 			{
 				//if the login is successful
 				//redirect them back to the home page
 				$this->session->set_flashdata('message', $this->ion_auth->messages());
-				redirect('/', 'refresh');
+				if ($this->ion_auth->in_group('members') && !$this->ion_auth->is_admin())
+				{
+					redirect('main/member', 'refresh');
+				}
+				else
+				{
+					redirect('/', 'refresh');
+				}
 			}
 			else
 			{
@@ -222,8 +257,17 @@ class Auth extends CI_Controller {
 		}
 		else
 		{
-			$identity_column = $this->config->item('identity','ion_auth');
-			$identity = $this->ion_auth->where($identity_column, $this->input->post('identity'))->users()->row();
+			$identity_value = trim($this->input->post('identity'));
+			$tables = $this->config->item('tables', 'ion_auth');
+			$identity = $this->db
+				->group_start()
+					->where('username', $identity_value)
+					->or_where('email', $identity_value)
+					->or_where('npk', $identity_value)
+				->group_end()
+				->limit(1)
+				->get($tables['users'])
+				->row();
 
 			if(empty($identity)) {
 
@@ -239,6 +283,13 @@ class Auth extends CI_Controller {
 		                $this->session->set_flashdata('message', $this->ion_auth->errors());
                 		redirect("auth/forgot_password", 'refresh');
             		}
+
+			if (empty($identity->email))
+			{
+				$this->ion_auth->set_error('forgot_password_email_not_found');
+				$this->session->set_flashdata('message', $this->ion_auth->errors());
+				redirect('auth/forgot_password', 'refresh');
+			}
 
 			// run the forgotten password method to email an activation code to the user
 			$forgotten = $this->ion_auth->forgotten_password($identity->{$this->config->item('identity', 'ion_auth')});
@@ -355,9 +406,48 @@ class Auth extends CI_Controller {
 		{
 			$activation = $this->ion_auth->activate($id, $code);
 		}
-		else if ($this->ion_auth->is_admin())
+		else
 		{
-			$activation = $this->ion_auth->activate($id);
+			if (!$this->ion_auth->logged_in() || !$this->ion_auth->is_admin())
+			{
+				show_error('You must be an administrator to activate a user.', 403);
+			}
+
+			$id = (int) $id;
+			$user = $this->ion_auth->user($id)->row();
+			if (!$user)
+			{
+				show_404();
+			}
+
+			if ($this->input->method(TRUE) === 'POST')
+			{
+				if ($this->_valid_csrf_nonce() === FALSE || $id != $this->input->post('id'))
+				{
+					show_error($this->lang->line('error_csrf'));
+				}
+
+				if ($this->input->post('confirm') === 'yes')
+				{
+					$activation = $this->ion_auth->activate($id);
+				}
+				else
+				{
+					redirect('auth', 'refresh');
+				}
+			}
+			else
+			{
+				$this->data['user'] = $user;
+				$this->data['csrf'] = $this->_get_csrf_nonce();
+				$data['judul_besar'] = 'Aktifkan User';
+				$data['judul_kecil'] = 'Konfirmasi perubahan status';
+				$data['m_auth_index'] = TRUE;
+				$data['output'] = $this->data;
+				$data['view_file'] = 'auth/activate_user';
+				$this->load->view('auth/main', $data, FALSE);
+				return;
+			}
 		}
 
 		if ($activation)
@@ -437,10 +527,11 @@ class Auth extends CI_Controller {
         // validate form input
         $this->form_validation->set_rules('first_name', $this->lang->line('create_user_validation_fname_label'), 'required');
         $this->form_validation->set_rules('last_name', $this->lang->line('create_user_validation_lname_label'), 'required');
+        $this->form_validation->set_rules('npk', 'NPK', 'trim|callback_npk_not_taken[0]');
         if($identity_column!=='email')
         {
-            $this->form_validation->set_rules('identity',$this->lang->line('create_user_validation_identity_label'),'required|is_unique['.$tables['users'].'.'.$identity_column.']');
-            $this->form_validation->set_rules('email', $this->lang->line('create_user_validation_email_label'), 'required|valid_email');
+            $this->form_validation->set_rules('identity',$this->lang->line('create_user_validation_identity_label'),'required|trim|is_unique['.$tables['users'].'.'.$identity_column.']');
+            $this->form_validation->set_rules('email', $this->lang->line('create_user_validation_email_label'), 'trim|valid_email|callback_email_not_taken');
         }
         else
         {
@@ -453,8 +544,9 @@ class Auth extends CI_Controller {
 
         if ($this->form_validation->run() == true)
         {
-            $email    = strtolower($this->input->post('email'));
-            $identity = ($identity_column==='email') ? $email : $this->input->post('identity');
+            $email    = strtolower(trim($this->input->post('email')));
+            $email    = $email === '' ? NULL : $email;
+            $identity = ($identity_column==='email') ? $email : trim($this->input->post('identity'));
             $password = $this->input->post('password');
 
             $additional_data = array(
@@ -462,6 +554,7 @@ class Auth extends CI_Controller {
                 'last_name'  => $this->input->post('last_name'),
                 'company'    => $this->input->post('company'),
                 'phone'      => $this->input->post('phone'),
+                'npk'        => trim($this->input->post('npk')) !== '' ? trim($this->input->post('npk')) : NULL,
             );
         }
         if ($this->form_validation->run() == true && $this->ion_auth->register($identity, $password, $email, $additional_data))
@@ -488,6 +581,12 @@ class Auth extends CI_Controller {
                 'id'    => 'last_name',
                 'type'  => 'text',
                 'value' => $this->form_validation->set_value('last_name'),
+            );
+            $this->data['npk'] = array(
+                'name'  => 'npk',
+                'id'    => 'npk',
+                'type'  => 'text',
+                'value' => $this->form_validation->set_value('npk'),
             );
             $this->data['identity'] = array(
                 'name'  => 'identity',
@@ -552,6 +651,7 @@ class Auth extends CI_Controller {
 		// validate form input
 		$this->form_validation->set_rules('first_name', $this->lang->line('edit_user_validation_fname_label'), 'required');
 		$this->form_validation->set_rules('last_name', $this->lang->line('edit_user_validation_lname_label'), 'required');
+		$this->form_validation->set_rules('npk', 'NPK', 'trim|callback_npk_not_taken[' . (int) $id . ']');
 		$this->form_validation->set_rules('phone', $this->lang->line('edit_user_validation_phone_label'), 'required');
 		$this->form_validation->set_rules('company', $this->lang->line('edit_user_validation_company_label'), 'required');
 
@@ -566,6 +666,7 @@ class Auth extends CI_Controller {
 			// update the password if it was posted
 			if ($this->input->post('password'))
 			{
+				$this->form_validation->set_rules('old_password', $this->lang->line('change_password_validation_old_password_label'), 'required|callback_valid_password');
 				$this->form_validation->set_rules('password', $this->lang->line('edit_user_validation_password_label'), 'required|min_length[' . $this->config->item('min_password_length', 'ion_auth') . ']|max_length[' . $this->config->item('max_password_length', 'ion_auth') . ']|matches[password_confirm]');
 				$this->form_validation->set_rules('password_confirm', $this->lang->line('edit_user_validation_password_confirm_label'), 'required');
 			}
@@ -578,6 +679,11 @@ class Auth extends CI_Controller {
 					'company'    => $this->input->post('company'),
 					'phone'      => $this->input->post('phone'),
 				);
+				$tables = $this->config->item('tables', 'ion_auth');
+				if ($this->db->field_exists('npk', $tables['users']))
+				{
+					$data['npk'] = trim($this->input->post('npk')) !== '' ? trim($this->input->post('npk')) : NULL;
+				}
 
 				// update the password if it was posted
 				if ($this->input->post('password'))
@@ -660,6 +766,12 @@ class Auth extends CI_Controller {
 			'type'  => 'text',
 			'value' => $this->form_validation->set_value('last_name', $user->last_name),
 		);
+		$this->data['npk'] = array(
+			'name'  => 'npk',
+			'id'    => 'npk',
+			'type'  => 'text',
+			'value' => $this->form_validation->set_value('npk', isset($user->npk) ? $user->npk : ''),
+		);
 		$this->data['company'] = array(
 			'name'  => 'company',
 			'id'    => 'company',
@@ -671,6 +783,11 @@ class Auth extends CI_Controller {
 			'id'    => 'phone',
 			'type'  => 'text',
 			'value' => $this->form_validation->set_value('phone', $user->phone),
+		);
+		$this->data['old_password'] = array(
+			'name' => 'old_password',
+			'id'   => 'old_password',
+			'type' => 'password'
 		);
 		$this->data['password'] = array(
 			'name' => 'password',
@@ -762,6 +879,10 @@ class Auth extends CI_Controller {
 		}
 
 		$group = $this->ion_auth->group($id)->row();
+		if (!$group)
+		{
+			show_404();
+		}
 
 		// validate form input
 		$this->form_validation->set_rules('group_name', $this->lang->line('edit_group_validation_name_label'), 'required|alpha_dash');
@@ -770,11 +891,18 @@ class Auth extends CI_Controller {
 		{
 			if ($this->form_validation->run() === TRUE)
 			{
-				$group_update = $this->ion_auth->update_group($id, $_POST['group_name'], $_POST['group_description']);
+				$group_update = $this->ion_auth->update_group($id, $this->input->post('group_name'), $this->input->post('group_description'));
 
 				if($group_update)
 				{
-					$this->session->set_flashdata('message', $this->lang->line('edit_group_saved'));
+					if ($this->page_access->save_group_pages($id, $this->input->post('pages')))
+					{
+						$this->session->set_flashdata('message', $this->lang->line('edit_group_saved'));
+					}
+					else
+					{
+						$this->session->set_flashdata('message', 'Akses halaman gagal disimpan.');
+					}
 				}
 				else
 				{
@@ -789,6 +917,8 @@ class Auth extends CI_Controller {
 
 		// pass the user to the view
 		$this->data['group'] = $group;
+		$this->data['pages'] = $this->page_access->pages();
+		$this->data['group_pages'] = $this->page_access->group_pages($id);
 
 		$readonly = $this->config->item('admin_group', 'ion_auth') === $group->name ? 'readonly' : '';
 
@@ -816,6 +946,51 @@ class Auth extends CI_Controller {
 	}
 
 
+	function npk_not_taken($npk, $user_id)
+	{
+		$npk = trim($npk);
+		if ($npk === '')
+		{
+			return TRUE;
+		}
+
+		$tables = $this->config->item('tables', 'ion_auth');
+		if (!$this->db->field_exists('npk', $tables['users']))
+		{
+			$this->form_validation->set_message('npk_not_taken', 'Jalankan application/sql/auth_npk_group_pages.sql untuk mengaktifkan NPK.');
+			return FALSE;
+		}
+
+		$this->db->where('npk', $npk);
+		$this->db->where('id !=', (int) $user_id);
+		if ($this->db->count_all_results($tables['users']) > 0)
+		{
+			$this->form_validation->set_message('npk_not_taken', 'NPK sudah digunakan oleh user lain.');
+			return FALSE;
+		}
+
+		return TRUE;
+	}
+
+	function email_not_taken($email)
+	{
+		$email = strtolower(trim($email));
+		if ($email === '')
+		{
+			return TRUE;
+		}
+
+		$tables = $this->config->item('tables', 'ion_auth');
+		$this->db->where('email', $email);
+		if ($this->db->count_all_results($tables['users']) > 0)
+		{
+			$this->form_validation->set_message('email_not_taken', 'Email sudah digunakan oleh user lain.');
+			return FALSE;
+		}
+
+		return TRUE;
+	}
+
 	function _get_csrf_nonce()
 	{
 		$this->load->helper('string');
@@ -840,14 +1015,29 @@ class Auth extends CI_Controller {
 		}
 	}
 
-	function _render_page($view, $data=null, $returnhtml=false)//I think this makes more sense
-	{
+		function _render_page($view, $data=null, $returnhtml=false)//I think this makes more sense
+		{
+			$this->viewdata = (empty($data)) ? $this->data: $data;
+			$view_html = $this->load->view($view, $this->viewdata, $returnhtml);
+			if ($returnhtml) return $view_html;//This will return html on 3rd argument being true
+		}
 
-		$this->viewdata = (empty($data)) ? $this->data: $data;
-
-		$view_html = $this->load->view($view, $this->viewdata, $returnhtml);
-
-		if ($returnhtml) return $view_html;//This will return html on 3rd argument being true
+		// callback untuk validasi password lama
+		function valid_password($password = '')
+		{
+			if (empty($password)) {
+				$this->form_validation->set_message('valid_password', 'Password lama harus diisi jika akan mengubah password');
+				return FALSE;
+			}
+			$user = $this->ion_auth->user()->row();
+			$identity = $user->{$this->config->item('identity', 'ion_auth')};
+			// check against the password in the db
+			$result = $this->ion_auth->login($identity, $password, FALSE, FALSE);
+			if (!$result)
+			{
+				$this->form_validation->set_message('valid_password', 'Password lama tidak sesuai');
+				return FALSE;
+			}
+			return TRUE;
+		}
 	}
-
-}

@@ -23,6 +23,22 @@
     <label><?php echo lang('edit_group_desc_label', 'description');?></label>
     <?php echo form_input($group_description, '', 'class="form-control"');?>
   </div>
+  <div class="form-group">
+    <label>Halaman yang dapat diakses</label>
+    <?php foreach ($pages as $page_key => $page): ?>
+      <div class="checkbox">
+        <label>
+          <?php if ($page_key === 'users') { ?>
+            <i class="fa fa-lock"></i>
+          <?php } else { ?>
+            <?php echo form_checkbox('pages[]', $page_key, in_array($page_key, $group_pages, TRUE)); ?>
+          <?php } ?>
+          <?php echo html_escape($page['label']); ?>
+          <?php if ($page_key === 'users') { ?><small>(khusus admin)</small><?php } ?>
+        </label>
+      </div>
+    <?php endforeach; ?>
+  </div>
   <div class="box-footer">
     <?php echo form_submit('submit', lang('edit_group_submit_btn'), 'class = "btn btn-primary"');?>
   <?php echo form_close();?>

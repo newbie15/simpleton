@@ -10,11 +10,12 @@ class Product_conversion extends CI_Controller
 		$this->load->database();
 		$this->load->helper(array('url', 'form'));
 		$this->load->library(array('session', 'ion_auth'));
+		$this->load->library('page_access');
 
 		if (!$this->ion_auth->logged_in()) {
 			redirect('auth/login', 'refresh');
 		}
-		if (!$this->ion_auth->in_group(array('admin', 'management'))) {
+		if (!$this->page_access->can_access('product_conversion')) {
 			show_error('Anda tidak memiliki akses untuk mengelola konversi kemasan.', 403);
 		}
 	}
