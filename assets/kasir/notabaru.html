@@ -45,7 +45,8 @@
       <!-- <td colspan="4" rowspan="1">Tanda Terima</td> -->
       <td colspan="4" rowspan="1" border="2" align="right"><span id="ttlx">Rp x.xxx.xxx</span></td>
     </tr>
-    <tr id="receipt-voucher-row" style="display:none;"><td colspan="4">Diskon voucher: <span id="receipt-voucher">Rp 0</span></td></tr>
+    <tr id="receipt-voucher-row" style="display:none;"><td colspan="4">Dibayar Voucher / Gift Card: <span id="receipt-voucher">Rp 0</span></td></tr>
+    <tr id="receipt-final-row" style="display:none;"><td colspan="4" align="right" style="font-weight:bold; border-top:1px dashed #000;">SISA BAYAR: <span id="receipt-final">Rp 0</span></td></tr>
     <tr id="receipt-cash-row" style="display:none;"><td colspan="4">Tunai diterima: <span id="receipt-cash">Rp 0</span><br>Kembalian: <span id="receipt-change">Rp 0</span></td></tr>
     <tr></tr>
     <tr><td colspan="4" rowspan="1">&nbsp;</td></tr>
@@ -68,11 +69,11 @@
   $(document).ready(function() {
     // alert(JSON.stringify(window.pass_data));
     // window.print();
-    
 
-    $("#npk").html(window.npk);    
-    $("#nkar").html(window.nkar);    
-    $("#akar").html(window.akar); 
+
+    $("#npk").html(window.npk);
+    $("#nkar").html(window.nkar);
+    $("#akar").html(window.akar);
     $("#tgl").html(window.tgl);
     $("#nonotax").html(window.no);
     var paymentLabels = {
@@ -83,8 +84,8 @@
       transfer: "Transfer Bank"
     };
     $("#metode_pembayaran_nota").text(paymentLabels[window.metodePembayaran] || "");
-    var nota = window.no; 
-    
+    var nota = window.no;
+
     data = window.pass_data;
     // alert();
     var shtml = "";
@@ -137,19 +138,26 @@
     });
 
     // $("#cart").html(shtml);
+    var diskonVoucher = Number(window.diskonVoucher) || 0;
     var receiptTotal = Number(window.totalTagihan);
     if (!isFinite(receiptTotal)) {
       receiptTotal = total;
     }
-    $("#ttlx").text("TOTAL Rp "+receiptTotal.toLocaleString());
+    var grossTotal = receiptTotal + (diskonVoucher > 0 ? diskonVoucher : 0);
+    if (diskonVoucher > 0) {
+      // Gift Card = alat bayar, bukan potongan DPP — PPN tetap dihitung dari total utuh
+      $("#ttlx").text("TOTAL BELANJA Rp "+grossTotal.toLocaleString());
+      $("#receipt-voucher").text("- Rp " + diskonVoucher.toLocaleString());
+      $("#receipt-voucher-row").show();
+      $("#receipt-final").text("Rp " + receiptTotal.toLocaleString());
+      $("#receipt-final-row").show();
+    } else {
+      $("#ttlx").text("TOTAL Rp "+receiptTotal.toLocaleString());
+    }
     if (window.metodePembayaran === "tunai") {
       $("#receipt-cash").text("Rp " + Number(window.nominalBayar || 0).toLocaleString());
       $("#receipt-change").text("Rp " + Number(window.kembalian || 0).toLocaleString());
       $("#receipt-cash-row").show();
-    }
-    if (Number(window.diskonVoucher) > 0) {
-      $("#receipt-voucher").text("Rp " + Number(window.diskonVoucher).toLocaleString());
-      $("#receipt-voucher-row").show();
     }
     $("#ppnx").html("Rp "+pajak.toLocaleString());
     var date = new Date();

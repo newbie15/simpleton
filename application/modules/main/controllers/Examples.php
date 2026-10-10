@@ -264,7 +264,7 @@ class Examples extends CI_Controller {
 			base_url("assets/jexcel/js/excel-formula.min.js"),			
 			base_url("assets/jexcel/js/numeral.min.js"),			
 			base_url("assets/easyautocomplete/jquery.easy-autocomplete.min.js"),			
-			base_url("assets/kasir/kasir.js?v=20261007-checkout-confirm"),
+			base_url("assets/kasir/kasir.js?v=20261010-payment-method-display"),
 		];
 		$data['m_penjualan'] = TRUE;
 
@@ -376,19 +376,12 @@ class Examples extends CI_Controller {
                     <!-- Metode pembayaran ditampilkan saja (dipilih di halaman kasir) -->
                     <div style="background-color: white; padding: 12px; border-radius: 4px; text-align: center; margin-bottom: 12px;">
                       <div style="font-size: 12px; color: #666; margin-bottom: 5px;">Metode Pembayaran</div>
-                      <div id="checkout-metode-display" style="display: none; font-size: 18px; font-weight: bold; color: #2c3e50;"></div>
-                      <select class="form-control" id="metode_pembayaran" name="metode_pembayaran" style="display: none;" tabindex="-1" aria-hidden="true">
-                        <option value="potong_gaji">Potong gaji</option>
-                        <option value="tunai">Tunai / Cash</option>
-                        <option value="qris">QRIS</option>
-                        <option value="edc">EDC (Debit/Kredit)</option>
-                        <option value="transfer">Transfer Bank</option>
-                      </select>
+                      <div id="checkout-metode-display" style="font-size: 18px; font-weight: bold; color: #2c3e50;"></div>
                     </div>
 
                     <!-- Voucher -->
                     <div class="form-group" data-checkout-field>
-                      <label for="checkout-voucher">Kode voucher (opsional)</label>
+                      <label for="checkout-voucher">Kode Voucher / Gift Card (opsional)</label>
                       <div style="display: flex; gap: 8px;">
                         <input class="form-control" type="text" id="checkout-voucher" maxlength="32" autocomplete="off" style="flex: 1;">
                         <button type="button" id="check-voucher" class="btn btn-default">Cek</button>
@@ -396,19 +389,19 @@ class Examples extends CI_Controller {
                       <div id="voucher-status" class="help-block" style="margin: 6px 0 0;"></div>
                     </div>
 
-                    <!-- Ringkasan nilai: total, diskon voucher, dibayar, kembalian -->
+                    <!-- Ringkasan nilai: total belanja utuh (sudah PPN), dibayar voucher gift card, sisa bayar - gift card sebagai alat bayar PPN tetap -->
                     <div style="background-color: white; padding: 14px; border-radius: 4px;">
                       <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px;">
-                        <span style="font-size: 13px; color: #666;">Total Tagihan</span>
+                        <span style="font-size: 13px; color: #666;">Total Belanja</span>
                         <span id="payment-total-display" style="font-size: 20px; font-weight: bold; color: #2c3e50;">Rp 0</span>
                       </div>
                       <div id="payment-diskon-row" style="display: none; justify-content: space-between; align-items: baseline; margin-bottom: 8px;">
-                        <span style="font-size: 13px; color: #666;">Diskon Voucher</span>
+                        <span style="font-size: 13px; color: #666;">Dibayar Voucher / Gift Card</span>
                         <span id="payment-diskon-display" style="font-size: 18px; font-weight: bold; color: #c0392b;">- Rp 0</span>
                       </div>
                       <div style="border-top: 1px dashed #ccc; margin: 10px 0;"></div>
                       <div style="display: flex; justify-content: space-between; align-items: baseline;">
-                        <span style="font-size: 13px; color: #666;">Total Bayar</span>
+                        <span style="font-size: 13px; color: #666;">Sisa Bayar</span>
                         <span id="payment-bayar-display" style="font-size: 26px; font-weight: bold; color: #2c3e50;">Rp 0</span>
                       </div>
                     </div>

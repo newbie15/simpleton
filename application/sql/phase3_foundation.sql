@@ -325,4 +325,5 @@ INSERT IGNORE INTO `acc_accounts` (`code`, `name`, `type`, `normal_balance`, `pa
 ('5101', 'Harga Pokok Penjualan (HPP)', 'cogs', 'debit', NULL, 1),
 ('6101', 'Beban Selisih Stok Opname', 'expense', 'debit', NULL, 1),
 ('6102', 'Beban Kerusakan / Afkir Barang', 'expense', 'debit', NULL, 1),
-('6103', 'Beban Operasional Toko', 'expense', 'debit', NULL, 1);
+('6103', 'Beban Operasional Toko', 'expense', 'debit', NULL, 1),
+('6104', 'Beban Pemasaran - Voucher', 'expense', 'debit', NULL, 1);

@@ -155,7 +155,7 @@ $(document).ready(function(){
         }[method] || "-";
     }
 
-    // Diskon voucher dari server (0 jika belum/ tidak valid).
+    // Nilai pembayaran voucher gift card dari server (0 jika belum/ tidak valid) — gift card sebagai alat bayar, PPN tetap.
     var activeVoucher = null;
 
     function updatePaymentFields() {
@@ -176,7 +176,7 @@ $(document).ready(function(){
             $("#kode-konfirmasi-label").text("Kode konfirmasi / nomor transfer");
         }
 
-        $("#checkout-metode-display").text(paymentMethodLabel(method));
+        $("#checkout-metode-display").text(paymentMethodLabel(method)).show();
         updatePaymentDisplay();
     }
 
@@ -430,7 +430,7 @@ $(document).ready(function(){
         }
     });
 
-    // Total setelah diskon voucher (dihitung ulang tiap kali voucher berubah).
+    // Sisa bayar setelah pembayaran voucher gift card (PPN tetap, voucher sebagai alat bayar).
     function checkoutGrandTotal() {
         var diskon = activeVoucher ? activeVoucher.diskon : 0;
         return Math.max(0, totl - diskon);
@@ -442,7 +442,7 @@ $(document).ready(function(){
         var diskon = activeVoucher ? activeVoucher.diskon : 0;
         var finalTotl = checkoutGrandTotal();
 
-        // Ringkasan nilai: total tagihan, diskon voucher, total bayar.
+        // Ringkasan nilai: total belanja utuh (sudah PPN), dibayar voucher gift card, sisa bayar.
         $("#payment-total-display").html("Rp " + formatRupiah(Math.round(totl)));
         if (diskon > 0) {
             $("#payment-diskon-row").css("display", "flex");
@@ -475,7 +475,7 @@ $(document).ready(function(){
     }
 
     // ------------------------------------------------------------------
-    // Voucher: validasi ke server, tampilkan nominal diskon, hitung ulang.
+    // Voucher gift card: validasi ke server, tampilkan nominal pembayaran voucher, hitung ulang sisa bayar (PPN tetap).
     // ------------------------------------------------------------------
     function clearVoucher(message, isError) {
         activeVoucher = null;
@@ -488,7 +488,7 @@ $(document).ready(function(){
     function applyVoucherFromServer(result) {
         activeVoucher = { kode: $.trim($("#checkout-voucher").val()), diskon: result.diskon };
         $("#voucher-status")
-            .text("Voucher berlaku. Potongan Rp " + formatRupiah(Math.round(result.diskon)) + ".")
+            .text("Voucher Gift Card berlaku. Dibayar voucher Rp " + formatRupiah(Math.round(result.diskon)) + ".")
             .css("color", "#27ae60");
         updatePaymentDisplay();
     }

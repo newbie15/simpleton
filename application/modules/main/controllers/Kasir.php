@@ -500,6 +500,17 @@ class Kasir extends CI_Controller {
 		$discount_amount = round((float) $diskon_voucher, 2);
 		$tax_amount = round((float) $sale_totals->tax_total, 2);
 		$gross_amount = round((float) $sale_totals->gross_sales, 2);
+		if ($discount_amount > 0) {
+			$marketing_account = $this->db->get_where('acc_accounts', array(
+				'code' => '6104',
+				'type' => 'expense',
+				'normal_balance' => 'debit',
+				'is_active' => 1
+			))->row();
+			if (!$marketing_account) {
+				return 'Akun beban pemasaran voucher 6104 belum tersedia. Jalankan application/sql/voucher_marketing_account.sql.';
+			}
+		}
 		if ($payment_amount > 0) {
 			$journal_lines[] = array(
 				'account' => $payment_account,
@@ -510,10 +521,10 @@ class Kasir extends CI_Controller {
 		}
 		if ($discount_amount > 0) {
 			$journal_lines[] = array(
-				'account' => '4202',
+				'account' => '6104',
 				'debit' => $discount_amount,
 				'credit' => 0,
-				'memo' => 'Voucher '.$kode_voucher.' untuk nota '.$nota
+				'memo' => 'Beban pemasaran voucher '.$kode_voucher.' untuk nota '.$nota
 			);
 		}
 		if ($gross_amount > 0) {
