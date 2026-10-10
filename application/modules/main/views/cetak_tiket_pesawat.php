@@ -91,7 +91,7 @@ switch ($maskapai) {
 
 
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
-<html><head><meta content="text/html; charset=ISO-8859-1" http-equiv="content-type"><title>tiket KMS</title></head>
+<html><head><meta content="text/html; charset=ISO-8859-1" http-equiv="content-type"><title>tiket MIS</title></head>
 <body style="
     font-family: sans-serif;
 ">

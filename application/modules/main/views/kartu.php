@@ -1,7 +1,7 @@
 <style>
 .bg {
   /* width: 520px; */
-  background-image: url("<?php echo  base_url('assets/kartu/KTA KOPKAR KMS.png');?>");
+  background-image: url("<?php echo  base_url('assets/kartu/KTA KOPKAR MIS.png');?>");
   background-size:100% 100%;
   color:black;
 }
