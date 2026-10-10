@@ -9,6 +9,7 @@ $config['pages'] = array(
 	'stock_opname' => array('label' => 'Stok Opname', 'uri' => 'main/stock_opname'),
 	'purchasing' => array('label' => 'Purchasing', 'uri' => 'main/purchasing'),
 	'product_conversion' => array('label' => 'Konversi Kemasan', 'uri' => 'main/product_conversion'),
+	'vouchers' => array('label' => 'Voucher', 'uri' => 'main/voucher'),
 	'sales_return' => array('label' => 'Retur Penjualan', 'uri' => 'main/sales_return'),
 	'supplier_return' => array('label' => 'Retur Supplier', 'uri' => 'main/supplier_return'),
 	'accounting' => array('label' => 'Accounting', 'uri' => 'main/accounting'),

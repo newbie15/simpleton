@@ -558,16 +558,24 @@ class Ajax extends CI_Controller {
             show_error('Anda tidak memiliki akses untuk melihat daftar kasir.', 403);
         }
 
-        $users_table = $this->config->item('tables', 'ion_auth')['users'];
+        $auth_tables = $this->config->item('tables', 'ion_auth');
+        $users_table = $auth_tables['users'];
+        $users_groups_table = $auth_tables['users_groups'];
+        $groups_table = $auth_tables['groups'];
         $columns = array('id', 'username', 'email', 'first_name', 'last_name');
         if ($this->db->field_exists('npk', $users_table)) {
             $columns[] = 'npk';
         }
         $query = $this->db
-            ->select($columns)
-            ->where('active', 1)
-            ->order_by('first_name', 'asc')
-            ->get($users_table);
+            ->select('users.'.implode(', users.', $columns), FALSE)
+            ->from($users_table.' users')
+            ->join($users_groups_table.' users_groups', 'users_groups.user_id = users.id')
+            ->join($groups_table.' groups', 'groups.id = users_groups.group_id')
+            ->where('users.active', 1)
+            ->where('groups.name', 'kasir')
+            ->group_by('users.id')
+            ->order_by('users.first_name', 'asc')
+            ->get();
 
         echo '<option value="0">===pilih salah satu===</option>';
         foreach ($query->result() as $row) {

@@ -32,6 +32,7 @@ UNION ALL SELECT `id`, 'rekap_penjualan' FROM `groups` WHERE `name` NOT IN ('adm
 
 INSERT IGNORE INTO `group_pages` (`group_id`, `page_key`)
 SELECT `id`, 'product_conversion' FROM `groups` WHERE `name` = 'management'
+UNION ALL SELECT `id`, 'vouchers' FROM `groups` WHERE `name` = 'management'
 UNION ALL SELECT `id`, 'sales_return' FROM `groups` WHERE `name` = 'management'
 UNION ALL SELECT `id`, 'supplier_return' FROM `groups` WHERE `name` IN ('management', 'pengurus')
 UNION ALL SELECT `id`, 'accounting' FROM `groups` WHERE `name` IN ('management', 'pengurus')
