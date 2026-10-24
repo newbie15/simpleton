@@ -7,6 +7,19 @@ require dirname(__DIR__).DIRECTORY_SEPARATOR.'application'.DIRECTORY_SEPARATOR.
 $controller = (new ReflectionClass('Petty_cash'))->newInstanceWithoutConstructor();
 $tests = array();
 
+class PettyCashTestResult
+{
+	private $value;
+	public function __construct($value) { $this->value = $value; }
+	public function row() { return $this->value; }
+}
+
+class PettyCashTestDatabase
+{
+	public function query($sql, $params) { return new PettyCashTestResult(NULL); }
+	public function get_where($table, $where) { return new PettyCashTestResult((object) array('imprest_limit' => 4573000)); }
+}
+
 $invoke = function ($method, $arguments) use ($controller) {
 	$reflection = new ReflectionMethod('Petty_cash', $method);
 	$reflection->setAccessible(TRUE);
@@ -29,6 +42,9 @@ $assert($invoke('_fund_account_code', array('cashier')) === '1101', 'Maps cashie
 $assert($invoke('_fund_account_code', array('main')) === '1106', 'Maps main funds to account 1106.');
 $assert($invoke('_fund_account_code', array('petty')) === '1107', 'Maps petty cash to account 1107.');
 $assert($invoke('_fund_account_code', array('invalid')) === '', 'Rejects unknown cash-fund types.');
+$controller->db = new PettyCashTestDatabase();
+$assert($invoke('_unreplenished_expenses', array(12, '2026-08-31', 99)) === 4573000.0,
+	'Allows the first petty cash advance up to the fund imprest limit.');
 
 $migration = file_get_contents(dirname(__DIR__).DIRECTORY_SEPARATOR.'application'.DIRECTORY_SEPARATOR.
 	'sql'.DIRECTORY_SEPARATOR.'petty_cash.sql');
@@ -47,6 +63,8 @@ $assert(strpos($view_source, 'Buku kas harian') !== FALSE &&
 	strpos($view_source, 'Saldo awal') !== FALSE &&
 	strpos($view_source, 'Saldo berjalan') !== FALSE &&
 	strpos($view_source, 'Saldo akhir sistem') !== FALSE, 'Daily cash view presents opening, running, and closing balances.');
+$assert(strpos($controller_source, 'if (!$supplier_receipt || $outstanding === FALSE') !== FALSE,
+	'Supplier-payment approval validates the locked goods receipt before posting.');
 
 $failures = 0;
 foreach ($tests as $test) {
