@@ -23,6 +23,7 @@ Sistem mengimplementasikan **Role-Based Access Control (RBAC)** dengan 5 peran r
 | **Inventory & Purchasing** | | | | | |
 | - Master Data Barang & Harga | Ya | Lihat | **Ya** | Lihat Saja | Tidak |
 | - Relasi Kemasan Dus vs Pcs | Ya | Lihat | **Ya** | Tidak | Tidak |
+| - Kelola Master Voucher | Ya | Tidak | **Ya** | Tidak | Tidak |
 | - Buat Purchase Order (PO) | Ya | **Approval** | **Ya** | Tidak | Tidak |
 | - Penerimaan Barang (Goods Receipt) | Ya | Tidak | **Ya** | Tidak | Tidak |
 | - Retur Barang ke Supplier | Ya | **Approval** | **Ya** | Tidak | Tidak |
