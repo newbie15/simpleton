@@ -63,9 +63,25 @@
 
 <br style="font-family: Courier;">
 </table>
+<div style="text-align:center; margin-top:12px;">
+  <svg id="receipt-barcode" style="max-width:100%; height:64px;"></svg>
+</div>
 </body>
 <script src="http://localhost/simpleton/assets/adminlte/plugins/jQuery/jQuery-2.1.4.min.js"></script>
+<script src="http://localhost/simpleton/JsBarcode.all.js"></script>
 <script>
+  function renderReceiptBarcode() {
+    var query = new URLSearchParams(window.location.search);
+    var notaCode = String(window.no || query.get("nota") || "").trim();
+    if (!notaCode || typeof JsBarcode !== "function") {
+      return;
+    }
+    JsBarcode("#receipt-barcode", notaCode, {
+      format: "CODE128", displayValue: true, fontSize: 12, height: 42, margin: 2
+    });
+  }
+  window.renderReceiptBarcode = renderReceiptBarcode;
+
   $(document).ready(function() {
     // alert(JSON.stringify(window.pass_data));
     // window.print();
@@ -85,6 +101,7 @@
     };
     $("#metode_pembayaran_nota").text(paymentLabels[window.metodePembayaran] || "");
     var nota = window.no;
+    renderReceiptBarcode();
 
     data = window.pass_data;
     // alert();
@@ -146,20 +163,20 @@
     var grossTotal = receiptTotal + (diskonVoucher > 0 ? diskonVoucher : 0);
     if (diskonVoucher > 0) {
       // Gift Card = alat bayar, bukan potongan DPP — PPN tetap dihitung dari total utuh
-      $("#ttlx").text("TOTAL BELANJA Rp "+grossTotal.toLocaleString());
-      $("#receipt-voucher").text("- Rp " + diskonVoucher.toLocaleString());
+      $("#ttlx").text("TOTAL BELANJA Rp "+grossTotal.toLocaleString("id-ID"));
+      $("#receipt-voucher").text("- Rp " + diskonVoucher.toLocaleString("id-ID"));
       $("#receipt-voucher-row").show();
-      $("#receipt-final").text("Rp " + receiptTotal.toLocaleString());
+      $("#receipt-final").text("Rp " + receiptTotal.toLocaleString("id-ID"));
       $("#receipt-final-row").show();
     } else {
-      $("#ttlx").text("TOTAL Rp "+receiptTotal.toLocaleString());
+      $("#ttlx").text("TOTAL Rp "+receiptTotal.toLocaleString("id-ID"));
     }
     if (window.metodePembayaran === "tunai") {
-      $("#receipt-cash").text("Rp " + Number(window.nominalBayar || 0).toLocaleString());
-      $("#receipt-change").text("Rp " + Number(window.kembalian || 0).toLocaleString());
+      $("#receipt-cash").text("Rp " + Number(window.nominalBayar || 0).toLocaleString("id-ID"));
+      $("#receipt-change").text("Rp " + Number(window.kembalian || 0).toLocaleString("id-ID"));
       $("#receipt-cash-row").show();
     }
-    $("#ppnx").html("Rp "+pajak.toLocaleString());
+    $("#ppnx").html("Rp "+pajak.toLocaleString("id-ID"));
     var date = new Date();
     var d = date.getDate();
     var m = date.getMonth() + 1;

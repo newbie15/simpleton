@@ -68,6 +68,66 @@ class Kasir extends CI_Controller {
 		$this->load->view('welcome_message', $data);
 	}
 
+	public function reprint()
+	{
+		$this->load->database();
+		$this->load->helper('url');
+		$this->load->library(array('session', 'ion_auth', 'page_access'));
+		if (!$this->ion_auth->logged_in()) {
+			redirect('auth/login', 'refresh');
+		}
+		if (!$this->page_access->can_access('penjualan')) {
+			show_error('Anda tidak memiliki akses untuk mencetak ulang nota.', 403);
+		}
+
+		$nota = trim((string) $this->input->get('nota', TRUE));
+		$receipt = NULL;
+		if ($nota !== '') {
+			if (strlen($nota) > 64) {
+				show_error('Nomor nota tidak valid.', 400);
+			}
+			$receipt = $this->db->query("
+				SELECT sale.nota, sale.id_karyawan AS npk, MIN(sale.tgl) AS transaction_date,
+					COALESCE(employee.nama, sale.id_karyawan) AS employee_name,
+					COALESCE(NULLIF(CONCAT_WS(' ', cashier.first_name, cashier.last_name), ''), cashier.username, payment.id_user, sale.id_user) AS cashier_name,
+					COALESCE(payment.metode_pembayaran, sale.metode_pembayaran, '') AS payment_method,
+					COALESCE(payment.total_tagihan, SUM(sale.jumlah + sale.jumlah * sale.ppn), SUM(sale.jumlah)) AS total_paid,
+					COALESCE(payment.diskon_voucher, 0) AS voucher_discount,
+					COALESCE(payment.kode_voucher, '') AS voucher_code,
+					COALESCE(payment.nominal_bayar, 0) AS amount_paid,
+					COALESCE(payment.kembalian, 0) AS change_amount
+				FROM penjualan sale
+				LEFT JOIN penjualan_pembayaran payment ON payment.nota = sale.nota
+				LEFT JOIN karyawan employee ON employee.npk = sale.id_karyawan
+				LEFT JOIN users cashier ON cashier.id = payment.id_user
+				WHERE sale.nota = ?
+				GROUP BY sale.nota, sale.id_karyawan, employee.nama, cashier.first_name,
+					cashier.last_name, cashier.username, payment.id_user, sale.id_user,
+					payment.metode_pembayaran, sale.metode_pembayaran, payment.total_tagihan,
+					payment.diskon_voucher, payment.kode_voucher, payment.nominal_bayar, payment.kembalian
+			", array($nota))->row();
+			if (!$receipt) {
+				$this->session->set_flashdata('receipt_error', 'Nota tidak ditemukan. Periksa kembali nomor nota.');
+				redirect('main/kasir/reprint');
+			}
+			$receipt->items = $this->db->query("
+				SELECT sale.kode AS barcode, COALESCE(stock.nama, sale.kode) AS product_name,
+					sale.qty, sale.harga, sale.jumlah, sale.ppn
+				FROM penjualan sale
+				LEFT JOIN stok stock ON stock.barcode = sale.kode
+				WHERE sale.nota = ?
+				ORDER BY sale.id ASC
+			", array($nota))->result();
+		}
+
+		$data = array(
+			'nota' => $nota,
+			'receipt' => $receipt,
+			'error' => $this->session->flashdata('receipt_error')
+		);
+		$this->load->view('pos_receipt_reprint', $data);
+	}
+
 	public function checkout(){
 		if ($this->input->method(TRUE) !== 'POST') {
 			show_404();
@@ -77,7 +137,7 @@ class Kasir extends CI_Controller {
 		if ($input === FALSE) {
 			return;
 		}
-		$nota = $input['nota'];
+		$request_id = $input['request_id'];
 		$id_user = $input['id_user'];
 		$id_karyawan = $input['id_karyawan'];
 		$payment_method = $input['payment_method'];
@@ -85,13 +145,18 @@ class Kasir extends CI_Controller {
 		$kode_voucher = $input['kode_voucher'];
 		$nomor_ref = $input['nomor_referensi'];
 		$bank_tujuan = $input['bank_tujuan'];
+		if (!$this->db->table_exists('pos_receipt_sequences') ||
+			!$this->db->field_exists('checkout_request_id', 'penjualan_pembayaran')) {
+			$this->_checkout_json(FALSE, 'Skema nomor nota pendek belum tersedia. Jalankan application/sql/pos_receipt_sequence.sql.');
+			return;
+		}
 
 		$clean_items = $this->_clean_cart_items($input['items']);
 		if ($clean_items === FALSE) {
 			return;
 		}
 
-		if ($this->_respond_existing_checkout($nota, $id_user, $id_karyawan)) {
+		if ($this->_respond_existing_checkout($request_id, $id_user, $id_karyawan)) {
 			return;
 		}
 
@@ -146,8 +211,9 @@ class Kasir extends CI_Controller {
 		// Validasi voucher (opsional)
 		$diskon_voucher = 0.0;
 		$voucher_id_used = NULL;
+		$voucher_coupon_id_used = NULL;
 		if ($kode_voucher !== '') {
-			$voucher_result = $this->_apply_voucher($kode_voucher, $total_tagihan);
+			$voucher_result = $this->_apply_voucher($kode_voucher, $total_tagihan, $id_karyawan);
 			if (!$voucher_result['valid']) {
 				$this->db->trans_rollback();
 				$this->db->db_debug = $previous_db_debug;
@@ -156,6 +222,7 @@ class Kasir extends CI_Controller {
 			}
 			$diskon_voucher = $voucher_result['diskon'];
 			$voucher_id_used = $voucher_result['voucher_id'];
+			$voucher_coupon_id_used = $voucher_result['coupon_id'];
 			$total_tagihan = max(0, $total_tagihan - $diskon_voucher);
 		}
 
@@ -165,12 +232,19 @@ class Kasir extends CI_Controller {
 		if ($is_cash && $nominal_bayar < $total_tagihan) {
 			$this->db->trans_rollback();
 			$this->db->db_debug = $previous_db_debug;
-			$this->_checkout_json(FALSE, 'Uang tunai yang dibayarkan ('.number_format($nominal_bayar).')'
-				.' kurang dari total tagihan ('.number_format($total_tagihan).').');
+			$this->_checkout_json(FALSE, 'Uang tunai yang dibayarkan ('.number_format($nominal_bayar, 0, ',', '.').')'
+				.' kurang dari total tagihan ('.number_format($total_tagihan, 0, ',', '.').').');
 			return;
 		}
 
 		$kembalian = $is_cash ? max(0, $nominal_bayar - $total_tagihan) : 0;
+		$nota = $this->_next_receipt_number($id_karyawan, $sale_time);
+		if ($nota === FALSE) {
+			$this->db->trans_rollback();
+			$this->db->db_debug = $previous_db_debug;
+			$this->_checkout_json(FALSE, 'Nomor nota tidak dapat dibuat. Transaksi belum disimpan.');
+			return;
+		}
 
 		// Simpan tiap baris penjualan & kurangi stok
 		$errors = $this->_persist_sale_lines($resolved_items, $nota, $id_user, $id_karyawan, $sale_time, $payment_method);
@@ -185,6 +259,7 @@ class Kasir extends CI_Controller {
 		// Simpan header pembayaran ke penjualan_pembayaran
 		$this->db->insert('penjualan_pembayaran', array(
 			'nota'              => $nota,
+			'checkout_request_id' => $request_id,
 			'metode_pembayaran' => $payment_method,
 			'total_tagihan'     => $total_tagihan,
 			'nominal_bayar'     => $is_cash ? $nominal_bayar : $total_tagihan,
@@ -204,13 +279,36 @@ class Kasir extends CI_Controller {
 				'UPDATE `vouchers` SET `terpakai` = `terpakai` + 1 WHERE `id` = ?',
 				array($voucher_id_used)
 			);
-			$this->db->insert('voucher_usages', array(
+			$usage_record = array(
 				'voucher_id'     => $voucher_id_used,
 				'nota'           => $nota,
 				'npk_anggota'    => $id_karyawan,
 				'nominal_diskon' => $diskon_voucher,
 				'used_at'        => $sale_time,
-			));
+			);
+			if ($this->db->field_exists('voucher_coupon_id', 'voucher_usages')) {
+				$usage_record['voucher_coupon_id'] = $voucher_coupon_id_used;
+			}
+			if (!$this->db->insert('voucher_usages', $usage_record)) {
+				$this->db->trans_rollback();
+				$this->db->db_debug = $previous_db_debug;
+				$this->_checkout_json(FALSE, 'Riwayat penggunaan voucher gagal disimpan. Transaksi tidak disimpan.');
+				return;
+			}
+			if ($voucher_coupon_id_used !== NULL) {
+				$updated_coupon = $this->db->where('id', (int) $voucher_coupon_id_used)
+					->where('status', 'available')->update('voucher_coupons', array(
+						'status' => 'used',
+						'used_nota' => $nota,
+						'used_at' => $sale_time
+					));
+				if (!$updated_coupon || $this->db->affected_rows() !== 1) {
+					$this->db->trans_rollback();
+					$this->db->db_debug = $previous_db_debug;
+					$this->_checkout_json(FALSE, 'Kupon sudah dipakai atau gagal ditandai. Transaksi tidak disimpan.');
+					return;
+				}
+			}
 		}
 
 		$journal_error = $this->_post_checkout_journal($nota, $payment_method, $id_user, $sale_time, $total_tagihan, $diskon_voucher, $kode_voucher);
@@ -226,7 +324,7 @@ class Kasir extends CI_Controller {
 			$database_error = $this->db->error();
 			$this->db->trans_rollback();
 			$this->db->db_debug = $previous_db_debug;
-			if ($this->_respond_existing_checkout($nota, $id_user, $id_karyawan)) {
+			if ($this->_respond_existing_checkout($request_id, $id_user, $id_karyawan)) {
 				return;
 			}
 			$error_code = !empty($database_error['code']) ? $database_error['code'] : 'unknown';
@@ -239,7 +337,7 @@ class Kasir extends CI_Controller {
 			$database_error = $this->db->error();
 			$this->db->trans_rollback();
 			$this->db->db_debug = $previous_db_debug;
-			if ($this->_respond_existing_checkout($nota, $id_user, $id_karyawan)) {
+			if ($this->_respond_existing_checkout($request_id, $id_user, $id_karyawan)) {
 				return;
 			}
 			$error_code = !empty($database_error['code']) ? $database_error['code'] : 'unknown';
@@ -250,6 +348,7 @@ class Kasir extends CI_Controller {
 		}
 		$this->db->db_debug = $previous_db_debug;
 		$this->_checkout_json(TRUE, 'Transaksi berhasil dicatat.', array(), array(
+			'nota'           => $nota,
 			'kembalian'      => $kembalian,
 			'total_tagihan'  => $total_tagihan,
 			'diskon_voucher' => $diskon_voucher,
@@ -261,7 +360,10 @@ class Kasir extends CI_Controller {
 	 */
 	private function _checkout_input()
 	{
-		$nota = trim((string) $this->input->post('no', TRUE));
+		$request_id = trim((string) $this->input->post('request_id', TRUE));
+		if ($request_id === '') {
+			$request_id = trim((string) $this->input->post('no', TRUE));
+		}
 		$id_user = trim((string) $this->input->post('id_user', TRUE));
 		$id_karyawan = trim((string) $this->input->post('id_karyawan', TRUE));
 		$payment_method = trim((string) $this->input->post('metode_pembayaran', TRUE));
@@ -275,7 +377,8 @@ class Kasir extends CI_Controller {
 		$nomor_ref      = trim((string) $this->input->post('nomor_referensi', TRUE));
 		$bank_tujuan    = trim((string) $this->input->post('bank_tujuan', TRUE));
 
-		if ($nota === '' || strlen($nota) > 64 ||
+		if ($request_id === '' || strlen($request_id) > 64 ||
+			!preg_match('/^[A-Za-z0-9_-]+$/D', $request_id) ||
 			$id_user === '' || strlen($id_user) > 32 ||
 			$id_karyawan === '' || strlen($id_karyawan) > 32 ||
 			!in_array($payment_method, $allowed_methods, TRUE) ||
@@ -300,7 +403,7 @@ class Kasir extends CI_Controller {
 		}
 
 		return array(
-			'nota'             => $nota,
+			'request_id'       => $request_id,
 			'id_user'          => $id_user,
 			'id_karyawan'      => $id_karyawan,
 			'payment_method'   => $payment_method,
@@ -590,9 +693,14 @@ class Kasir extends CI_Controller {
 		return NULL;
 	}
 
-	private function _respond_existing_checkout($nota, $id_user, $id_karyawan)
+	private function _respond_existing_checkout($request_id, $id_user, $id_karyawan)
 	{
-		$payment = $this->db->get_where('penjualan_pembayaran', array('nota' => $nota))->row();
+		$payment = $this->db->get_where('penjualan_pembayaran', array(
+			'checkout_request_id' => $request_id
+		))->row();
+		if (!$payment) {
+			$payment = $this->db->get_where('penjualan_pembayaran', array('nota' => $request_id))->row();
+		}
 		if (!$payment) {
 			return FALSE;
 		}
@@ -605,6 +713,7 @@ class Kasir extends CI_Controller {
 		}
 
 		$this->_checkout_json(TRUE, 'Transaksi sudah tercatat.', array(), array(
+			'nota' => $payment->nota,
 			'total_tagihan' => (float) $payment->total_tagihan,
 			'diskon_voucher' => (float) $payment->diskon_voucher,
 			'kembalian' => (float) $payment->kembalian,
@@ -613,28 +722,87 @@ class Kasir extends CI_Controller {
 		return TRUE;
 	}
 
+	private function _next_receipt_number($npk, $sale_time)
+	{
+		$business_date = substr($sale_time, 0, 10);
+		$updated = $this->db->query("
+			INSERT INTO pos_receipt_sequences (business_date, npk, last_number)
+			VALUES (?, ?, 1)
+			ON DUPLICATE KEY UPDATE last_number = last_number + 1
+		", array($business_date, $npk));
+		if ($updated === FALSE) {
+			return FALSE;
+		}
+		$sequence = $this->db->query("
+			SELECT last_number FROM pos_receipt_sequences
+			WHERE business_date = ? AND npk = ? FOR UPDATE
+		", array($business_date, $npk))->row();
+		if (!$sequence || (int) $sequence->last_number < 1) {
+			return FALSE;
+		}
+		return $this->_format_receipt_number($npk, $business_date, (int) $sequence->last_number);
+	}
+
+	private function _format_receipt_number($npk, $business_date, $sequence)
+	{
+		$timestamp = strtotime($business_date);
+		if ($timestamp === FALSE || (int) $sequence < 1) {
+			return FALSE;
+		}
+		return (string) $npk.'-'.date('ymd', $timestamp).'-'.str_pad((string) (int) $sequence, 3, '0', STR_PAD_LEFT);
+	}
+
 	/**
 	 * Validasi dan hitung diskon voucher.
 	 * Return array: ['valid'=>bool, 'message'=>string, 'diskon'=>float, 'voucher_id'=>int|null]
 	 */
-	private function _apply_voucher($kode, $total_belanja)
+	private function _apply_voucher($kode, $total_belanja, $npk = '')
 	{
-		$v = $this->db->query("
-			SELECT id, tipe, nilai, min_belanja, max_diskon, kuota, terpakai
-			FROM vouchers
-			WHERE kode = ? AND is_active = 1
-				AND tgl_mulai <= NOW() AND tgl_kadaluarsa >= NOW()
-			FOR UPDATE
-		", array($kode))->row();
+		$coupon_id = NULL;
+		$coupon = NULL;
+		if ($this->db->table_exists('voucher_coupons')) {
+			$coupon = $this->db->get_where('voucher_coupons', array('serial_code' => strtoupper($kode)))->row();
+		}
+		if ($coupon) {
+			if ($coupon->status !== 'available') {
+				return array('valid' => FALSE, 'message' => 'Kupon ini sudah dipakai atau dibatalkan.', 'diskon' => 0, 'voucher_id' => NULL, 'coupon_id' => NULL);
+			}
+			if ($coupon->assigned_npk !== NULL && strtoupper((string) $coupon->assigned_npk) !== strtoupper((string) $npk)) {
+				return array('valid' => FALSE, 'message' => 'Kupon ini diterbitkan untuk NPK lain.', 'diskon' => 0, 'voucher_id' => NULL, 'coupon_id' => NULL);
+			}
+			$v = $this->db->query("
+				SELECT id, tipe, nilai, min_belanja, max_diskon, kuota, terpakai
+				FROM vouchers
+				WHERE id = ? AND is_active = 1
+					AND tgl_mulai <= NOW() AND tgl_kadaluarsa >= NOW()
+				FOR UPDATE
+			", array((int) $coupon->voucher_id))->row();
+			$coupon_id = (int) $coupon->id;
+		} else {
+			$v = $this->db->query("
+				SELECT id, tipe, nilai, min_belanja, max_diskon, kuota, terpakai
+				FROM vouchers
+				WHERE kode = ? AND is_active = 1
+					AND tgl_mulai <= NOW() AND tgl_kadaluarsa >= NOW()
+				FOR UPDATE
+			", array($kode))->row();
+		}
 
 		if (!$v) {
-			return array('valid' => FALSE, 'message' => 'Voucher tidak valid atau sudah kedaluwarsa.', 'diskon' => 0, 'voucher_id' => NULL);
+			return array('valid' => FALSE, 'message' => 'Voucher tidak valid atau sudah kedaluwarsa.', 'diskon' => 0, 'voucher_id' => NULL, 'coupon_id' => NULL);
 		}
 		if ((int)$v->kuota > 0 && (int)$v->terpakai >= (int)$v->kuota) {
-			return array('valid' => FALSE, 'message' => 'Kuota voucher sudah habis.', 'diskon' => 0, 'voucher_id' => NULL);
+			return array('valid' => FALSE, 'message' => 'Kuota voucher sudah habis.', 'diskon' => 0, 'voucher_id' => NULL, 'coupon_id' => NULL);
+		}
+		if (!$coupon && (int) $v->kuota > 0 && $this->db->table_exists('voucher_coupons')) {
+			$reserved = $this->db->where('voucher_id', (int) $v->id)
+				->where('status', 'available')->count_all_results('voucher_coupons');
+			if ((int) $v->terpakai + (int) $reserved >= (int) $v->kuota) {
+				return array('valid' => FALSE, 'message' => 'Sisa kuota voucher sudah dialokasikan ke kupon berserial.', 'diskon' => 0, 'voucher_id' => NULL, 'coupon_id' => NULL);
+			}
 		}
 		if ($total_belanja < (float)$v->min_belanja) {
-			return array('valid' => FALSE, 'message' => 'Minimum belanja untuk voucher ini Rp '.number_format($v->min_belanja).'.', 'diskon' => 0, 'voucher_id' => NULL);
+			return array('valid' => FALSE, 'message' => 'Minimum belanja untuk voucher ini Rp '.number_format($v->min_belanja).'.', 'diskon' => 0, 'voucher_id' => NULL, 'coupon_id' => NULL);
 		}
 
 		$diskon = 0.0;
@@ -649,7 +817,7 @@ class Kasir extends CI_Controller {
 			$diskon = (float) $v->nilai; // Cashback dicatat sebagai potongan pada sesi ini
 		}
 
-		return array('valid' => TRUE, 'message' => 'OK', 'diskon' => $diskon, 'voucher_id' => (int) $v->id);
+		return array('valid' => TRUE, 'message' => 'OK', 'diskon' => $diskon, 'voucher_id' => (int) $v->id, 'coupon_id' => $coupon_id);
 	}
 
 	/**
@@ -661,16 +829,47 @@ class Kasir extends CI_Controller {
 		if ($this->input->method(TRUE) !== 'GET') { show_404(); }
 		$kode = trim((string) $kode);
 		$total = (float) $total;
+		$npk = trim((string) $this->input->get('npk', TRUE));
 		if ($kode === '') {
 			$this->output->set_content_type('application/json')->set_output(json_encode(array('valid' => FALSE, 'message' => 'Kode voucher kosong.')));
 			return;
 		}
-		$result = $this->_apply_voucher($kode, $total);
+		$result = $this->_apply_voucher($kode, $total, $npk);
 		$this->output->set_content_type('application/json')->set_output(json_encode(array(
 			'valid'   => $result['valid'],
 			'message' => $result['message'],
 			'diskon'  => $result['diskon'],
 		)));
+	}
+
+	public function eligible_vouchers()
+	{
+		if ($this->input->method(TRUE) !== 'GET') {
+			show_404();
+		}
+		$this->load->database();
+		$this->load->library(array('ion_auth', 'page_access'));
+		if (!$this->ion_auth->logged_in() || !$this->page_access->can_access('penjualan')) {
+			show_error('Anda tidak memiliki akses untuk melihat voucher penjualan.', 403);
+		}
+		$npk = $this->input->get('npk', TRUE);
+		$npk = is_string($npk) ? trim($npk) : '';
+		if ($npk === '' || strlen($npk) > 32 || !preg_match('/^[A-Za-z0-9_-]+$/D', $npk)) {
+			$this->output->set_status_header(400);
+			$this->output->set_content_type('application/json', 'utf-8')->set_output(json_encode(array('data' => array())));
+			return;
+		}
+		$coupons = $this->db->query("
+			SELECT coupon.serial_code, voucher.nama, voucher.nilai
+			FROM voucher_coupons AS coupon
+			JOIN vouchers AS voucher ON voucher.id = coupon.voucher_id
+			WHERE coupon.assigned_npk = ? AND coupon.status = 'available'
+				AND voucher.is_active = 1
+				AND voucher.tgl_mulai <= NOW() AND voucher.tgl_kadaluarsa >= NOW()
+				AND (voucher.kuota = 0 OR voucher.terpakai < voucher.kuota)
+			ORDER BY coupon.id ASC
+		", array($npk))->result_array();
+		$this->output->set_content_type('application/json', 'utf-8')->set_output(json_encode(array('data' => $coupons)));
 	}
 
 	/**

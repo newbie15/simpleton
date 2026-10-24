@@ -22,6 +22,9 @@
 
     <!-- iCheck -->
     <link rel="stylesheet" href="<?= base_url('assets/adminlte/plugins/iCheck/square/blue.css') ?>">
+    <?php if (isset($view_file) && $view_file === 'auth/index') { ?>
+    <link rel="stylesheet" href="<?= base_url('assets/adminlte/plugins/datatables/jquery.dataTables.min.css') ?>">
+    <?php } ?>
     <!-- Morris chart -->
     <link rel="stylesheet" href="<?= base_url('assets/adminlte/plugins/morris/morris.css') ?>">
     <!-- jvectormap -->
@@ -300,5 +303,83 @@
     <script src="<?= base_url('assets/adminlte/dist/js/app.min.js') ?>"></script>
     <!-- AdminLTE for demo purposes -->
     <script src="<?= base_url('assets/adminlte/dist/js/demo.js') ?>"></script>
+    <?php if (isset($view_file) && $view_file === 'auth/index') { ?>
+    <script src="<?= base_url('assets/adminlte/plugins/datatables/jquery.dataTables.min.js') ?>"></script>
+    <script>
+      $(function () {
+        var table = $('#users-table');
+        var escapeHtml = function (value) {
+          return $('<div>').text(value == null ? '' : value).html();
+        };
+
+        table.DataTable({
+          processing: true,
+          serverSide: true,
+          searchDelay: 400,
+          pageLength: 25,
+          lengthMenu: [10, 25, 50, 100],
+          order: [[0, 'asc']],
+          ajax: table.data('ajax-url'),
+          columns: [
+            { data: 'first_name', render: escapeHtml },
+            { data: 'last_name', render: escapeHtml },
+            { data: 'npk', render: escapeHtml },
+            { data: 'email', render: escapeHtml },
+            {
+              data: 'groups',
+              orderable: false,
+              render: function (groups) {
+                if (!groups || !groups.length) {
+                  return '';
+                }
+                return $.map(groups, function (group) {
+                  var url = <?php echo json_encode(site_url('auth/edit_group/')); ?> + encodeURIComponent(group.id);
+                  return '<a href="' + escapeHtml(url) + '">' + escapeHtml(group.name) + '</a>';
+                }).join('<br>');
+              }
+            },
+            {
+              data: 'active',
+              render: function (active, type, user) {
+                if (type !== 'display') {
+                  return active ? 1 : 0;
+                }
+                var label = active ? '<?php echo html_escape(lang('index_active_link')); ?>' : '<?php echo html_escape(lang('index_inactive_link')); ?>';
+                var url = (active ? table.data('deactivate-url') : table.data('activate-url')) + '/' + encodeURIComponent(user.id);
+                var action = active ? 'Nonaktifkan' : 'Aktifkan';
+                return '<span class="label ' + (active ? 'label-success' : 'label-default') + '">' + escapeHtml(label) + '</span> ' +
+                  '<a href="' + escapeHtml(url) + '">' + action + '</a>';
+              }
+            },
+            {
+              data: 'id',
+              orderable: false,
+              searchable: false,
+              render: function (id) {
+                var url = table.data('edit-url') + '/' + encodeURIComponent(id);
+                return '<a class="btn btn-xs btn-default" href="' + escapeHtml(url) + '">Edit</a>';
+              }
+            }
+          ],
+          language: {
+            processing: 'Memuat...',
+            search: 'Cari:',
+            lengthMenu: 'Tampilkan _MENU_ user',
+            info: 'Menampilkan _START_ sampai _END_ dari _TOTAL_ user',
+            infoEmpty: 'Tidak ada user untuk ditampilkan',
+            infoFiltered: '(difilter dari _MAX_ total user)',
+            zeroRecords: 'User tidak ditemukan',
+            emptyTable: 'Belum ada user.',
+            paginate: {
+              first: 'Pertama',
+              previous: 'Sebelumnya',
+              next: 'Berikutnya',
+              last: 'Terakhir'
+            }
+          }
+        });
+      });
+    </script>
+    <?php } ?>
   </body>
 </html>

@@ -138,11 +138,13 @@ $(document).ready(function () {
             return;
         }
         loadSheet('perorangan-sheet', reportUrl('data_perorangan', period, npk, false), [
-            { type: 'text', width: 120 },
+            { type: 'text', width: 100 },
             { type: 'text', width: 180 },
             { type: 'text', width: 100 },
-            { type: 'text', width: 220 },
-            { type: 'text', width: 140 }
+            { type: 'text', width: 200 },
+            { type: 'text', width: 130 },
+            { type: 'text', width: 130 },
+            { type: 'text', width: 130 }
         ], 30);
     }
 
@@ -155,6 +157,8 @@ $(document).ready(function () {
             { type: 'text', width: 100 },
             { type: 'text', width: 220 },
             { type: 'text', width: 180 },
+            { type: 'text', width: 140 },
+            { type: 'text', width: 140 },
             { type: 'text', width: 140 }
         ], 30);
     }
