@@ -341,16 +341,19 @@
 		<div class="box-header with-border">
 			<h3 class="box-title"><?php echo html_escape($order->order_number); ?></h3>
 			<div class="pull-right">
-				<button class="btn btn-primary btn-sm" type="submit" form="receipt-form">Simpan Penerimaan</button>
+				<?php if ($can_receive) { ?><button class="btn btn-primary btn-sm" type="submit" form="receipt-form">Simpan Penerimaan</button><?php } else { ?><span class="label label-default">PO closed</span><?php } ?>
 				<a class="btn btn-default btn-sm" href="<?php echo site_url('main/purchasing'); ?>">Kembali ke Purchasing</a>
 			</div>
 		</div>
 		<div class="box-body">
 			<p><strong>Supplier:</strong> <?php echo html_escape($order->supplier_name); ?>
 				&nbsp; <strong>Tanggal PO:</strong> <?php echo html_escape($order->ordered_at); ?></p>
+			<?php if ($order->status === 'closed') { ?><div class="alert alert-warning">PO ditutup oleh <?php echo html_escape($order->closed_by); ?> pada <?php echo html_escape($order->closed_at); ?>. Alasan: <?php echo html_escape($order->close_reason); ?>. Penerimaan baru dikunci.</div><?php } ?>
 			<?php if ($order->notes !== '') { ?><p><strong>Catatan PO:</strong> <?php echo html_escape($order->notes); ?></p><?php } ?>
 
-			<form id="receipt-form" method="post" novalidate action="<?php echo site_url('main/purchasing/save_receipt/'.$order->id); ?>">
+			<?php if ($can_receive) { ?>
+			<form id="receipt-form" method="post" novalidate action="<?php echo site_url('main/purchasing/save_receipt/'.$order->id); ?>" data-product-search-url="<?php echo html_escape(site_url('main/purchasing/product_search')); ?>">
+				<input type="hidden" name="form_token" value="<?php echo html_escape($form_token); ?>">
 				<div class="row">
 					<div class="col-md-6">
 						<div class="form-group">
@@ -372,24 +375,52 @@
 						</div>
 					</div>
 				</div>
+				<?php if ($can_add_adhoc) { ?>
+				<div class="panel panel-warning">
+					<div class="panel-heading"><strong>Barang di luar PO</strong></div>
+					<div class="panel-body">
+						<p class="help-block">Khusus manager/pengurus. Cari atau scan produk lalu tekan Enter. Untuk barang baru, cari nama dulu, scan barcode, lalu isi qty dan harga beli sesuai faktur.</p>
+						<div class="table-responsive"><table class="table table-condensed table-bordered">
+							<thead><tr><th>Scan / cari barang</th><th>Nama barang bila baru</th><th>Qty diterima</th><th>Harga satuan</th><th></th></tr></thead>
+							<tbody id="adhoc-receipt-rows">
+								<tr>
+									<td>
+										<div class="adhoc-product-picker" style="position:relative;">
+											<input class="form-control" data-adhoc-search autocomplete="off" placeholder="Scan barcode atau cari nama">
+											<input type="hidden" name="adhoc[0][barcode]" data-adhoc-barcode>
+											<div class="list-group" data-adhoc-results style="display:none;position:absolute;z-index:1000;top:100%;left:0;right:0;max-height:220px;overflow:auto;margin:0;"></div>
+										</div>
+									</td>
+									<td><input class="form-control" name="adhoc[0][name]" data-adhoc-name maxlength="64"></td>
+									<td><input class="form-control" type="number" min="0" step="1" name="adhoc[0][qty]" value="0"></td>
+									<td><input class="form-control" type="number" min="0" step="1" name="adhoc[0][unit_price]"></td>
+									<td><button class="btn btn-xs btn-default" type="button" data-remove-adhoc>Hapus</button></td>
+								</tr>
+							</tbody>
+						</table></div>
+						<button class="btn btn-xs btn-default" id="add-adhoc-row" type="button"><i class="fa fa-plus"></i> Tambah baris</button>
+					</div>
+				</div>
+				<?php } ?>
 				<div class="table-responsive">
 					<table class="table table-bordered">
 						<thead>
-							<tr><th>Barcode</th><th>Barang</th><th>Qty diminta</th><th>Sudah diterima</th><th>Sisa permintaan</th><th>Datang sekarang</th><th>Harga satuan</th><th>Tipe diskon</th><th>Nilai diskon</th><th>Subtotal</th><th>Perbandingan</th></tr>
+							<tr><th>Jenis</th><th>Barcode</th><th>Barang</th><th>Qty diminta</th><th>Sudah diterima</th><th>Sisa permintaan</th><th>Datang sekarang</th><th>Harga satuan</th><th>Tipe diskon</th><th>Nilai diskon</th><th>Subtotal</th><th>Perbandingan</th></tr>
 						</thead>
 						<tbody>
 							<?php foreach ($items as $item) {
 								$remaining = (int) $item->qty_ordered - (int) $item->qty_received;
-								$comparison = (int) $item->qty_received > (int) $item->qty_ordered ? 'Lebih diterima' :
-									($remaining === 0 ? 'Sesuai' : 'Menunggu');
+								$comparison = (int) $item->is_adhoc === 1 ? 'Ad-hoc' : ((int) $item->qty_received > (int) $item->qty_ordered ? 'Lebih diterima' :
+									($remaining === 0 ? 'Sesuai' : 'Menunggu'));
 							?>
 								<tr>
+									<td><?php echo (int) $item->is_adhoc === 1 ? '<span class="label label-warning">Ad-hoc</span>' : 'PO'; ?></td>
 									<td><?php echo html_escape($item->barcode); ?></td>
 									<td><?php echo html_escape($item->product_name); ?></td>
 									<td><?php echo number_format((int) $item->qty_ordered); ?></td>
 									<td><?php echo number_format((int) $item->qty_received); ?></td>
 									<td><?php echo number_format(max(0, $remaining)); ?></td>
-									<td><input class="form-control receipt-quantity" type="number" min="0" step="1" name="qty_received[<?php echo (int) $item->id; ?>]" value="0"></td>
+									<td><input class="form-control receipt-quantity" type="number" min="0" step="1" name="qty_received[<?php echo (int) $item->id; ?>]" value="0"<?php echo (int) $item->is_adhoc === 1 ? ' disabled' : ''; ?>></td>
 									<td><input class="form-control receipt-unit-price" type="number" min="0" step="1" name="unit_price[<?php echo (int) $item->id; ?>]" value="" placeholder="Harga aktual"></td>
 									<td>
 										<select class="form-control receipt-discount-type" name="discount_type[<?php echo (int) $item->id; ?>]">
@@ -405,14 +436,15 @@
 							<?php } ?>
 						</tbody>
 						<tfoot>
-							<tr><th colspan="9" class="text-right">Subtotal setelah diskon</th><th id="receipt-subtotal">Rp 0</th><th></th></tr>
-							<tr><th colspan="9" class="text-right">PPN faktur</th><th id="receipt-ppn">Rp 0</th><th></th></tr>
-							<tr><th colspan="9" class="text-right">Total tagihan faktur</th><th id="receipt-total">Rp 0</th><th></th></tr>
+							<tr><th colspan="10" class="text-right">Subtotal setelah diskon</th><th id="receipt-subtotal">Rp 0</th><th></th></tr>
+							<tr><th colspan="10" class="text-right">PPN faktur</th><th id="receipt-ppn">Rp 0</th><th></th></tr>
+							<tr><th colspan="10" class="text-right">Total tagihan faktur</th><th id="receipt-total">Rp 0</th><th></th></tr>
 						</tfoot>
 					</table>
 				</div>
 				<p class="help-block">Isi harga beli aktual, diskon per baris (persen atau nominal), dan PPN rupiah sesuai faktur. Jumlah lebih dari sisa PO tetap menambah stok sesuai barang yang benar-benar diterima.</p>
 			</form>
+			<?php } ?>
 		</div>
 	</div>
 
@@ -557,6 +589,31 @@
 		}
 		ppnInput.addEventListener('input', updateReceiptTotal);
 		updateReceiptTotal();
+	}());
+	(function () {
+		var rows = document.getElementById('adhoc-receipt-rows');
+		var add = document.getElementById('add-adhoc-row');
+		if (!rows || !add) { return; }
+		var next = 1;
+		add.addEventListener('click', function () {
+			var row = document.createElement('tr');
+			row.innerHTML = '<td><div class="adhoc-product-picker" style="position:relative;">' +
+				'<input class="form-control" data-adhoc-search autocomplete="off" placeholder="Scan barcode atau cari nama">' +
+				'<input type="hidden" name="adhoc[' + next + '][barcode]" data-adhoc-barcode>' +
+				'<div class="list-group" data-adhoc-results style="display:none;position:absolute;z-index:1000;top:100%;left:0;right:0;max-height:220px;overflow:auto;margin:0;"></div></div></td>' +
+				'<td><input class="form-control" maxlength="64" name="adhoc[' + next + '][name]" data-adhoc-name></td>' +
+				'<td><input class="form-control" type="number" min="0" step="1" value="0" name="adhoc[' + next + '][qty]"></td>' +
+				'<td><input class="form-control" type="number" min="0" step="1" name="adhoc[' + next + '][unit_price]"></td>' +
+				'<td><button class="btn btn-xs btn-default" type="button" data-remove-adhoc>Hapus</button></td>';
+			rows.appendChild(row);
+			next++;
+		});
+		rows.addEventListener('click', function (event) {
+			if (event.target && event.target.hasAttribute('data-remove-adhoc')) {
+				var row = event.target.closest('tr');
+				if (row) { row.parentNode.removeChild(row); }
+			}
+		});
 	}());
 	</script>
 <?php } ?>
