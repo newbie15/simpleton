@@ -91,6 +91,65 @@ class Supplier_return extends CI_Controller
 		$this->load->view('welcome_message', $data);
 	}
 
+	public function preview($return_id = NULL)
+	{
+		if (!$this->_is_positive_integer($return_id)) {
+			show_404();
+		}
+		$return = $this->db->query("
+			SELECT return_header.*, supplier.name AS supplier_name,
+				receipt.receipt_number, receipt.received_at, receipt.supplier_document
+			FROM retur_supplier return_header
+			JOIN suppliers supplier ON supplier.id = return_header.supplier_id
+			LEFT JOIN goods_receipts receipt ON receipt.id = return_header.goods_receipt_id
+			WHERE return_header.id = ?
+		", array((int) $return_id))->row();
+		if (!$return) {
+			show_404();
+		}
+
+		$receipt_items = $this->_get_receipt_items((int) $return->goods_receipt_id);
+		$receipt_by_barcode = array();
+		foreach ($receipt_items as $receipt_item) {
+			$receipt_by_barcode[$receipt_item->barcode] = $receipt_item;
+		}
+		$items = $this->db->query("
+			SELECT return_item.*,
+				COALESCE(MAX(order_item.product_name), return_item.barcode) AS product_name
+			FROM retur_supplier_items return_item
+			JOIN retur_supplier return_header ON return_header.id = return_item.retur_supplier_id
+			LEFT JOIN goods_receipts receipt ON receipt.id = return_header.goods_receipt_id
+			LEFT JOIN purchase_order_items order_item
+				ON order_item.purchase_order_id = receipt.purchase_order_id
+				AND order_item.barcode = return_item.barcode
+			WHERE return_item.retur_supplier_id = ?
+			GROUP BY return_item.id, return_item.retur_supplier_id, return_item.barcode,
+				return_item.qty_retur, return_item.harga_beli, return_item.subtotal, return_item.alasan_detail
+			ORDER BY return_item.id ASC
+		", array((int) $return_id))->result();
+		foreach ($items as $item) {
+			$receipt_item = isset($receipt_by_barcode[$item->barcode]) ? $receipt_by_barcode[$item->barcode] : NULL;
+			$item->qty_received = $receipt_item ? (int) $receipt_item->qty_received : 0;
+			$item->qty_available = $receipt_item ? (int) $receipt_item->qty_available : 0;
+			$item->qty_returned_before = max(0, $item->qty_received - $item->qty_available -
+				($return->status === 'final' ? (int) $item->qty_retur : 0));
+			$item->qty_remaining_after = $return->status === 'final'
+				? $item->qty_available
+				: max(0, $item->qty_available - (int) $item->qty_retur);
+		}
+
+		$data = array(
+			'return' => $return,
+			'items' => $items,
+			'can_approve' => $this->ion_auth->in_group(array('admin', 'pengurus')),
+			'judul_besar' => 'Preview Retur Supplier',
+			'judul_kecil' => $return->nomor_retur,
+			'm_supplier_return' => TRUE
+		);
+		$data['output'] = $this->load->view('supplier_return_preview', $data, TRUE);
+		$this->load->view('welcome_message', $data);
+	}
+
 	public function save_draft($receipt_id = NULL)
 	{
 		if ($this->input->method(TRUE) !== 'POST') {

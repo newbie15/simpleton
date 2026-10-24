@@ -52,6 +52,7 @@
 						<td>Rp <?php echo number_format((float) $draft->total_nominal, 0, ',', '.'); ?></td>
 						<td><?php echo html_escape($draft->id_user); ?></td>
 						<td>
+							<a class="btn btn-xs btn-default" href="<?php echo site_url('main/supplier_return/preview/'.(int) $draft->id); ?>">Lihat dulu</a>
 							<?php if ($can_approve) { ?>
 								<form method="post" action="<?php echo site_url('main/supplier_return/approve/'.(int) $draft->id); ?>" onsubmit="return window.confirm('Setujui retur ini? Stok akan dikurangi dan retur tidak dapat dibatalkan.');">
 									<button class="btn btn-xs btn-danger" type="submit">Setujui &amp; Finalisasi</button>
@@ -83,7 +84,7 @@
 						<td><?php echo html_escape($return->supplier_name); ?></td>
 						<td><?php echo html_escape($return->tgl_retur); ?></td>
 						<td>Rp <?php echo number_format((float) $return->total_nominal, 0, ',', '.'); ?></td>
-						<td><?php echo html_escape($return->id_user); ?></td>
+						<td><?php echo html_escape($return->id_user); ?><br><a class="btn btn-xs btn-default" href="<?php echo site_url('main/supplier_return/preview/'.(int) $return->id); ?>">Lihat</a></td>
 					</tr>
 				<?php } ?>
 				<?php if (count($history) === 0) { ?>
