@@ -3,15 +3,15 @@
 
 	$(function () {
 		var table = $('#voucher-usage-table');
-		if (!table.length) {
-			return;
-		}
 
 		function escapeText(value, type) {
 			if (value === null || value === undefined) {
 				return '';
 			}
 			return type === 'display' ? $('<div>').text(value).html() : value;
+		}
+		if (!table.length) {
+			return;
 		}
 		table.DataTable({
 			processing: true,
@@ -20,7 +20,12 @@
 			pageLength: 25,
 			lengthMenu: [10, 25, 50, 100],
 			order: [[0, 'desc']],
-			ajax: table.data('source'),
+			ajax: {
+				url: table.data('source'),
+				data: function (request) {
+					request.npk = $.trim($('#voucher-npk').val() || '');
+				}
+			},
 			columns: [
 				{ data: 'used_at', render: escapeText },
 				{ data: 'kode', render: escapeText },
@@ -28,6 +33,12 @@
 				{ data: 'nota', render: escapeText },
 				{
 					data: 'npk_anggota',
+					render: function (value, type) {
+						return type === 'display' && (value === null || value === '') ? '-' : escapeText(value, type);
+					}
+				},
+				{
+					data: 'serial_code',
 					render: function (value, type) {
 						return type === 'display' && (value === null || value === '') ? '-' : escapeText(value, type);
 					}
@@ -62,6 +73,15 @@
 					previous: 'Sebelumnya'
 				}
 			}
+		});
+
+		$('#voucher-npk-filter').on('submit', function (event) {
+			event.preventDefault();
+			table.DataTable().ajax.reload();
+		});
+		$('#voucher-npk-reset').on('click', function () {
+			$('#voucher-npk').val('');
+			table.DataTable().ajax.reload();
 		});
 	});
 }(jQuery));
