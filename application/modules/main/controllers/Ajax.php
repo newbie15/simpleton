@@ -300,21 +300,31 @@ class Ajax extends CI_Controller {
             show_error('Periode laporan tidak valid.', 400);
         }
         if (!is_string($npk) || $npk === '' || strlen($npk) > 10) {
-            $this->_sales_csv(array('tanggal', 'nota', 'npk', 'nama', 'total_belanja'), array(), 'data_perorangan.csv', $this->uri->segment(6) === 'd');
+            $this->_sales_csv(array('tanggal', 'nota', 'npk', 'nama', 'total_transaksi', 'retur_disetujui', 'tertagih'), array(), 'data_perorangan.csv', $this->uri->segment(6) === 'd');
             return;
         }
 
         $rows = $this->db->query("
             SELECT DATE(sale.tgl) AS tanggal, sale.nota, sale.id_karyawan AS npk,
-                employee.nama, SUM(sale.jumlah) AS total_belanja
+                employee.nama, SUM(sale.jumlah) AS total_transaksi,
+                SUM(COALESCE(approved_return.amount, 0)) AS retur_disetujui,
+                SUM(sale.jumlah - COALESCE(approved_return.amount, 0)) AS tertagih
             FROM penjualan sale
             LEFT JOIN karyawan employee ON employee.npk = sale.id_karyawan
+            LEFT JOIN (
+                SELECT return_item.penjualan_id,
+                    SUM(return_item.harga_satuan * return_item.qty_retur) AS amount
+                FROM retur_penjualan_items return_item
+                JOIN retur_penjualan return_header ON return_header.id = return_item.retur_id
+                WHERE return_header.status IN ('approved', 'completed')
+                GROUP BY return_item.penjualan_id
+            ) approved_return ON approved_return.penjualan_id = sale.id
             WHERE sale.id_karyawan = ? AND sale.tgl >= ? AND sale.tgl < ?
             GROUP BY DATE(sale.tgl), sale.nota, sale.id_karyawan, employee.nama
             ORDER BY MIN(sale.tgl) ASC, sale.nota ASC
         ", array($npk, $range['start'], $range['end']))->result_array();
         $this->_sales_csv(
-            array('tanggal', 'nota', 'npk', 'nama', 'total_belanja'),
+            array('tanggal', 'nota', 'npk', 'nama', 'total_transaksi', 'retur_disetujui', 'tertagih'),
             $rows,
             'data_perorangan_'.$period.'_'.$npk.'.csv',
             $this->uri->segment(6) === 'd'
@@ -330,15 +340,26 @@ class Ajax extends CI_Controller {
         }
 
         $rows = $this->db->query("
-            SELECT sale.id_karyawan AS npk, employee.nama, employee.bagian, SUM(sale.jumlah) AS jumlah
+            SELECT sale.id_karyawan AS npk, employee.nama, employee.bagian,
+                SUM(sale.jumlah) AS total_transaksi,
+                SUM(COALESCE(approved_return.amount, 0)) AS retur_disetujui,
+                SUM(sale.jumlah - COALESCE(approved_return.amount, 0)) AS tertagih
             FROM penjualan sale
             LEFT JOIN karyawan employee ON employee.npk = sale.id_karyawan
+            LEFT JOIN (
+                SELECT return_item.penjualan_id,
+                    SUM(return_item.harga_satuan * return_item.qty_retur) AS amount
+                FROM retur_penjualan_items return_item
+                JOIN retur_penjualan return_header ON return_header.id = return_item.retur_id
+                WHERE return_header.status IN ('approved', 'completed')
+                GROUP BY return_item.penjualan_id
+            ) approved_return ON approved_return.penjualan_id = sale.id
             WHERE sale.tgl >= ? AND sale.tgl < ?
             GROUP BY sale.id_karyawan, employee.nama, employee.bagian
             ORDER BY employee.bagian ASC, employee.nama ASC
         ", array($range['start'], $range['end']))->result_array();
         $this->_sales_csv(
-            array('npk', 'nama', 'bagian', 'jumlah'),
+            array('npk', 'nama', 'bagian', 'total_transaksi', 'retur_disetujui', 'tertagih'),
             $rows,
             'data_bulanan_'.$period.'.csv',
             $this->uri->segment(5) === 'd'
