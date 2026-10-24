@@ -23,6 +23,7 @@
     <label><?php echo lang('edit_group_desc_label', 'description');?></label>
     <?php echo form_input($group_description, '', 'class="form-control"');?>
   </div>
+  <?php echo form_hidden($csrf); ?>
   <div class="form-group">
     <label>Halaman yang dapat diakses</label>
     <?php foreach ($pages as $page_key => $page): ?>
@@ -41,5 +42,6 @@
   </div>
   <div class="box-footer">
     <?php echo form_submit('submit', lang('edit_group_submit_btn'), 'class = "btn btn-primary"');?>
+    <?php echo anchor('auth/groups', 'Kembali ke daftar Groups', array('class' => 'btn btn-default')); ?>
   <?php echo form_close();?>
   </div>

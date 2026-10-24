@@ -33,13 +33,7 @@ class Auth extends CI_Controller {
 		{
 			// set the flash data error message if there is one
 			$this->data['message'] = (validation_errors()) ? validation_errors() : $this->session->flashdata('message');
-
-			//list the users
-			$this->data['users'] = $this->ion_auth->users()->result();
-			foreach ($this->data['users'] as $k => $user)
-			{
-				$this->data['users'][$k]->groups = $this->ion_auth->get_users_groups($user->id)->result();
-			}
+			$this->data['csrf'] = $this->_get_csrf_nonce();
 
             ////////Config Halaman////////
             $data['judul_besar'] = 'Manage User';
@@ -47,11 +41,182 @@ class Auth extends CI_Controller {
 			$data['m_auth_index'] = TRUE;
 			$data['output'] = array(
 				'message' => $this->data['message'],
-				'users' => $this->data['users'],
+				'csrf' => $this->data['csrf'],
 			);
 			$data['view_file'] = 'auth/index';
 			$this->load->view('auth/main', $data, FALSE);
 		}
+	}
+
+	function users_datatable()
+	{
+		if (!$this->ion_auth->logged_in() || !$this->ion_auth->is_admin())
+		{
+			show_error('You must be an administrator to view this page.', 403);
+		}
+
+		$tables = $this->config->item('tables', 'ion_auth');
+		$users_table = $tables['users'];
+		$users_groups_table = $tables['users_groups'];
+		$groups_table = $tables['groups'];
+		$has_npk = $this->db->field_exists('npk', $users_table);
+		$draw = max(0, (int) $this->input->get('draw'));
+		$start = max(0, (int) $this->input->get('start'));
+		$length = (int) $this->input->get('length');
+		if ($length < 1)
+		{
+			$length = 10;
+		}
+		$length = min($length, 100);
+
+		$search_data = $this->input->get('search');
+		$search = is_array($search_data) && isset($search_data['value'])
+			? trim(substr($search_data['value'], 0, 100))
+			: '';
+
+		$total = (int) $this->db->count_all($users_table);
+		$filtered = $total;
+		if ($search !== '')
+		{
+			$this->db->from($users_table);
+			$this->_apply_user_search($search, $users_table, $users_groups_table, $groups_table, $has_npk);
+			$count_row = $this->db->select('COUNT(DISTINCT '.$users_table.'.id) AS total', FALSE)
+				->get()
+				->row();
+			$filtered = $count_row ? (int) $count_row->total : 0;
+		}
+
+		$columns = array(
+			0 => 'first_name',
+			1 => 'last_name',
+			2 => $has_npk ? 'npk' : 'first_name',
+			3 => 'email',
+			5 => 'active',
+			6 => 'id',
+		);
+		$order_data = $this->input->get('order');
+		$order = is_array($order_data) && isset($order_data[0]) ? $order_data[0] : array();
+		$order_column = isset($order['column']) ? (int) $order['column'] : 0;
+		$order_direction = isset($order['dir']) && strtolower($order['dir']) === 'desc' ? 'DESC' : 'ASC';
+		$order_by = isset($columns[$order_column]) ? $columns[$order_column] : 'first_name';
+
+		$select = array(
+			$users_table.'.id',
+			$users_table.'.first_name',
+			$users_table.'.last_name',
+			$users_table.'.email',
+			$users_table.'.active',
+		);
+		$select[] = $has_npk ? $users_table.'.npk' : "'' AS npk";
+
+		$this->db->select($select)->from($users_table);
+		if ($search !== '')
+		{
+			$this->_apply_user_search($search, $users_table, $users_groups_table, $groups_table, $has_npk);
+		}
+		$this->db->order_by($users_table.'.'.$order_by, $order_direction);
+		$this->db->order_by($users_table.'.id', 'ASC');
+		$users = $this->db->limit($length, $start)->get()->result_array();
+
+		$user_ids = array();
+		foreach ($users as $user)
+		{
+			$user_ids[] = (int) $user['id'];
+		}
+
+		$user_groups = array();
+		if (!empty($user_ids))
+		{
+			$group_rows = $this->db
+				->select($users_groups_table.'.user_id, '.$groups_table.'.id, '.$groups_table.'.name')
+				->from($users_groups_table)
+				->join($groups_table, $groups_table.'.id = '.$users_groups_table.'.group_id', 'inner')
+				->where_in($users_groups_table.'.user_id', $user_ids)
+				->order_by($groups_table.'.name', 'ASC')
+				->get()
+				->result_array();
+			foreach ($group_rows as $group)
+			{
+				$user_id = (int) $group['user_id'];
+				if (!isset($user_groups[$user_id]))
+				{
+					$user_groups[$user_id] = array();
+				}
+				$user_groups[$user_id][] = array(
+					'id' => (int) $group['id'],
+					'name' => $group['name'],
+				);
+			}
+		}
+
+		foreach ($users as &$user)
+		{
+			$user['groups'] = isset($user_groups[(int) $user['id']]) ? $user_groups[(int) $user['id']] : array();
+			$user['active'] = (bool) $user['active'];
+		}
+		unset($user);
+
+		$this->output
+			->set_content_type('application/json')
+			->set_output(json_encode(array(
+				'draw' => $draw,
+				'recordsTotal' => $total,
+				'recordsFiltered' => $filtered,
+				'data' => $users,
+			)));
+	}
+
+	private function _apply_user_search($search, $users_table, $users_groups_table, $groups_table, $has_npk)
+	{
+		$this->db->group_start()
+			->like($users_table.'.first_name', $search)
+			->or_like($users_table.'.last_name', $search)
+			->or_like($users_table.'.email', $search);
+		if ($has_npk)
+		{
+			$this->db->or_like($users_table.'.npk', $search);
+		}
+		$group_search = 'EXISTS (SELECT 1 FROM '.$users_groups_table.' AS user_group_search'
+			.' INNER JOIN '.$groups_table.' AS group_search ON group_search.id = user_group_search.group_id'
+			.' WHERE user_group_search.user_id = '.$users_table.'.id'
+			.' AND group_search.name LIKE '.$this->db->escape('%'.$search.'%').')';
+		$this->db->or_where($group_search, NULL, FALSE)
+			->group_end();
+	}
+
+	function groups()
+	{
+		if (!$this->ion_auth->logged_in() || !$this->ion_auth->is_admin())
+		{
+			show_error('You must be an administrator to view this page.', 403);
+		}
+
+		$groups = $this->ion_auth->groups()->result();
+		$user_counts = $this->db
+			->select('group_id, COUNT(DISTINCT user_id) AS user_count')
+			->group_by('group_id')
+			->get($this->config->item('tables', 'ion_auth')['users_groups'])
+			->result();
+		$counts_by_group = array();
+		foreach ($user_counts as $count)
+		{
+			$counts_by_group[(int) $count->group_id] = (int) $count->user_count;
+		}
+		foreach ($groups as $group)
+		{
+			$group->user_count = isset($counts_by_group[(int) $group->id]) ? $counts_by_group[(int) $group->id] : 0;
+		}
+
+		$data['judul_besar'] = 'Manage Groups';
+		$data['judul_kecil'] = 'List';
+		$data['m_auth_index'] = TRUE;
+		$data['output'] = array(
+			'groups' => $groups,
+			'message' => $this->session->flashdata('message'),
+			'csrf' => $this->_get_csrf_nonce(),
+		);
+		$data['view_file'] = 'auth/groups';
+		$this->load->view('auth/main', $data, FALSE);
 	}
 
 	// log the user in
@@ -819,6 +984,11 @@ class Auth extends CI_Controller {
 			redirect('auth', 'refresh');
 		}
 
+		if ($this->input->method(TRUE) === 'POST' && $this->_valid_csrf_nonce() === FALSE)
+		{
+			show_error($this->lang->line('error_csrf'));
+		}
+
 		// validate form input
 		$this->form_validation->set_rules('group_name', $this->lang->line('create_group_validation_name_label'), 'required|alpha_dash');
 
@@ -827,39 +997,34 @@ class Auth extends CI_Controller {
 			$new_group_id = $this->ion_auth->create_group($this->input->post('group_name'), $this->input->post('description'));
 			if($new_group_id)
 			{
-				// check to see if we are creating the group
-				// redirect them back to the admin page
 				$this->session->set_flashdata('message', $this->ion_auth->messages());
-				redirect("auth", 'refresh');
+				redirect('auth/groups', 'refresh');
 			}
 		}
-		else
-		{
-			// display the create group form
-			// set the flash data error message if there is one
-			$this->data['message'] = (validation_errors() ? validation_errors() : ($this->ion_auth->errors() ? $this->ion_auth->errors() : $this->session->flashdata('message')));
 
-			$this->data['group_name'] = array(
-				'name'  => 'group_name',
-				'id'    => 'group_name',
-				'type'  => 'text',
-				'value' => $this->form_validation->set_value('group_name'),
-			);
-			$this->data['description'] = array(
-				'name'  => 'description',
-				'id'    => 'description',
-				'type'  => 'text',
-				'value' => $this->form_validation->set_value('description'),
-			);
+		$this->data['message'] = validation_errors()
+			? validation_errors()
+			: ($this->ion_auth->errors() ? $this->ion_auth->errors() : $this->session->flashdata('message'));
+		$this->data['group_name'] = array(
+			'name'  => 'group_name',
+			'id'    => 'group_name',
+			'type'  => 'text',
+			'value' => $this->form_validation->set_value('group_name'),
+		);
+		$this->data['description'] = array(
+			'name'  => 'description',
+			'id'    => 'description',
+			'type'  => 'text',
+			'value' => $this->form_validation->set_value('description'),
+		);
+		$this->data['csrf'] = $this->_get_csrf_nonce();
 
-			////////Config Halaman////////
-			$data['judul_besar'] = 'Edit Group';
-			$data['judul_kecil'] = 'List';
-			$data['m_auth_index'] = TRUE;
-			$data['output'] = $this->data;
-			$data['view_file'] = 'auth/create_group';
-			$this->load->view('auth/main', $data, FALSE);
-		}
+		$data['judul_besar'] = 'Manage Groups';
+		$data['judul_kecil'] = 'Tambah Group';
+		$data['m_auth_index'] = TRUE;
+		$data['output'] = $this->data;
+		$data['view_file'] = 'auth/create_group';
+		$this->load->view('auth/main', $data, FALSE);
 	}
 
 	// edit a group
@@ -889,6 +1054,11 @@ class Auth extends CI_Controller {
 
 		if (isset($_POST) && !empty($_POST))
 		{
+			if ($this->_valid_csrf_nonce() === FALSE)
+			{
+				show_error($this->lang->line('error_csrf'));
+			}
+
 			if ($this->form_validation->run() === TRUE)
 			{
 				$group_update = $this->ion_auth->update_group($id, $this->input->post('group_name'), $this->input->post('group_description'));
@@ -908,7 +1078,7 @@ class Auth extends CI_Controller {
 				{
 					$this->session->set_flashdata('message', $this->ion_auth->errors());
 				}
-				redirect("auth", 'refresh');
+				redirect('auth/groups', 'refresh');
 			}
 		}
 
@@ -919,6 +1089,7 @@ class Auth extends CI_Controller {
 		$this->data['group'] = $group;
 		$this->data['pages'] = $this->page_access->pages();
 		$this->data['group_pages'] = $this->page_access->group_pages($id);
+		$this->data['csrf'] = $this->_get_csrf_nonce();
 
 		$readonly = $this->config->item('admin_group', 'ion_auth') === $group->name ? 'readonly' : '';
 
@@ -943,6 +1114,39 @@ class Auth extends CI_Controller {
 		$data['output'] = $this->data;
 		$data['view_file'] = 'auth/edit_group';
 		$this->load->view('auth/main', $data, FALSE);
+	}
+
+	function delete_group($id = NULL)
+	{
+		if (!$this->ion_auth->logged_in() || !$this->ion_auth->is_admin())
+		{
+			show_error('You must be an administrator to delete a group.', 403);
+		}
+		if ($this->input->method(TRUE) !== 'POST')
+		{
+			show_error('Method not allowed.', 405);
+		}
+
+		$id = (int) $id;
+		$group = $this->ion_auth->group($id)->row();
+		if (!$group)
+		{
+			show_404();
+		}
+		if ($this->_valid_csrf_nonce() === FALSE || $id !== (int) $this->input->post('id'))
+		{
+			show_error($this->lang->line('error_csrf'));
+		}
+
+		if ($this->ion_auth->delete_group($id))
+		{
+			$this->session->set_flashdata('message', 'Group berhasil dihapus. Anggota group tersebut tidak lagi memiliki akses melalui group ini.');
+		}
+		else
+		{
+			$this->session->set_flashdata('message', $this->ion_auth->errors());
+		}
+		redirect('auth/groups', 'refresh');
 	}
 
 

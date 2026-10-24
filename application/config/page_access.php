@@ -3,9 +3,9 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 
 $config['pages'] = array(
 	'member_portal' => array('label' => 'Beranda Anggota', 'uri' => 'main/member'),
-	'penjualan' => array('label' => 'Penjualan', 'uri' => 'main/examples/penjualan'),
+	'penjualan' => array('label' => 'Penjualan', 'uri' => 'main/penjualan', 'aliases' => array('main/examples/penjualan')),
 	'tiket' => array('label' => 'Tiket Travel', 'uri' => 'main/tiket'),
-	'stok' => array('label' => 'Stok', 'uri' => 'main/examples/stok'),
+	'stok' => array('label' => 'Stok', 'uri' => 'main/stok', 'aliases' => array('main/examples/stok')),
 	'stock_opname' => array('label' => 'Stok Opname', 'uri' => 'main/stock_opname'),
 	'purchasing' => array('label' => 'Purchasing', 'uri' => 'main/purchasing'),
 	'product_conversion' => array('label' => 'Konversi Kemasan', 'uri' => 'main/product_conversion'),
@@ -16,10 +16,10 @@ $config['pages'] = array(
 	'petty_cash' => array('label' => 'Kas & Petty Cash', 'uri' => 'main/petty_cash'),
 	'suppliers' => array('label' => 'Supplier', 'uri' => 'main/purchasing/suppliers'),
 	'users' => array('label' => 'Manajemen User', 'uri' => 'auth/index'),
-	'karyawan' => array('label' => 'Karyawan', 'uri' => 'main/examples/karyawan'),
-	'kartu' => array('label' => 'Kartu Anggota', 'uri' => 'main/examples/kartu'),
+	'karyawan' => array('label' => 'Karyawan', 'uri' => 'main/karyawan', 'aliases' => array('main/examples/karyawan')),
+	'kartu' => array('label' => 'Kartu Anggota', 'uri' => 'main/kartu', 'aliases' => array('main/examples/kartu')),
 	'kamera' => array('label' => 'Foto Anggota', 'uri' => 'main/kamera'),
-	'update_data' => array('label' => 'Update Data', 'uri' => 'main/examples/update_data'),
-	'rekap_penjualan' => array('label' => 'Rekap Penjualan', 'uri' => 'main/examples/rekap_penjualan'),
+	'update_data' => array('label' => 'Update Data', 'uri' => 'main/data_update', 'aliases' => array('main/examples/update_data')),
+	'rekap_penjualan' => array('label' => 'Rekap Penjualan', 'uri' => 'main/rekap_penjualan', 'aliases' => array('main/examples/rekap_penjualan')),
 	'bank_reconciliation' => array('label' => 'Rekonsiliasi Bank', 'uri' => 'main/bank_reconciliation'),
 );

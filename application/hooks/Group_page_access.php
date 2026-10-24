@@ -26,10 +26,17 @@ class Group_page_access
 
 		foreach ($pages as $page_key => $page)
 		{
-			$page_uri = trim($page['uri'], '/');
-			if (strcasecmp($requested_uri, $page_uri) !== 0 &&
-				strncasecmp($requested_uri, $page_uri . '/', strlen($page_uri) + 1) !== 0)
-			{
+			$page_uris = array_merge(array($page['uri']), isset($page['aliases']) ? $page['aliases'] : array());
+			$matches_page = FALSE;
+			foreach ($page_uris as $configured_uri) {
+				$page_uri = trim($configured_uri, '/');
+				if (strcasecmp($requested_uri, $page_uri) === 0 ||
+					strncasecmp($requested_uri, $page_uri . '/', strlen($page_uri) + 1) === 0) {
+					$matches_page = TRUE;
+					break;
+				}
+			}
+			if (!$matches_page) {
 				continue;
 			}
 
