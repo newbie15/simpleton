@@ -91,6 +91,7 @@
 			<div class="box-header with-border"><h3 class="box-title">Ajukan transaksi kas</h3></div>
 			<div class="box-body">
 				<form method="post" enctype="multipart/form-data" action="<?php echo site_url('main/petty_cash/submit_transaction'); ?>">
+					<input type="hidden" name="form_token" value="<?php echo html_escape($form_token); ?>">
 					<div class="form-group">
 						<label for="fund_id">Dana</label>
 						<select class="form-control" id="fund_id" name="fund_id" required>
@@ -177,6 +178,7 @@
 			<div class="box-body">
 				<?php if ($is_approver) { ?>
 					<form method="post" action="<?php echo site_url('main/petty_cash/close_day'); ?>">
+						<input type="hidden" name="form_token" value="<?php echo html_escape($form_token); ?>">
 						<div class="form-group">
 							<label for="closing_fund_id">Dana</label>
 							<select class="form-control" id="closing_fund_id" name="fund_id" required>
@@ -210,6 +212,7 @@
 				<div class="box-header with-border"><h3 class="box-title">Buat dana kas</h3></div>
 				<div class="box-body">
 					<form method="post" action="<?php echo site_url('main/petty_cash/create_fund'); ?>">
+						<input type="hidden" name="form_token" value="<?php echo html_escape($form_token); ?>">
 						<div class="form-group">
 							<label for="fund_code">Kode unik</label>
 							<input class="form-control" type="text" id="fund_code" name="fund_code" maxlength="32" pattern="[A-Za-z0-9_-]{2,32}" required>
@@ -292,9 +295,11 @@
 							<td>
 								<?php if ($transaction->status === 'pending' && (string) $transaction->created_by !== (string) $this->ion_auth->get_user_id()) { ?>
 									<form method="post" action="<?php echo site_url('main/petty_cash/approve/'.(int) $transaction->id); ?>" style="margin-bottom:5px;">
+										<input type="hidden" name="form_token" value="<?php echo html_escape($form_token); ?>">
 										<button class="btn btn-xs btn-success" type="submit" onclick="return confirm('Setujui dan posting jurnal transaksi ini?');">Setujui & posting</button>
 									</form>
 									<form method="post" action="<?php echo site_url('main/petty_cash/reject/'.(int) $transaction->id); ?>">
+										<input type="hidden" name="form_token" value="<?php echo html_escape($form_token); ?>">
 										<input class="form-control input-sm" type="text" name="rejection_reason" maxlength="500" placeholder="Alasan penolakan" required>
 										<button class="btn btn-xs btn-danger" type="submit" style="margin-top:4px;">Tolak</button>
 									</form>

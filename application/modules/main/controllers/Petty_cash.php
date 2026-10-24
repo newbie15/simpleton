@@ -152,6 +152,7 @@ class Petty_cash extends CI_Controller
 		$data['users'] = $this->db->select('id, username, first_name, last_name')
 			->where('active', 1)->order_by('username', 'ASC')->get('users')->result();
 		$data['is_approver'] = $this->_is_approver();
+		$data['form_token'] = $this->_form_token();
 		$data['notice'] = $this->session->flashdata('cash_notice');
 		$data['error'] = $this->session->flashdata('cash_error');
 		$data['judul_besar'] = 'Kas & Petty Cash';
@@ -495,7 +496,6 @@ class Petty_cash extends CI_Controller
 				'id' => (int) $transaction->expense_account_id,
 				'type' => 'expense',
 				'is_active' => 1,
-				'type' => 'asset',
 				'normal_balance' => 'debit'
 			))->row();
 			if (!$expense || $fund_balance === FALSE ||
@@ -521,7 +521,7 @@ class Petty_cash extends CI_Controller
 				->where('type', 'liability')
 				->where('normal_balance', 'credit')
 				->get('acc_accounts')->row();
-			if (!$receipt || $outstanding === FALSE ||
+			if (!$supplier_receipt || $outstanding === FALSE ||
 				$outstanding + 0.0001 < (float) $transaction->amount ||
 				$fund_balance === FALSE ||
 				$fund_balance + 0.0001 < (float) $transaction->amount || !$payable) {
@@ -884,7 +884,8 @@ class Petty_cash extends CI_Controller
 			LIMIT 1
 		", array((int) $fund_id, $date))->row();
 		if (!$last_funding) {
-			return 0.0;
+		$fund = $this->_get_fund($fund_id);
+		return $fund ? (float) $fund->imprest_limit : FALSE;
 		}
 		$row = $this->db->query("
 			SELECT COALESCE(SUM(amount), 0) AS amount
@@ -979,11 +980,32 @@ class Petty_cash extends CI_Controller
 		if ($this->input->method(TRUE) !== 'POST') {
 			show_error('Metode permintaan tidak diizinkan.', 405);
 		}
+		$expected_token = $this->session->userdata('petty_cash_form_token');
+		$posted_token = $this->input->post('form_token', TRUE);
+		if (!is_string($expected_token) || $expected_token === '' ||
+			!is_string($posted_token) || $posted_token !== $expected_token) {
+			show_error('Sesi formulir kas tidak valid. Muat ulang halaman sebelum mencoba lagi.', 403);
+		}
+	}
+
+	private function _form_token()
+	{
+		$token = $this->session->userdata('petty_cash_form_token');
+		if (!is_string($token) || $token === '') {
+			$this->load->helper('string');
+			$token = random_string('alnum', 32);
+			$this->session->set_userdata('petty_cash_form_token', $token);
+		}
+		return $token;
 	}
 
 	private function _message($message, $success)
 	{
 		$this->session->set_flashdata($success ? 'cash_notice' : 'cash_error', $message);
-		redirect('main/petty_cash');
+		$return_to = $this->input->post('return_to', TRUE);
+		if ($return_to === 'main/management_payments') {
+			redirect('main/management_payments');
+		}
+		redirect($return_to === 'main/petty_cash_new' ? 'main/petty_cash_new' : 'main/petty_cash');
 	}
 }
