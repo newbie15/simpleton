@@ -693,6 +693,7 @@ class Auth extends CI_Controller {
         $this->form_validation->set_rules('first_name', $this->lang->line('create_user_validation_fname_label'), 'required');
         $this->form_validation->set_rules('last_name', $this->lang->line('create_user_validation_lname_label'), 'required');
         $this->form_validation->set_rules('npk', 'NPK', 'trim|callback_npk_not_taken[0]');
+        $this->form_validation->set_rules('telegram_pin', 'PIN Telegram', 'trim|numeric|exact_length[6]');
         if($identity_column!=='email')
         {
             $this->form_validation->set_rules('identity',$this->lang->line('create_user_validation_identity_label'),'required|trim|is_unique['.$tables['users'].'.'.$identity_column.']');
@@ -721,6 +722,11 @@ class Auth extends CI_Controller {
                 'phone'      => $this->input->post('phone'),
                 'npk'        => trim($this->input->post('npk')) !== '' ? trim($this->input->post('npk')) : NULL,
             );
+            if ($this->db->field_exists('telegram_pin', $tables['users']))
+            {
+                $pin = trim($this->input->post('telegram_pin'));
+                $additional_data['telegram_pin'] = $pin !== '' ? $pin : NULL;
+            }
         }
         if ($this->form_validation->run() == true && $this->ion_auth->register($identity, $password, $email, $additional_data))
         {
@@ -752,6 +758,13 @@ class Auth extends CI_Controller {
                 'id'    => 'npk',
                 'type'  => 'text',
                 'value' => $this->form_validation->set_value('npk'),
+            );
+            $this->data['telegram_pin'] = array(
+                'name'  => 'telegram_pin',
+                'id'    => 'telegram_pin',
+                'type'  => 'text',
+                'maxlength' => 6,
+                'value' => $this->form_validation->set_value('telegram_pin'),
             );
             $this->data['identity'] = array(
                 'name'  => 'identity',
@@ -817,6 +830,10 @@ class Auth extends CI_Controller {
 		$this->form_validation->set_rules('first_name', $this->lang->line('edit_user_validation_fname_label'), 'required');
 		$this->form_validation->set_rules('last_name', $this->lang->line('edit_user_validation_lname_label'), 'required');
 		$this->form_validation->set_rules('npk', 'NPK', 'trim|callback_npk_not_taken[' . (int) $id . ']');
+		if ($this->ion_auth->is_admin())
+		{
+			$this->form_validation->set_rules('telegram_pin', 'PIN Telegram', 'trim|numeric|exact_length[6]');
+		}
 		$this->form_validation->set_rules('phone', $this->lang->line('edit_user_validation_phone_label'), 'required');
 		$this->form_validation->set_rules('company', $this->lang->line('edit_user_validation_company_label'), 'required');
 
@@ -848,6 +865,12 @@ class Auth extends CI_Controller {
 				if ($this->db->field_exists('npk', $tables['users']))
 				{
 					$data['npk'] = trim($this->input->post('npk')) !== '' ? trim($this->input->post('npk')) : NULL;
+				}
+
+				if ($this->ion_auth->is_admin() && $this->db->field_exists('telegram_pin', $tables['users']))
+				{
+					$pin = trim($this->input->post('telegram_pin'));
+					$data['telegram_pin'] = $pin !== '' ? $pin : NULL;
 				}
 
 				// update the password if it was posted
@@ -936,6 +959,13 @@ class Auth extends CI_Controller {
 			'id'    => 'npk',
 			'type'  => 'text',
 			'value' => $this->form_validation->set_value('npk', isset($user->npk) ? $user->npk : ''),
+		);
+		$this->data['telegram_pin'] = array(
+			'name'  => 'telegram_pin',
+			'id'    => 'telegram_pin',
+			'type'  => 'text',
+			'maxlength' => 6,
+			'value' => $this->form_validation->set_value('telegram_pin', isset($user->telegram_pin) ? $user->telegram_pin : ''),
 		);
 		$this->data['company'] = array(
 			'name'  => 'company',

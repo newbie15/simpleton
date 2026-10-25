@@ -30,6 +30,12 @@
           <label for="npk">NPK (opsional)</label>
           <?php echo form_input($npk, '', 'class="form-control"');?>
         </div>
+        <?php if ($this->ion_auth->is_admin()) { ?>
+        <div class="form-group">
+          <label for="telegram_pin">PIN Bot Telegram (6 digit, opsional)</label>
+          <?php echo form_input($telegram_pin, '', 'class="form-control"');?>
+        </div>
+        <?php } ?>
       </div><!-- /.col -->
       
       <div class="col-md-6">

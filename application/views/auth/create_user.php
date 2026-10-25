@@ -42,6 +42,12 @@
             <?php echo form_input($npk, '', 'class="form-control"');?>
           </div>
         </div>
+        <div class="form-group">
+          <label for="telegram_pin" class="col-sm-4 control-label">PIN Telegram <small class="text-muted">(6 digit, opsional)</small></label>
+          <div class="col-sm-8">
+            <?php echo form_input($telegram_pin, '', 'class="form-control"');?>
+          </div>
+        </div>
       </div>
       <div class="col-md-6">
         <?php if($identity_column!=='email') { ?>
