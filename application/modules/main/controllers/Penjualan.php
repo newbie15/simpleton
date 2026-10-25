@@ -19,7 +19,7 @@ class Penjualan extends CI_Controller
 			base_url('assets/jexcel/js/excel-formula.min.js'),
 			base_url('assets/jexcel/js/numeral.min.js'),
 			base_url('assets/easyautocomplete/jquery.easy-autocomplete.min.js'),
-			base_url('assets/kasir/kasir.js?v=20261024-short-receipt-number')
+			base_url('assets/kasir/kasir.js?v=20261025-limit-format')
 		);
 		$data['m_penjualan'] = TRUE;
 		$data['output'] = '
@@ -77,9 +77,17 @@ class Penjualan extends CI_Controller
             </div>
             <div class="col-sm-3">
               <label>&nbsp;</label>
-              <button id="checkout" type="button" class="btn btn-info btn-block">Checkout [ F9 ]</button>
-              <button id="clear-cart" type="button" class="btn btn-default btn-block">Kosongkan Keranjang</button>
-              <a class="btn btn-link btn-block" target="_blank" href="'.site_url('main/kasir/reprint').'">Cetak ulang nota</a>
+              <div style="display:flex;gap:6px;">
+                <button id="checkout" type="button" class="btn btn-info" style="flex:2;">Checkout [ F9 ]</button>
+                <button id="clear-cart" type="button" class="btn btn-default" title="Kosongkan Keranjang">
+                  <span class="glyphicon glyphicon-trash" aria-hidden="true"></span>
+                </button>
+                <a class="btn reprint-btn" target="_blank" href="'.site_url('main/kasir/reprint').'"
+                   title="Cetak Ulang Nota"
+                   style="background-color:#8e44ad;border-color:#7d3c98;color:#fff;">
+                  <span class="glyphicon glyphicon-print" aria-hidden="true"></span>
+                </a>
+              </div>
             </div>
           </div>
           <br>

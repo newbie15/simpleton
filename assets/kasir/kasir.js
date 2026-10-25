@@ -25,8 +25,12 @@ $(document).ready(function(){
                 console.log("Failed to load limit_belanja");
                 return;
             }
-            var lb = parseInt($("#limit_belanja").html());
-            var l = parseInt($("#limit").html());
+            var rawLimit = parseInt(response);
+            if (!isNaN(rawLimit)) {
+                $("#limit").html(rawLimit.toLocaleString('id-ID')).data('raw', rawLimit);
+            }
+            var lb = parseInt($('#limit_belanja').data('raw') !== undefined ? $('#limit_belanja').data('raw') : $('#limit_belanja').html());
+            var l = parseInt($('#limit').data('raw') !== undefined ? $('#limit').data('raw') : $('#limit').html());
 
             if (!isNaN(l) && !isNaN(lb) && l > lb){
                 alert("belanja anda telah melebihi limit bulanan\n silahkan berbelanja bulan depan");
@@ -102,8 +106,10 @@ $(document).ready(function(){
     }
 
     function checklimit(){
-        var lb = parseInt($("#limit_belanja").html());
-        var l = parseInt($("#limit").html());
+        var lbEl = $('#limit_belanja');
+        var lEl = $('#limit');
+        var lb = parseInt(lbEl.data('raw') !== undefined ? lbEl.data('raw') : lbEl.html());
+        var l = parseInt(lEl.data('raw') !== undefined ? lEl.data('raw') : lEl.html());
 
         lb = lb || 0;
         l = l || 0;
@@ -369,7 +375,7 @@ $(document).ready(function(){
                         limit = limit_belanja;
                         $("#nkaryawan").html(nama);
                         $("#akaryawan").html(alamat);
-                        $("#limit_belanja").html(limit_belanja);
+                        $("#limit_belanja").html(Number(limit_belanja).toLocaleString('id-ID')).data('raw', limit_belanja);
                         check_limit_belanja($("#npk").val());
                         check_jadwal_belanja($("#npk").val());
                         tampilkan_foto(npk);
