@@ -39,7 +39,7 @@
   <?php endif; ?>
     <div class="login-box">
       <div class="login-logo">
-        <a href="http://github.com/newbie15" target="_blank"><b>Sistem Koperasi<br/>Mitra Indah Sejahtera</b><br><h6>By : @newbie15</h6></a>
+        <a href="http://github.com/newbie15" target="_blank"><b>Sistem Koperasi<br/>Makmur Indah Sejahtera</b><br><h6>By : @newbie15</h6></a>
       </div><!-- /.login-logo -->
       <div class="login-box-body">
         <p class="login-box-msg">Login untuk memulai</p>

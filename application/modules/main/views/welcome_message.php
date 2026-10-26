@@ -46,7 +46,7 @@
           <!-- mini logo for sidebar mini 50x50 pixels -->
           <span class="logo-mini"><b>MIS</b></span>
           <!-- logo for regular state and mobile devices -->
-          <span class="logo-lg"><b>Koperasi MIS</b></span>
+          <span class="logo-lg"><b>Koperasi Makmur Indah Sejahtera</b></span>
         </a>
         <!-- Header Navbar: style can be found in header.less -->
         <nav class="navbar navbar-static-top" role="navigation">
@@ -105,6 +105,12 @@
         <!-- /.sidebar -->
       </aside>
 
+      <?php if (isset($js_files)) { ?>
+      <?php foreach($js_files as $file): ?>
+        <script src="<?php echo $file; ?>"></script>
+      <?php endforeach; ?>
+      <?php } ?>
+
       <!-- Content Wrapper. Contains page content -->
       <div class="content-wrapper">
         <!-- Content Header (Page header) -->
@@ -157,11 +163,6 @@
     <script src="<?= base_url('assets/adminlte/dist/js/demo.js') ?>"></script>
     <?php if (isset($js_file)) { ?>
     <?php foreach($js_file as $file): ?>
-      <script src="<?php echo $file; ?>"></script>
-    <?php endforeach; ?>
-    <?php } ?>
-    <?php if (isset($js_files)) { ?>
-    <?php foreach($js_files as $file): ?>
       <script src="<?php echo $file; ?>"></script>
     <?php endforeach; ?>
     <?php } ?>
