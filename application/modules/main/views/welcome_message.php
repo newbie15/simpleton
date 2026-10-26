@@ -29,9 +29,6 @@
     foreach($css_files as $file): ?>
       <link type="text/css" rel="stylesheet" href="<?php echo $file; ?>" />
     <?php endforeach; ?>
-    <?php foreach($js_files as $file): ?>
-      <script src="<?php echo $file; ?>"></script>
-    <?php endforeach; ?>
     <?php } ?>
     <?php if (isset($css_file)) { ?>
     <?php
@@ -160,6 +157,11 @@
     <script src="<?= base_url('assets/adminlte/dist/js/demo.js') ?>"></script>
     <?php if (isset($js_file)) { ?>
     <?php foreach($js_file as $file): ?>
+      <script src="<?php echo $file; ?>"></script>
+    <?php endforeach; ?>
+    <?php } ?>
+    <?php if (isset($js_files)) { ?>
+    <?php foreach($js_files as $file): ?>
       <script src="<?php echo $file; ?>"></script>
     <?php endforeach; ?>
     <?php } ?>
