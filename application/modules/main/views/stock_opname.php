@@ -8,37 +8,30 @@
 <?php } ?>
 
 <?php if ($page === 'list') { ?>
-	<div class="row">
-		<div class="col-md-12">
-			<div class="box box-default">
-				<div class="box-body">
-					<form method="post" action="<?php echo site_url('main/stock_opname/create'); ?>" style="display:inline">
-						<button class="btn btn-primary" type="submit">Mulai Stok Opname</button>
-					</form>
-					<p class="help-block">Buat draft berdasarkan jumlah sistem saat ini, isi qty fisik dan harga pokok, lalu selesaikan untuk menerapkan selisih stok.</p>
-				</div>
+	<div class="box box-default">
+		<div class="box-header with-border">
+			<h3 class="box-title">Daftar Stok Opname</h3>
+			<div class="box-tools">
+				<form method="post" action="<?php echo site_url('main/stock_opname/create'); ?>" style="display:inline">
+					<button class="btn btn-primary btn-sm" type="submit"><span class="glyphicon glyphicon-plus"></span> Mulai Stok Opname</button>
+				</form>
 			</div>
 		</div>
-	</div>
-	<div class="box box-default">
-		<div class="box-header with-border"><h3 class="box-title">Daftar Stok Opname</h3></div>
 		<div class="box-body table-responsive">
-			<table class="table table-striped table-bordered">
+			<p class="help-block">Buat draft berdasarkan jumlah sistem saat ini, isi qty fisik dan harga pokok, lalu selesaikan untuk menerapkan selisih stok.</p>
+			<table class="table table-striped table-bordered" id="opname-list-table">
 				<thead>
 					<tr><th>No. Opname</th><th>Dibuat</th><th>Status</th><th>Jumlah barang</th><th>Belum dihitung</th><th>Nilai persediaan</th><th>Aksi</th></tr>
 				</thead>
 				<tbody>
-					<?php if (count($opnames) === 0) { ?>
-						<tr><td colspan="7" class="text-center">Belum ada stok opname.</td></tr>
-					<?php } ?>
 					<?php foreach ($opnames as $opname) { ?>
 						<tr>
 							<td><?php echo html_escape($opname->opname_number); ?></td>
 							<td><?php echo html_escape($opname->created_at); ?></td>
 							<td><?php echo $opname->status === 'finalized' ? 'Selesai' : 'Draft'; ?></td>
-							<td><?php echo number_format((int) $opname->item_count); ?></td>
-							<td><?php echo number_format((int) $opname->uncounted_items); ?></td>
-							<td><?php echo 'Rp '.number_format((float) $opname->inventory_value, 0, ',', '.'); ?></td>
+							<td data-order="<?php echo (int) $opname->item_count; ?>"><?php echo number_format((int) $opname->item_count); ?></td>
+							<td data-order="<?php echo (int) $opname->uncounted_items; ?>"><?php echo number_format((int) $opname->uncounted_items); ?></td>
+							<td data-order="<?php echo (float) $opname->inventory_value; ?>"><?php echo 'Rp '.number_format((float) $opname->inventory_value, 0, ',', '.'); ?></td>
 							<td><a class="btn btn-xs btn-default" href="<?php echo site_url('main/stock_opname/edit/'.(int) $opname->id); ?>"><?php echo $opname->status === 'finalized' ? 'Lihat' : 'Lanjutkan'; ?></a></td>
 						</tr>
 					<?php } ?>
@@ -46,6 +39,28 @@
 			</table>
 		</div>
 	</div>
+	<script>
+	(function () {
+		document.addEventListener('DOMContentLoaded', function () {
+			$('#opname-list-table').DataTable({
+				order: [[1, 'desc']],
+				pageLength: 10,
+				lengthMenu: [10, 25, 50, 100],
+				columnDefs: [{ orderable: false, targets: 6 }],
+				language: {
+					emptyTable: 'Belum ada stok opname.',
+					info: 'Menampilkan _START_ - _END_ dari _TOTAL_ opname',
+					infoEmpty: 'Menampilkan 0 opname',
+					infoFiltered: '(difilter dari _MAX_ total opname)',
+					lengthMenu: 'Tampilkan _MENU_ opname',
+					search: 'Cari:',
+					paginate: { first: 'Awal', last: 'Akhir', next: 'Berikut', previous: 'Sebelum' },
+					zeroRecords: 'Tidak ada opname yang cocok.'
+				}
+			});
+		});
+	}());
+	</script>
 <?php } else { ?>
 	<div class="box box-primary">
 		<div class="box-header with-border">

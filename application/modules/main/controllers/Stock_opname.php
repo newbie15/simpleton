@@ -308,13 +308,24 @@ class Stock_opname extends CI_Controller
 		$data['m_stock_opname'] = TRUE;
 		if ($data['page'] === 'edit') {
 			$data['css_files'] = array(
+				base_url('assets/datatables/css/jquery.dataTables.min.css'),
 				base_url('assets/jexcel/css/jexcel.css'),
 				base_url('assets/jexcel/css/jsuites.css')
 			);
+		}
+		if ($data['page'] === 'edit') {
 			$data['js_files'] = array(
 				base_url('assets/adminlte/plugins/jQuery/jQuery-2.1.4.min.js'),
 				base_url('assets/jexcel/js/jsuites.js'),
 				base_url('assets/jexcel/js/jexcel.js')
+			);
+		}
+		if ($data['page'] === 'list') {
+			$data['css_files'] = array(
+				base_url('assets/datatables/css/jquery.dataTables.min.css')
+			);
+			$data['js_file'] = array(
+				base_url('assets/datatables/js/jquery.dataTables.min.js')
 			);
 		}
 		$data['output'] = $this->load->view('stock_opname', $data, TRUE);
