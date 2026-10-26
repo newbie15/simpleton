@@ -348,7 +348,7 @@
 		<div class="box-body">
 			<p><strong>Supplier:</strong> <?php echo html_escape($order->supplier_name); ?>
 				&nbsp; <strong>Tanggal PO:</strong> <?php echo html_escape($order->ordered_at); ?></p>
-			<?php if ($order->status === 'closed') { ?><div class="alert alert-warning">PO ditutup oleh <?php echo html_escape($order->closed_by); ?> pada <?php echo html_escape($order->closed_at); ?>. Alasan: <?php echo html_escape($order->close_reason); ?>. Penerimaan baru dikunci.</div><?php } ?>
+			<?php if ($order->status === 'closed') { ?><div class="alert alert-warning">PO ditutup oleh <?php echo html_escape($order->closed_by_name); ?> pada <?php echo html_escape($order->closed_at); ?>. Alasan: <?php echo html_escape($order->close_reason); ?>. Penerimaan baru dikunci.</div><?php } ?>
 			<?php if ($order->notes !== '') { ?><p><strong>Catatan PO:</strong> <?php echo html_escape($order->notes); ?></p><?php } ?>
 
 			<?php if ($can_receive) { ?>

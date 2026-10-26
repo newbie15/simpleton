@@ -1017,9 +1017,11 @@ class Purchasing extends CI_Controller {
 		}
 
 		$query = $this->db
-			->select('po.*, s.name AS supplier_name, s.phone AS supplier_phone, s.address AS supplier_address')
+			->select('po.*, s.name AS supplier_name, s.phone AS supplier_phone, s.address AS supplier_address, '
+				.'COALESCE(closer.username, closer.email, po.closed_by) AS closed_by_name')
 			->from('purchase_orders po')
 			->join('suppliers s', 's.id = po.supplier_id')
+			->join('users closer', 'closer.id = po.closed_by', 'left')
 			->where('po.id', (int) $order_id)
 			->get();
 		return $query->num_rows() === 1 ? $query->row() : NULL;
