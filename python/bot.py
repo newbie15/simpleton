@@ -80,7 +80,7 @@ async def start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"Halo {member['nama']}, pilih menu di bawah.", reply_markup=MENU)
         return
     await update.message.reply_text(
-        "Selamat datang di bot Koperasi Mitra Indah Sejahtera.\n"
+        "Selamat datang di bot Koperasi Makmur Indah Sejahtera.\n"
         "Untuk membuka layanan anggota, tekan tombol di bawah untuk masuk.",
         reply_markup=LOGIN_KEYBOARD,
     )
