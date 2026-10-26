@@ -36,6 +36,12 @@ class Product_conversion extends CI_Controller
 		$data['judul_besar'] = 'Konversi Kemasan';
 		$data['judul_kecil'] = 'Hubungkan barcode kemasan dengan stok satuan pcs';
 		$data['m_product_conversion'] = TRUE;
+		$data['css_files'] = array(
+			base_url('assets/datatables/css/jquery.dataTables.min.css')
+		);
+		$data['js_file'] = array(
+			base_url('assets/datatables/js/jquery.dataTables.min.js')
+		);
 		$data['output'] = $this->load->view('product_conversion', $data, TRUE);
 		$this->load->view('welcome_message', $data);
 	}

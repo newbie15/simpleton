@@ -21,6 +21,13 @@
 		max-height: 260px;
 		overflow-y: auto;
 	}
+	.conversion-edit-toggle {
+		list-style: none;
+		cursor: pointer;
+	}
+	.conversion-edit-toggle::-webkit-details-marker {
+		display: none;
+	}
 </style>
 
 <div class="row">
@@ -79,7 +86,7 @@
 <div class="box box-default">
 	<div class="box-header with-border"><h3 class="box-title">Relasi Kemasan Terdaftar</h3></div>
 	<div class="box-body table-responsive">
-		<table class="table table-striped table-bordered">
+		<table class="table table-striped table-bordered" id="conversion-list-table">
 			<thead>
 				<tr>
 					<th>Barang pcs</th>
@@ -97,10 +104,12 @@
 						<td><?php echo html_escape($conversion->barcode_pcs); ?></td>
 						<td><?php echo html_escape($conversion->nama_kemasan); ?></td>
 						<td><?php echo html_escape($conversion->barcode_dus); ?></td>
-						<td><?php echo (int) $conversion->rasio; ?> pcs</td>
+						<td data-order="<?php echo (int) $conversion->rasio; ?>"><?php echo (int) $conversion->rasio; ?> pcs</td>
 						<td>
 							<details>
-								<summary>Edit</summary>
+								<summary class="conversion-edit-toggle btn btn-primary btn-sm">
+									<i class="fa fa-pencil" aria-hidden="true"></i> Edit
+								</summary>
 								<form method="post" action="<?php echo site_url('main/product_conversion/save/'.(int) $conversion->id); ?>">
 									<div class="form-group">
 										<label>Barcode kemasan</label>
@@ -133,9 +142,6 @@
 						</td>
 					</tr>
 				<?php } ?>
-				<?php if (count($conversions) === 0) { ?>
-					<tr><td colspan="6" class="text-center">Belum ada relasi konversi kemasan.</td></tr>
-				<?php } ?>
 			</tbody>
 		</table>
 	</div>
@@ -143,6 +149,25 @@
 
 <script>
 (function () {
+	document.addEventListener('DOMContentLoaded', function () {
+		$('#conversion-list-table').DataTable({
+			order: [],
+			pageLength: 10,
+			lengthMenu: [10, 25, 50, 100],
+			columnDefs: [{ orderable: false, targets: 5 }],
+			language: {
+				emptyTable: 'Belum ada relasi konversi kemasan.',
+				info: 'Menampilkan _START_ - _END_ dari _TOTAL_ relasi',
+				infoEmpty: 'Menampilkan 0 relasi',
+				infoFiltered: '(difilter dari _MAX_ total relasi)',
+				lengthMenu: 'Tampilkan _MENU_ relasi',
+				search: 'Cari:',
+				paginate: { first: 'Awal', last: 'Akhir', next: 'Berikut', previous: 'Sebelum' },
+				zeroRecords: 'Tidak ada relasi konversi yang cocok.'
+			}
+		});
+	});
+
 	var searchUrl = <?php echo json_encode(site_url('main/product_conversion/product_search?q=')); ?>;
 	var inputs = document.querySelectorAll('.conversion-product-input');
 
