@@ -3,6 +3,9 @@
 
 	$(function () {
 		var table = $('#voucher-usage-table');
+		var npkInput = $('#voucher-npk');
+		var ajaxBase = table.data('source').replace(/\/voucher\/usage_data\/?$/, '/ajax');
+		var selectedEmployee = null;
 
 		function escapeText(value, type) {
 			if (value === null || value === undefined) {
@@ -13,6 +16,15 @@
 		if (!table.length) {
 			return;
 		}
+
+		function selectedNpk() {
+			var value = $.trim(npkInput.val() || '');
+			if (selectedEmployee && selectedEmployee.label === value) {
+				return selectedEmployee.npk;
+			}
+			return value;
+		}
+
 		table.DataTable({
 			processing: true,
 			serverSide: true,
@@ -23,7 +35,7 @@
 			ajax: {
 				url: table.data('source'),
 				data: function (request) {
-					request.npk = $.trim($('#voucher-npk').val() || '');
+					request.npk = selectedNpk();
 				}
 			},
 			columns: [
@@ -75,12 +87,32 @@
 			}
 		});
 
+		npkInput.easyAutocomplete({
+			url: ajaxBase + '/karyawan_list',
+			getValue: 'nama',
+			list: {
+				match: { enabled: true },
+				onChooseEvent: function () {
+					var label = $.trim(npkInput.val() || '');
+					var match = label.match(/-([^-]+)$/);
+					selectedEmployee = {
+						label: label,
+						npk: match ? $.trim(match[1]) : label
+					};
+					table.DataTable().ajax.reload();
+				}
+			}
+		});
+		npkInput.on('input', function () {
+			selectedEmployee = null;
+		});
+
 		$('#voucher-npk-filter').on('submit', function (event) {
 			event.preventDefault();
 			table.DataTable().ajax.reload();
 		});
 		$('#voucher-npk-reset').on('click', function () {
-			$('#voucher-npk').val('');
+			npkInput.val('').trigger('input');
 			table.DataTable().ajax.reload();
 		});
 	});
