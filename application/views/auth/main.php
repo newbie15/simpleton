@@ -378,6 +378,95 @@
             }
           }
         });
+
+        var syncForm = $('#sync-karyawan-form');
+        var syncButton = $('#sync-karyawan-button');
+        var progressPanel = $('#sync-karyawan-progress');
+        var progressBar = $('#sync-karyawan-progress-bar');
+        var status = $('#sync-karyawan-status');
+        var details = $('#sync-karyawan-details');
+        var syncData = { total: 0, processed: 0, created: 0, skipped: 0 };
+
+        var updateProgress = function (complete) {
+          var percent = syncData.total
+            ? Math.floor(syncData.processed * 100 / syncData.total)
+            : 100;
+          if (!complete) {
+            percent = Math.min(percent, 99);
+          }
+          progressBar
+            .css('width', percent + '%')
+            .attr('aria-valuenow', percent)
+            .text(percent + '%');
+          details.text(
+            'Diproses ' + Math.min(syncData.processed, syncData.total) + ' dari ' +
+            syncData.total + ' karyawan; ' + syncData.created +
+            ' akun dibuat, ' + syncData.skipped + ' dilewati.'
+          );
+        };
+
+        var sendSyncRequest = function (action, success) {
+          $.ajax({
+            url: syncForm.data('ajax-url'),
+            method: 'POST',
+            dataType: 'json',
+            data: {
+              action: action,
+              sync_token: syncForm.find('input[name="sync_token"]').val()
+            }
+          }).done(success).fail(function (xhr) {
+            var message = xhr.responseJSON && xhr.responseJSON.error
+              ? xhr.responseJSON.error
+              : 'Terjadi kesalahan saat menghubungi server. Muat ulang halaman sebelum mencoba lagi.';
+            progressPanel.removeClass('alert-info alert-success').addClass('alert-danger');
+            status.text('Sinkronisasi berhenti: ' + message);
+            syncButton.prop('disabled', false);
+          });
+        };
+
+        var processSyncBatch = function () {
+          status.text('Menyinkronkan karyawan...');
+          sendSyncRequest('batch', function (result) {
+            syncData = result;
+            updateProgress(result.complete);
+            if (result.complete) {
+              progressPanel.removeClass('alert-info alert-danger').addClass('alert-success');
+              status.text('Sinkronisasi selesai.');
+              syncButton.prop('disabled', true);
+              window.setTimeout(function () {
+                window.location.reload();
+              }, 1500);
+              return;
+            }
+            window.setTimeout(processSyncBatch, 100);
+          });
+        };
+
+        syncForm.on('submit', function (event) {
+          event.preventDefault();
+          if (!window.confirm('Daftarkan semua karyawan yang belum memiliki akun sebagai member? Password awal setiap akun adalah NPK karyawan. Pastikan setiap anggota segera menggantinya.')) {
+            return;
+          }
+          syncButton.prop('disabled', true);
+          progressPanel.removeAttr('hidden').removeClass('alert-danger alert-success').addClass('alert-info');
+          status.text('Menyiapkan sinkronisasi...');
+          details.empty();
+          progressBar.css('width', '0%').attr('aria-valuenow', 0).text('0%');
+          sendSyncRequest('start', function (result) {
+            syncData = result;
+            updateProgress(result.complete);
+            if (result.complete) {
+              progressPanel.removeClass('alert-info').addClass('alert-success');
+              status.text('Tidak ada data karyawan untuk disinkronkan.');
+              syncButton.prop('disabled', true);
+              window.setTimeout(function () {
+                window.location.reload();
+              }, 1500);
+              return;
+            }
+            processSyncBatch();
+          });
+        });
       });
     </script>
     <?php } ?>

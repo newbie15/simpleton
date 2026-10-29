@@ -43,7 +43,7 @@
           </div>
         </div>
         <div class="form-group">
-          <label for="telegram_pin" class="col-sm-4 control-label">PIN Telegram <small class="text-muted">(6 digit, opsional)</small></label>
+          <label for="telegram_pin" class="col-sm-4 control-label">PIN Telegram <small class="text-muted">(default 123456)</small></label>
           <div class="col-sm-8">
             <?php echo form_input($telegram_pin, '', 'class="form-control"');?>
           </div>

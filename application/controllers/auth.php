@@ -2,6 +2,8 @@
 
 class Auth extends CI_Controller {
 
+	const DEFAULT_TELEGRAM_PIN = '123456';
+
 	function __construct()
 	{
 		parent::__construct();
@@ -31,6 +33,7 @@ class Auth extends CI_Controller {
 		}
 		else
 		{
+			$this->_ensure_default_telegram_pins();
 			// set the flash data error message if there is one
 			$this->data['message'] = (validation_errors()) ? validation_errors() : $this->session->flashdata('message');
 			$this->data['csrf'] = $this->_get_csrf_nonce();
@@ -42,6 +45,7 @@ class Auth extends CI_Controller {
 			$data['output'] = array(
 				'message' => $this->data['message'],
 				'csrf' => $this->data['csrf'],
+				'sync_token' => $this->_sync_karyawan_token(),
 			);
 			$data['view_file'] = 'auth/index';
 			$this->load->view('auth/main', $data, FALSE);
@@ -164,6 +168,251 @@ class Auth extends CI_Controller {
 				'recordsFiltered' => $filtered,
 				'data' => $users,
 			)));
+	}
+
+	function sync_karyawan()
+	{
+		if ($this->input->method(TRUE) !== 'POST')
+		{
+			$this->_sync_json_response(array('error' => 'Metode permintaan tidak diizinkan.'), 405);
+			return;
+		}
+		if (!$this->ion_auth->logged_in() || !$this->ion_auth->is_admin())
+		{
+			$this->_sync_json_response(array('error' => 'Anda harus menjadi administrator untuk menyinkronkan karyawan.'), 403);
+			return;
+		}
+		$expected_token = $this->session->userdata('sync_karyawan_token');
+		$posted_token = $this->input->post('sync_token', TRUE);
+		if (!is_string($expected_token) || $expected_token === '' ||
+			!is_string($posted_token) || $posted_token !== $expected_token)
+		{
+			$this->_sync_json_response(array('error' => $this->lang->line('error_csrf')), 403);
+			return;
+		}
+
+		$action = $this->input->post('action', TRUE);
+		$tables = $this->config->item('tables', 'ion_auth');
+		$users_table = $tables['users'];
+		$groups_table = $tables['groups'];
+		if (!$this->db->table_exists('karyawan') ||
+			!$this->db->field_exists('id', 'karyawan') ||
+			!$this->db->field_exists('npk', 'karyawan') ||
+			!$this->db->field_exists('nama', 'karyawan') ||
+			!$this->db->field_exists('username', $users_table) ||
+			!$this->db->field_exists('npk', $users_table) ||
+			!$this->db->field_exists('first_name', $users_table) ||
+			!$this->db->field_exists('last_name', $users_table))
+		{
+			$this->_sync_json_response(array('error' => 'Skema karyawan atau users belum siap untuk sinkronisasi.'), 500);
+			return;
+		}
+
+		$member_group = $this->db->get_where($groups_table, array('name' => 'members'))->row();
+		if (!$member_group)
+		{
+			$this->_sync_json_response(array('error' => 'Group members tidak ditemukan. Buat group tersebut sebelum sinkronisasi.'), 500);
+			return;
+		}
+
+		if ($action === 'start')
+		{
+			$total = (int) $this->db->count_all('karyawan');
+			$job = array(
+				'last_id' => 0,
+				'total' => $total,
+				'processed' => 0,
+				'created' => 0,
+				'skipped' => 0,
+			);
+			$this->session->set_userdata('sync_karyawan_job', $job);
+			if ($total === 0)
+			{
+				$this->session->unset_userdata('sync_karyawan_job');
+				$this->session->unset_userdata('sync_karyawan_token');
+			}
+			$this->_sync_json_response(array(
+				'total' => $total,
+				'processed' => 0,
+				'created' => 0,
+				'skipped' => 0,
+				'complete' => $total === 0,
+			));
+			return;
+		}
+
+		if ($action !== 'batch')
+		{
+			$this->_sync_json_response(array('error' => 'Aksi sinkronisasi tidak dikenal.'), 400);
+			return;
+		}
+
+		$job = $this->session->userdata('sync_karyawan_job');
+		if (!is_array($job) || !isset($job['last_id'], $job['total'], $job['processed'], $job['created'], $job['skipped']))
+		{
+			$this->_sync_json_response(array('error' => 'Sesi sinkronisasi tidak ditemukan. Mulai ulang proses sinkronisasi.'), 409);
+			return;
+		}
+
+		$batch_size = 10;
+		$previous_db_debug = $this->db->db_debug;
+		$this->db->db_debug = FALSE;
+		$employee_query = $this->db
+			->select('id, npk, nama')
+			->from('karyawan')
+			->where('id >', (int) $job['last_id'])
+			->order_by('id', 'ASC')
+			->limit($batch_size)
+			->get();
+		if ($employee_query === FALSE)
+		{
+			$error = $this->db->error();
+			$this->db->db_debug = $previous_db_debug;
+			log_message('error', 'Gagal membaca batch karyawan untuk sinkronisasi users: '.$error['code'].' '.$error['message']);
+			$this->_sync_json_response(array('error' => 'Batch karyawan gagal dibaca. Silakan coba lagi.'), 500);
+			return;
+		}
+		$employees = $employee_query->result();
+		if (empty($employees))
+		{
+			$this->db->db_debug = $previous_db_debug;
+			$this->session->unset_userdata('sync_karyawan_job');
+			$this->session->unset_userdata('sync_karyawan_token');
+			$this->_sync_json_response(array(
+				'total' => (int) $job['total'],
+				'processed' => (int) $job['processed'],
+				'created' => (int) $job['created'],
+				'skipped' => (int) $job['skipped'],
+				'complete' => TRUE,
+			));
+			return;
+		}
+
+		if (!$this->db->trans_begin())
+		{
+			$this->db->db_debug = $previous_db_debug;
+			$this->_sync_json_response(array('error' => 'Database tidak dapat memulai batch sinkronisasi.'), 500);
+			return;
+		}
+
+		$created = 0;
+		$skipped = 0;
+		$seen_npk = array();
+		$string_length = function ($value) {
+			if (function_exists('mb_strlen'))
+			{
+				return mb_strlen($value, 'UTF-8');
+			}
+			return function_exists('iconv_strlen') ? iconv_strlen($value, 'UTF-8') : strlen($value);
+		};
+		foreach ($employees as $employee)
+		{
+			$job['last_id'] = (int) $employee->id;
+			$job['processed']++;
+			$npk = trim((string) $employee->npk);
+			$name = trim(preg_replace('/\s+/', ' ', (string) $employee->nama));
+			$name_parts = preg_split('/\s+/', $name, 2);
+			$first_name = isset($name_parts[0]) ? $name_parts[0] : '';
+			$last_name = isset($name_parts[1]) ? $name_parts[1] : '';
+			$first_name_length = $string_length($first_name);
+			$last_name_length = $string_length($last_name);
+			if ($npk === '' || strlen($npk) > 32 || $name === '' ||
+				$first_name_length === FALSE || $first_name_length > 50 ||
+				$last_name_length === FALSE || $last_name_length > 50 ||
+				isset($seen_npk[$npk]))
+			{
+				$skipped++;
+				continue;
+			}
+			$seen_npk[$npk] = TRUE;
+
+			$existing_user_query = $this->db
+				->from($users_table)
+				->group_start()
+				->where('npk', $npk)
+				->or_where('username', $npk)
+				->group_end()
+				->limit(1)
+				->get();
+			if ($existing_user_query === FALSE)
+			{
+				$error = $this->db->error();
+				$this->db->trans_rollback();
+				$this->db->db_debug = $previous_db_debug;
+				log_message('error', 'Gagal memeriksa akun saat sinkronisasi karyawan: '.$error['code'].' '.$error['message']);
+				$this->_sync_json_response(array('error' => 'Pemeriksaan akun gagal pada batch ini. Tidak ada akun dari batch ini yang disimpan.'), 500);
+				return;
+			}
+			$existing_user = $existing_user_query->row();
+			if ($existing_user)
+			{
+				$skipped++;
+				continue;
+			}
+
+			$additional_data = array(
+				'npk' => $npk,
+				'first_name' => $first_name,
+				'last_name' => $last_name
+			);
+			if ($this->db->field_exists('telegram_pin', $users_table))
+			{
+				$additional_data['telegram_pin'] = self::DEFAULT_TELEGRAM_PIN;
+			}
+			$user_id = $this->ion_auth->register(
+				$npk,
+				$npk,
+				NULL,
+				$additional_data,
+				array((int) $member_group->id)
+			);
+			if (!$user_id || $this->db->trans_status() === FALSE)
+			{
+				$error = $this->db->error();
+				$this->db->trans_rollback();
+				$this->db->db_debug = $previous_db_debug;
+				log_message('error', 'Gagal membuat akun member saat sinkronisasi karyawan: '.$error['code'].' '.$error['message']);
+				$this->_sync_json_response(array('error' => 'Pembuatan akun gagal pada batch ini. Tidak ada akun dari batch ini yang disimpan.'), 500);
+				return;
+			}
+			$created++;
+		}
+
+		if ($this->db->trans_status() === FALSE || !$this->db->trans_commit())
+		{
+			$error = $this->db->error();
+			$this->db->trans_rollback();
+			$this->db->db_debug = $previous_db_debug;
+			log_message('error', 'Gagal menyelesaikan sinkronisasi karyawan: '.$error['code'].' '.$error['message']);
+			$this->_sync_json_response(array('error' => 'Batch sinkronisasi gagal disimpan. Silakan coba lagi.'), 500);
+			return;
+		}
+		$this->db->db_debug = $previous_db_debug;
+
+		$job['created'] += $created;
+		$job['skipped'] += $skipped;
+		$this->session->set_userdata('sync_karyawan_job', $job);
+		$complete = count($employees) < $batch_size;
+		if ($complete)
+		{
+			$this->session->unset_userdata('sync_karyawan_job');
+			$this->session->unset_userdata('sync_karyawan_token');
+		}
+		$this->_sync_json_response(array(
+			'total' => (int) $job['total'],
+			'processed' => (int) $job['processed'],
+			'created' => (int) $job['created'],
+			'skipped' => (int) $job['skipped'],
+			'complete' => $complete,
+		));
+	}
+
+	private function _sync_json_response($data, $status = 200)
+	{
+		$this->output
+			->set_status_header($status)
+			->set_content_type('application/json')
+			->set_output(json_encode($data));
 	}
 
 	private function _apply_user_search($search, $users_table, $users_groups_table, $groups_table, $has_npk)
@@ -725,7 +974,7 @@ class Auth extends CI_Controller {
             if ($this->db->field_exists('telegram_pin', $tables['users']))
             {
                 $pin = trim($this->input->post('telegram_pin'));
-                $additional_data['telegram_pin'] = $pin !== '' ? $pin : NULL;
+                $additional_data['telegram_pin'] = $pin !== '' ? $pin : self::DEFAULT_TELEGRAM_PIN;
             }
         }
         if ($this->form_validation->run() == true && $this->ion_auth->register($identity, $password, $email, $additional_data))
@@ -764,7 +1013,7 @@ class Auth extends CI_Controller {
                 'id'    => 'telegram_pin',
                 'type'  => 'text',
                 'maxlength' => 6,
-                'value' => $this->form_validation->set_value('telegram_pin'),
+                'value' => $this->form_validation->set_value('telegram_pin', self::DEFAULT_TELEGRAM_PIN),
             );
             $this->data['identity'] = array(
                 'name'  => 'identity',
@@ -870,7 +1119,7 @@ class Auth extends CI_Controller {
 				if ($this->ion_auth->is_admin() && $this->db->field_exists('telegram_pin', $tables['users']))
 				{
 					$pin = trim($this->input->post('telegram_pin'));
-					$data['telegram_pin'] = $pin !== '' ? $pin : NULL;
+					$data['telegram_pin'] = $pin !== '' ? $pin : self::DEFAULT_TELEGRAM_PIN;
 				}
 
 				// update the password if it was posted
@@ -965,7 +1214,7 @@ class Auth extends CI_Controller {
 			'id'    => 'telegram_pin',
 			'type'  => 'text',
 			'maxlength' => 6,
-			'value' => $this->form_validation->set_value('telegram_pin', isset($user->telegram_pin) ? $user->telegram_pin : ''),
+			'value' => $this->form_validation->set_value('telegram_pin', !empty($user->telegram_pin) ? $user->telegram_pin : self::DEFAULT_TELEGRAM_PIN),
 		);
 		$this->data['company'] = array(
 			'name'  => 'company',
@@ -1246,6 +1495,39 @@ class Auth extends CI_Controller {
 		else
 		{
 			return FALSE;
+		}
+	}
+
+	private function _sync_karyawan_token()
+	{
+		$token = $this->session->userdata('sync_karyawan_token');
+		if (!is_string($token) || $token === '')
+		{
+			$this->load->helper('string');
+			$token = random_string('alnum', 32);
+			$this->session->set_userdata('sync_karyawan_token', $token);
+		}
+		return $token;
+	}
+
+	private function _ensure_default_telegram_pins()
+	{
+		$tables = $this->config->item('tables', 'ion_auth');
+		$users_table = $tables['users'];
+		if (!$this->db->field_exists('telegram_pin', $users_table))
+		{
+			return;
+		}
+
+		$updated = $this->db
+			->where('telegram_pin IS NULL', NULL, FALSE)
+			->or_where('TRIM(telegram_pin) =', '')
+			->update($users_table, array('telegram_pin' => self::DEFAULT_TELEGRAM_PIN));
+		if ($updated === FALSE)
+		{
+			$error = $this->db->error();
+			log_message('error', 'Gagal mengisi PIN Telegram default: '.$error['code'].' '.$error['message']);
+			show_error('PIN Telegram default gagal diperbarui.', 500);
 		}
 	}
 
