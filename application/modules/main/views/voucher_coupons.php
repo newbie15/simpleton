@@ -65,14 +65,52 @@
 <div class="box box-default">
 	<div class="box-header with-border"><h3 class="box-title">Daftar kupon (500 terbaru)</h3></div>
 	<div class="box-body table-responsive">
-		<table class="table table-striped table-bordered">
-			<thead><tr><th>Serial</th><th>NPK penerima</th><th>Status</th><th>No. nota</th><th>Dipakai</th></tr></thead>
+		<table class="table table-striped table-bordered" id="voucher-coupons-table">
+			<thead><tr><th>Serial</th><th>NPK penerima</th><th>Status</th><th>No. nota</th><th>Dipakai</th><th>Aksi</th></tr></thead>
 			<tbody>
 			<?php foreach ($coupons as $coupon) { ?>
-			<tr><td><?php echo html_escape($coupon->serial_code); ?></td><td><?php echo html_escape($coupon->assigned_npk ? $coupon->assigned_npk : '—'); ?></td><td><?php echo html_escape(isset($status_labels[$coupon->status]) ? $status_labels[$coupon->status] : $coupon->status); ?></td><td><?php echo html_escape($coupon->used_nota ? $coupon->used_nota : '—'); ?></td><td><?php echo html_escape($coupon->used_at ? $coupon->used_at : '—'); ?></td></tr>
+			<tr>
+				<td><?php echo html_escape($coupon->serial_code); ?></td>
+				<td><?php echo html_escape($coupon->assigned_npk ? $coupon->assigned_npk : '—'); ?></td>
+				<td><?php echo html_escape(isset($status_labels[$coupon->status]) ? $status_labels[$coupon->status] : $coupon->status); ?></td>
+				<td><?php echo html_escape($coupon->used_nota ? $coupon->used_nota : '—'); ?></td>
+				<td><?php echo html_escape($coupon->used_at ? $coupon->used_at : '—'); ?></td>
+				<td>
+					<?php if ($coupon->status === 'available') { ?>
+					<form method="post" action="<?php echo site_url('main/voucher/delete_coupon/'.(int) $voucher->id.'/'.(int) $coupon->id); ?>" onsubmit="return window.confirm('Hapus serial kupon <?php echo html_escape($coupon->serial_code); ?>? Tindakan ini tidak dapat dibatalkan.');">
+						<input type="hidden" name="coupon_form_token" value="<?php echo html_escape($form_token); ?>">
+						<button class="btn btn-danger btn-xs" type="submit"><i class="fa fa-trash" aria-hidden="true"></i> Hapus</button>
+					</form>
+					<?php } else { ?>
+					<span class="text-muted">—</span>
+					<?php } ?>
+				</td>
+			</tr>
 			<?php } ?>
-			<?php if (!$coupons) { ?><tr><td colspan="5" class="text-muted">Belum ada serial kupon.</td></tr><?php } ?>
 			</tbody>
 		</table>
 	</div>
 </div>
+
+<script>
+(function () {
+	document.addEventListener('DOMContentLoaded', function () {
+		$('#voucher-coupons-table').DataTable({
+			order: [],
+			pageLength: 10,
+			lengthMenu: [10, 25, 50, 100],
+			columnDefs: [{ orderable: false, searchable: false, targets: 5 }],
+			language: {
+				emptyTable: 'Belum ada serial kupon.',
+				info: 'Menampilkan _START_ - _END_ dari _TOTAL_ kupon',
+				infoEmpty: 'Menampilkan 0 kupon',
+				infoFiltered: '(difilter dari _MAX_ total kupon)',
+				lengthMenu: 'Tampilkan _MENU_ kupon',
+				search: 'Cari:',
+				paginate: { first: 'Awal', last: 'Akhir', next: 'Berikut', previous: 'Sebelum' },
+				zeroRecords: 'Tidak ada kupon yang cocok.'
+			}
+		});
+	});
+}());
+</script>

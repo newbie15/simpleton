@@ -56,6 +56,8 @@ Pasang migrasi **[application/sql/pos_receipt_sequence.sql](application/sql/pos_
 
 Status retur penjualan dan audit keputusan manager dipasang melalui migrasi **[application/sql/sales_return_approval.sql](application/sql/sales_return_approval.sql)**. Status baru adalah `pending`, `approved`, dan `rejected`; data lama `completed` dipertahankan maknanya dan dinormalisasi menjadi `approved`. Pengajuan pending memesan qty retur, tetapi belum mengubah stok atau jurnal.
 
+Riwayat retur pada halaman Retur Penjualan memakai DataTables server-side: pencarian, pengurutan, dan pagination mengambil maksimal 100 baris per permintaan. Indeks tanggal/ID dan status/ID dibuat melalui `phase3_foundation.sql` untuk instalasi baru dan `sales_return_approval.sql` untuk database yang sudah ada.
+
 ### 1.4 `retur_penjualan` & `retur_penjualan_items` (Retur Pelanggan POS)
 * **`retur_penjualan`**:
   * `id` (int, PK, auto_increment)
@@ -144,6 +146,8 @@ Skrip **`application/sql/petty_cash.sql`** dijalankan setelah `phase3_foundation
 * **`acc_cash_funds`**: master dana dengan kode, nama/lokasi, tipe kas utama atau petty cash, pemegang, dan batas dana tetap per petty cash.
 * **`acc_cash_transactions`**: pengajuan penambahan dana, beban petty cash, dan pembayaran hutang supplier berdasarkan penerimaan barang. Pengajuan menyimpan tanggal, nominal, pihak terkait, referensi serta lampiran bukti, status, penginput, penyetuju, dan jurnal.
 * **`acc_cash_closings`**: saldo buku, hitungan kas fisik, selisih, catatan, pengguna, dan waktu tutup per dana/tanggal.
+
+Halaman Manage Payment memuat DataTables secara server-side agar hanya satu halaman data yang dikirim dan dirender browser setiap kali. Skrip `petty_cash.sql` dan `purchasing_workflow.sql` juga memastikan indeks transaksi pembayaran dan status PO tersedia; jalankan ulang kedua skrip tersebut pada instalasi lama untuk menerapkan indeks baru (operasi indeksnya idempotent).
 
 POS tetap menambah kas kasir **1101**. Pemindahan hasil kasir ke kas utama **1106** dan pengisian petty cash **1107** dicatat sebagai transfer dan tidak menjadi pendapatan/beban. Pembayaran penerimaan supplier mendebit hutang **2101** dan mengkredit akun kas yang digunakan; pengeluaran operasional mendebit akun beban yang dipilih dan mengkredit kas kecil. Semua jurnal menggunakan reference type `PETTY_CASH`, diposting atomik saat disetujui, dan mengikuti validasi akun/periode dari library akunting.
 

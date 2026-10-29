@@ -11,6 +11,20 @@ PREPARE purchasing_workflow_stmt FROM @purchasing_workflow_sql;
 EXECUTE purchasing_workflow_stmt;
 DEALLOCATE PREPARE purchasing_workflow_stmt;
 
+SET @po_status_index_exists = (
+	SELECT COUNT(1) FROM INFORMATION_SCHEMA.STATISTICS
+	WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'purchase_orders'
+		AND INDEX_NAME = 'idx_purchase_orders_status'
+);
+SET @purchasing_workflow_sql = IF(
+	@po_status_index_exists = 0,
+	'CREATE INDEX `idx_purchase_orders_status` ON `purchase_orders` (`status`)',
+	'SELECT 1'
+);
+PREPARE purchasing_workflow_stmt FROM @purchasing_workflow_sql;
+EXECUTE purchasing_workflow_stmt;
+DEALLOCATE PREPARE purchasing_workflow_stmt;
+
 SET @po_closed_at_exists = (
 	SELECT COUNT(1) FROM INFORMATION_SCHEMA.COLUMNS
 	WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'purchase_orders' AND COLUMN_NAME = 'closed_at'

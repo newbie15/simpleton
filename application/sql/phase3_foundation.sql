@@ -100,7 +100,9 @@ CREATE TABLE IF NOT EXISTS `retur_penjualan` (
   `status` enum('completed','cancelled') NOT NULL DEFAULT 'completed',
   PRIMARY KEY (`id`),
   UNIQUE KEY `idx_retur_nomor` (`nomor_retur`),
-  KEY `idx_retur_nota` (`nota_penjualan`)
+  KEY `idx_retur_nota` (`nota_penjualan`),
+  KEY `idx_retur_tanggal_id` (`tgl_retur`,`id`),
+  KEY `idx_retur_status_id` (`status`,`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 CREATE TABLE IF NOT EXISTS `retur_penjualan_items` (

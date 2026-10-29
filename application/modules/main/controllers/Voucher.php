@@ -75,12 +75,14 @@ class Voucher extends CI_Controller
 		$data['judul_kecil'] = 'Atur promo, masa berlaku, kuota, dan lihat pemakaian';
 		$data['m_vouchers'] = TRUE;
 		$data['css_file'] = array(
-			base_url('assets/adminlte/plugins/datatables/dataTables.bootstrap.css')
+			base_url('assets/adminlte/plugins/datatables/dataTables.bootstrap.css'),
+			base_url('assets/easyautocomplete/easy-autocomplete.min.css')
 		);
 		$data['js_file'] = array(
 			base_url('assets/adminlte/plugins/datatables/jquery.dataTables.min.js'),
 			base_url('assets/adminlte/plugins/datatables/dataTables.bootstrap.min.js'),
-			base_url('assets/voucher/voucher_history.js?v=20261024-server-paged-vouchers'),
+			base_url('assets/easyautocomplete/jquery.easy-autocomplete.min.js'),
+			base_url('assets/voucher/voucher_history.js?v=20261027-npk-autocomplete'),
 			base_url('assets/voucher/voucher_form.js?v=20261010-field-validation')
 		);
 		$data['output'] = $this->load->view('vouchers', $data, TRUE);
@@ -343,6 +345,12 @@ class Voucher extends CI_Controller
 			'judul_kecil' => $voucher->kode.' — '.html_escape($voucher->nama),
 			'm_vouchers' => TRUE
 		);
+		$data['css_files'] = array(
+			base_url('assets/datatables/css/jquery.dataTables.min.css')
+		);
+		$data['js_file'] = array(
+			base_url('assets/datatables/js/jquery.dataTables.min.js')
+		);
 		$data['output'] = $this->load->view('voucher_coupons', $data, TRUE);
 		$this->load->view('welcome_message', $data);
 	}
@@ -394,6 +402,67 @@ class Voucher extends CI_Controller
 			$this->_coupon_redirect($voucher_id, 'Kupon gagal dibuat; tidak ada serial yang disimpan.', FALSE);
 		}
 		$this->_coupon_redirect($voucher_id, $quantity.' kupon berhasil dibuat.', TRUE);
+	}
+
+	public function delete_coupon($voucher_id = NULL, $coupon_id = NULL)
+	{
+		$this->_require_coupon_post();
+		if (!$this->_is_positive_integer($voucher_id) || !$this->_is_positive_integer($coupon_id)) {
+			show_404();
+		}
+
+		$voucher_id = (int) $voucher_id;
+		$coupon_id = (int) $coupon_id;
+		if (!$this->db->trans_begin()) {
+			$this->_coupon_redirect($voucher_id, 'Database tidak dapat memulai penghapusan kupon.', FALSE);
+		}
+
+		$voucher = $this->db->query(
+			'SELECT id FROM vouchers WHERE id = ? FOR UPDATE',
+			array($voucher_id)
+		)->row();
+		if (!$voucher) {
+			$this->db->trans_rollback();
+			show_404();
+		}
+
+		$coupon = $this->db->query(
+			'SELECT id, status FROM voucher_coupons WHERE id = ? AND voucher_id = ? FOR UPDATE',
+			array($coupon_id, $voucher_id)
+		)->row();
+		if (!$coupon || $coupon->status !== 'available') {
+			$this->db->trans_rollback();
+			$this->_coupon_redirect($voucher_id, 'Hanya serial kupon tersedia yang dapat dihapus.', FALSE);
+		}
+
+		$usage = $this->db->query(
+			'SELECT id FROM voucher_usages WHERE voucher_coupon_id = ? LIMIT 1',
+			array($coupon_id)
+		);
+		if ($usage === FALSE) {
+			$error = $this->db->error();
+			$this->db->trans_rollback();
+			log_message('error', 'Gagal memeriksa pemakaian kupon '.$coupon_id.': '.$error['code'].' '.$error['message']);
+			$this->_coupon_redirect($voucher_id, 'Serial kupon gagal dihapus.', FALSE);
+		}
+		if ($usage->num_rows() > 0) {
+			$this->db->trans_rollback();
+			$this->_coupon_redirect($voucher_id, 'Serial kupon sudah tercatat pada transaksi dan tidak dapat dihapus.', FALSE);
+		}
+
+		$deleted = $this->db->where('id', $coupon_id)
+			->where('voucher_id', $voucher_id)
+			->where('status', 'available')
+			->delete('voucher_coupons');
+		if (!$deleted || $this->db->affected_rows() !== 1 ||
+			$this->db->trans_status() === FALSE || !$this->db->trans_commit()) {
+			$error = $this->db->error();
+			$this->db->trans_rollback();
+			log_message('error', 'Gagal menghapus serial kupon '.$coupon_id.': '.$error['code'].' '.$error['message']);
+			$this->_coupon_redirect($voucher_id, 'Serial kupon gagal dihapus.', FALSE);
+		}
+
+		$this->_coupon_redirect($voucher_id, 'Serial kupon berhasil dihapus.', TRUE);
 	}
 
 	public function preview_coupon_import($voucher_id = NULL)

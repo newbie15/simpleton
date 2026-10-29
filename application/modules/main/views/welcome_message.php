@@ -146,6 +146,24 @@
       <div class="control-sidebar-bg"></div>
     </div><!-- ./wrapper -->
 
+    <div class="modal fade" id="proof-preview-modal" tabindex="-1" role="dialog" aria-labelledby="proof-preview-title">
+      <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+            <h4 class="modal-title" id="proof-preview-title">Bukti transaksi</h4>
+          </div>
+          <div class="modal-body" style="padding:0">
+            <iframe id="proof-preview-frame" title="Bukti transaksi" style="display:block;width:100%;height:80vh;border:0"></iframe>
+          </div>
+          <div class="modal-footer">
+            <a id="proof-preview-new-tab" class="btn btn-default" href="#" target="_blank" rel="noopener">Buka di tab baru</a>
+            <button type="button" class="btn btn-primary" data-dismiss="modal">Tutup</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- <script>
       $.widget.bridge('uibutton', $.ui.button);
     </script> -->
@@ -161,6 +179,29 @@
     <!-- <script src="<?= base_url('assets/adminlte/dist/js/pages/dashboard.js') ?>"></script> -->
     <!-- AdminLTE for demo purposes -->
     <script src="<?= base_url('assets/adminlte/dist/js/demo.js') ?>"></script>
+    <script>
+      (function () {
+        var modal = document.getElementById('proof-preview-modal');
+        var frame = document.getElementById('proof-preview-frame');
+        var newTabLink = document.getElementById('proof-preview-new-tab');
+        if (!modal || !frame || !newTabLink || !window.jQuery) {
+          return;
+        }
+        jQuery(document).on('click', 'a.js-proof-preview', function (event) {
+          if (event.which !== 1 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) {
+            return;
+          }
+          event.preventDefault();
+          frame.src = this.href;
+          newTabLink.href = this.href;
+          jQuery(modal).modal('show');
+        });
+        jQuery(modal).on('hidden.bs.modal', function () {
+          frame.src = 'about:blank';
+          newTabLink.href = '#';
+        });
+      }());
+    </script>
     <?php if (isset($js_file)) { ?>
     <?php foreach($js_file as $file): ?>
       <script src="<?php echo $file; ?>"></script>

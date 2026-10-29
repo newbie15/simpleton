@@ -62,6 +62,55 @@ $create_values = array_merge(array(
 <style>
 	.voucher-field-error:empty { display: none; }
 	.voucher-form-error-summary { margin-bottom: 0; }
+	.voucher-actions {
+		display: flex;
+		align-items: flex-start;
+		gap: 4px;
+		white-space: nowrap;
+	}
+	.voucher-actions details > summary {
+		list-style: none;
+		cursor: pointer;
+	}
+	.voucher-actions details > summary::-webkit-details-marker {
+		display: none;
+	}
+	.voucher-actions form {
+		margin: 0;
+	}
+	.voucher-npk-filter {
+		display: flex;
+		align-items: center;
+		flex-wrap: wrap;
+		gap: 8px;
+		margin-bottom: 12px;
+	}
+	.voucher-npk-filter .form-group {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		margin: 0;
+	}
+	.voucher-npk-filter label {
+		margin: 0;
+		white-space: nowrap;
+	}
+	.voucher-npk-filter .easy-autocomplete {
+		width: 320px !important;
+		max-width: 100%;
+	}
+	.voucher-npk-filter .easy-autocomplete input {
+		width: 100%;
+	}
+	@media (max-width: 767px) {
+		.voucher-npk-filter .form-group {
+			flex-wrap: wrap;
+			flex: 1 1 100%;
+		}
+		.voucher-npk-filter .easy-autocomplete {
+			flex: 1 1 100%;
+		}
+	}
 </style>
 
 <?php if ($can_manage) { ?>
@@ -224,9 +273,10 @@ $create_values = array_merge(array(
 						</td>
 						<?php if ($can_manage) { ?>
 							<td>
-								<a class="btn btn-xs btn-info" href="<?php echo site_url('main/voucher/coupons/'.(int) $voucher->id); ?>">Kupon serial</a>
-								<details<?php echo count($row_form_errors) > 0 ? ' open' : ''; ?>>
-									<summary>Edit</summary>
+								<div class="voucher-actions">
+									<a class="btn btn-xs btn-info" href="<?php echo site_url('main/voucher/coupons/'.(int) $voucher->id); ?>"><i class="fa fa-ticket" aria-hidden="true"></i> Serial</a>
+									<details<?php echo count($row_form_errors) > 0 ? ' open' : ''; ?>>
+									<summary class="btn btn-xs btn-primary"><i class="fa fa-pencil" aria-hidden="true"></i> Edit</summary>
 									<form method="post" action="<?php echo site_url('main/voucher/save/'.(int) $voucher->id); ?>" style="min-width:280px;padding-top:8px;" data-voucher-form novalidate>
 										<div class="alert alert-danger voucher-form-error-summary" role="alert" style="display:none;"></div>
 										<div class="form-group<?php echo isset($row_form_errors['kode']) ? ' has-error' : ''; ?>">
@@ -280,12 +330,14 @@ $create_values = array_merge(array(
 										</div>
 										<button class="btn btn-primary btn-xs" type="submit">Simpan perubahan</button>
 									</form>
-								</details>
-								<form method="post" action="<?php echo site_url('main/voucher/toggle/'.(int) $voucher->id); ?>" style="margin-top:8px;">
+									</details>
+									<form method="post" action="<?php echo site_url('main/voucher/toggle/'.(int) $voucher->id); ?>">
 									<button class="btn btn-xs <?php echo (int) $voucher->is_active ? 'btn-warning' : 'btn-success'; ?>" type="submit">
+										<i class="fa <?php echo (int) $voucher->is_active ? 'fa-ban' : 'fa-check'; ?>" aria-hidden="true"></i>
 										<?php echo (int) $voucher->is_active ? 'Nonaktifkan' : 'Aktifkan'; ?>
 									</button>
-								</form>
+									</form>
+								</div>
 							</td>
 						<?php } ?>
 					</tr>
@@ -314,10 +366,10 @@ $create_values = array_merge(array(
 <div class="box box-default">
 	<div class="box-header with-border"><h3 class="box-title">Riwayat Penggunaan Voucher</h3></div>
 	<div class="box-body table-responsive">
-		<form id="voucher-npk-filter" class="form-inline" style="margin-bottom:12px;">
+		<form id="voucher-npk-filter" class="voucher-npk-filter">
 			<div class="form-group">
 				<label for="voucher-npk">Cari berdasarkan NPK pembeli&nbsp;</label>
-				<input id="voucher-npk" class="form-control" type="search" maxlength="32" placeholder="Masukkan NPK">
+				<input id="voucher-npk" class="form-control" type="search" maxlength="200" placeholder="Ketik nama atau NPK karyawan" autocomplete="off">
 			</div>
 			<button class="btn btn-primary" type="submit">Cari</button>
 			<button class="btn btn-default" id="voucher-npk-reset" type="button">Reset</button>
