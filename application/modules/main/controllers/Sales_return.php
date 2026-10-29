@@ -53,19 +53,6 @@ class Sales_return extends CI_Controller
 				", array($nota))->result();
 			}
 		}
-		$data['returns'] = $this->db->query("
-			SELECT return_header.id, return_header.nomor_retur, return_header.nota_penjualan,
-				return_header.tgl_retur, return_header.total_retur, return_header.id_user,
-				return_header.status, return_header.rejection_reason,
-				return_header.approved_by, return_header.rejected_by,
-				COUNT(return_item.id) AS item_count
-			FROM retur_penjualan return_header
-			LEFT JOIN retur_penjualan_items return_item ON return_item.retur_id = return_header.id
-			WHERE return_header.status IN ('pending', 'approved', 'rejected', 'completed')
-			GROUP BY return_header.id
-			ORDER BY return_header.id DESC
-			LIMIT 50
-		")->result();
 		$data['notice'] = $this->session->flashdata('sales_return_notice');
 		$data['error'] = $this->session->flashdata('sales_return_error');
 		$data['form_token'] = $this->_form_token();
@@ -73,7 +60,150 @@ class Sales_return extends CI_Controller
 		$data['judul_besar'] = 'Retur Penjualan';
 		$data['judul_kecil'] = 'Pengajuan retur menunggu persetujuan manager';
 		$data['m_sales_return'] = TRUE;
+		$data['css_file'] = array(
+			base_url('assets/adminlte/plugins/datatables/dataTables.bootstrap.css')
+		);
+		$data['js_file'] = array(
+			base_url('assets/adminlte/plugins/datatables/jquery.dataTables.min.js'),
+			base_url('assets/adminlte/plugins/datatables/dataTables.bootstrap.min.js'),
+			base_url('assets/purchasing/sales_return.js?v=20261029-server-side')
+		);
 		$data['output'] = $this->load->view('sales_return', $data, TRUE);
+		$this->load->view('welcome_message', $data);
+	}
+
+	public function returns_data()
+	{
+		if ($this->input->method(TRUE) !== 'GET') {
+			show_error('Metode permintaan tidak diizinkan.', 405);
+		}
+
+		$draw = $this->_datatable_integer($this->input->get('draw'), 0, 0, 2147483647);
+		$start = $this->_datatable_integer($this->input->get('start'), 0, 0, 10000000);
+		$length = $this->_datatable_integer($this->input->get('length'), 25, 1, 100);
+		$search_data = $this->input->get('search');
+		$search = is_array($search_data) && isset($search_data['value']) &&
+			is_string($search_data['value']) ? substr(trim($search_data['value']), 0, 100) : '';
+		$order_data = $this->input->get('order');
+		$order_column = is_array($order_data) && isset($order_data[0]) &&
+			is_array($order_data[0]) && isset($order_data[0]['column'])
+			? $this->_datatable_integer($order_data[0]['column'], 0, 0, 7)
+			: 0;
+		$order_direction = is_array($order_data) && isset($order_data[0]) &&
+			is_array($order_data[0]) && isset($order_data[0]['dir']) &&
+			is_string($order_data[0]['dir']) && strtolower($order_data[0]['dir']) === 'asc'
+			? 'ASC'
+			: 'DESC';
+
+		$base_where = " WHERE return_header.status IN ('pending', 'approved', 'rejected', 'completed')";
+		$total = $this->db->query(
+			'SELECT COUNT(*) AS total FROM retur_penjualan return_header'.$base_where
+		)->row();
+		$search_sql = '';
+		$params = array();
+		if ($search !== '') {
+			$search_columns = array(
+				'return_header.nomor_retur',
+				'return_header.nota_penjualan',
+				'return_header.tgl_retur',
+				'return_header.id_user',
+				'return_header.status',
+				'return_header.rejection_reason',
+				'return_header.approved_by',
+				'return_header.rejected_by'
+			);
+			$search_sql = ' AND ('.implode(' LIKE ? OR ', $search_columns).' LIKE ?)';
+			foreach ($search_columns as $column) {
+				$params[] = '%'.$search.'%';
+			}
+		}
+		$filtered = $search === ''
+			? $total
+			: $this->db->query(
+				'SELECT COUNT(*) AS total FROM retur_penjualan return_header'.$base_where.$search_sql,
+				$params
+			)->row();
+
+		$order_columns = array(
+			0 => 'return_header.nomor_retur',
+			1 => 'return_header.nota_penjualan',
+			2 => 'return_header.tgl_retur',
+			3 => 'return_header.id',
+			4 => 'return_header.total_retur',
+			5 => 'return_header.id_user',
+			6 => 'return_header.status'
+		);
+		$order_by = isset($order_columns[$order_column])
+			? $order_columns[$order_column]
+			: 'return_header.id';
+		$rows = $this->db->query("
+			SELECT return_header.id, return_header.nomor_retur, return_header.nota_penjualan,
+				return_header.tgl_retur, return_header.total_retur, return_header.id_user,
+				return_header.status, return_header.rejection_reason,
+				return_header.approved_by, return_header.rejected_by,
+				(SELECT COUNT(*) FROM retur_penjualan_items return_item
+					WHERE return_item.retur_id = return_header.id) AS item_count
+			FROM retur_penjualan return_header
+			".$base_where.$search_sql."
+			ORDER BY ".$order_by.' '.$order_direction.', return_header.id DESC'.
+			' LIMIT '.$length.' OFFSET '.$start,
+			$params
+		)->result();
+
+		$data = array();
+		foreach ($rows as $return) {
+			$data[] = array(
+				'id' => (int) $return->id,
+				'nomor_retur' => $return->nomor_retur,
+				'nota_penjualan' => $return->nota_penjualan,
+				'tgl_retur' => $return->tgl_retur,
+				'item_count' => (int) $return->item_count,
+				'total_retur' => (float) $return->total_retur,
+				'id_user' => $return->id_user,
+				'status' => $return->status,
+				'rejection_reason' => $return->rejection_reason,
+				'approved_by' => $return->approved_by,
+				'rejected_by' => $return->rejected_by,
+				'action_html' => $this->_return_action_html($return)
+			);
+		}
+		$this->output
+			->set_content_type('application/json', 'utf-8')
+			->set_header('Cache-Control: no-store, private')
+			->set_output(json_encode(array(
+				'draw' => $draw,
+				'recordsTotal' => (int) $total->total,
+				'recordsFiltered' => (int) $filtered->total,
+				'data' => $data
+			)));
+	}
+
+	public function view($return_id = NULL)
+	{
+		if (!$this->_is_positive_integer($return_id)) {
+			show_404();
+		}
+		$return = $this->db->get_where('retur_penjualan', array('id' => (int) $return_id))->row();
+		if (!$return) {
+			show_404();
+		}
+		$items = $this->db->query("
+			SELECT return_item.barcode, stock.nama AS product_name,
+				return_item.qty_retur, return_item.harga_satuan, return_item.subtotal,
+				return_item.kondisi, return_item.kembali_ke_stok
+			FROM retur_penjualan_items return_item
+			LEFT JOIN stok stock ON stock.barcode = return_item.barcode
+			WHERE return_item.retur_id = ?
+			ORDER BY return_item.id ASC
+		", array((int) $return_id))->result();
+		$data = array(
+			'return' => $return,
+			'items' => $items,
+			'judul_besar' => 'Detail retur penjualan',
+			'judul_kecil' => $return->nomor_retur,
+			'm_sales_return' => TRUE
+		);
+		$data['output'] = $this->load->view('sales_return_view', $data, TRUE);
 		$this->load->view('welcome_message', $data);
 	}
 
@@ -449,6 +579,46 @@ class Sales_return extends CI_Controller
 	{
 		return (is_string($value) || is_numeric($value)) &&
 			preg_match('/^[1-9][0-9]*$/', (string) $value);
+	}
+
+	private function _datatable_integer($value, $default, $minimum, $maximum)
+	{
+		if (!is_string($value) && !is_int($value)) {
+			return $default;
+		}
+		$value = (string) $value;
+		if (!ctype_digit($value)) {
+			return $default;
+		}
+		return max($minimum, min($maximum, (int) $value));
+	}
+
+	private function _return_action_html($return)
+	{
+		$view_url = site_url('main/sales_return/view/'.(int) $return->id);
+		$view_button = '<a class="btn btn-xs btn-info" href="'.html_escape($view_url).'"><i class="fa fa-eye" aria-hidden="true"></i> Lihat</a>';
+		if ($return->status === 'pending' && $this->_is_manager()) {
+			$token = html_escape($this->_form_token());
+			$id = (int) $return->id;
+			$approve_url = site_url('main/sales_return/approve/'.$id);
+			$reject_url = site_url('main/sales_return/reject/'.$id);
+			return $view_button.'<div style="margin-top:5px"></div><form method="post" action="'.html_escape($approve_url).'" style="margin-bottom:5px;" onsubmit="return window.confirm(\'Setujui retur ini? Stok dan jurnal akan diperbarui.\');">'.
+				'<input type="hidden" name="form_token" value="'.$token.'">'.
+				'<button class="btn btn-xs btn-success" type="submit">Setujui</button></form>'.
+				'<form method="post" action="'.html_escape($reject_url).'">'.
+				'<input type="hidden" name="form_token" value="'.$token.'">'.
+				'<div class="input-group input-group-sm"><input class="form-control" name="rejection_reason" maxlength="500" placeholder="Alasan penolakan" required><span class="input-group-btn"><button class="btn btn-danger" type="submit">Tolak</button></span></div></form>';
+		}
+		if ($return->status === 'pending') {
+			return $view_button.'<div style="margin-top:5px"></div><span class="text-muted">Menunggu manager</span>';
+		}
+		if ($return->approved_by) {
+			return $view_button.'<br><small>Disetujui oleh '.html_escape($return->approved_by).'</small>';
+		}
+		if ($return->rejected_by) {
+			return $view_button.'<br><small>Ditolak oleh '.html_escape($return->rejected_by).'</small>';
+		}
+		return $view_button;
 	}
 
 	private function _is_manager()

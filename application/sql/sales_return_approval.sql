@@ -17,6 +17,34 @@ PREPARE sales_return_stmt FROM @sales_return_sql;
 EXECUTE sales_return_stmt;
 DEALLOCATE PREPARE sales_return_stmt;
 
+SET @sales_return_date_index_exists = (
+	SELECT COUNT(1) FROM INFORMATION_SCHEMA.STATISTICS
+	WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'retur_penjualan'
+		AND INDEX_NAME = 'idx_retur_tanggal_id'
+);
+SET @sales_return_sql = IF(
+	@sales_return_date_index_exists = 0,
+	'CREATE INDEX `idx_retur_tanggal_id` ON `retur_penjualan` (`tgl_retur`, `id`)',
+	'SELECT 1'
+);
+PREPARE sales_return_stmt FROM @sales_return_sql;
+EXECUTE sales_return_stmt;
+DEALLOCATE PREPARE sales_return_stmt;
+
+SET @sales_return_status_index_exists = (
+	SELECT COUNT(1) FROM INFORMATION_SCHEMA.STATISTICS
+	WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'retur_penjualan'
+		AND INDEX_NAME = 'idx_retur_status_id'
+);
+SET @sales_return_sql = IF(
+	@sales_return_status_index_exists = 0,
+	'CREATE INDEX `idx_retur_status_id` ON `retur_penjualan` (`status`, `id`)',
+	'SELECT 1'
+);
+PREPARE sales_return_stmt FROM @sales_return_sql;
+EXECUTE sales_return_stmt;
+DEALLOCATE PREPARE sales_return_stmt;
+
 SET @sales_return_approved_at_exists = (
 	SELECT COUNT(1) FROM INFORMATION_SCHEMA.COLUMNS
 	WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'retur_penjualan'

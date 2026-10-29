@@ -101,47 +101,12 @@
 <?php } ?>
 
 <div class="box box-default">
-	<div class="box-header with-border"><h3 class="box-title">Riwayat Retur Terbaru</h3></div>
+	<div class="box-header with-border"><h3 class="box-title">Riwayat Retur Penjualan</h3></div>
 	<div class="box-body table-responsive">
-		<table class="table table-bordered table-striped">
+		<table id="sales-return-history" class="table table-bordered table-striped"
+			data-source="<?php echo html_escape(site_url('main/sales_return/returns_data')); ?>">
 			<thead><tr><th>No. Retur</th><th>No. Nota</th><th>Tanggal</th><th>Item</th><th>Total</th><th>Pengaju</th><th>Status / keputusan</th><th>Aksi</th></tr></thead>
-			<tbody>
-				<?php foreach ($returns as $return) { ?>
-					<tr>
-						<td><?php echo html_escape($return->nomor_retur); ?></td>
-						<td><?php echo html_escape($return->nota_penjualan); ?></td>
-						<td><?php echo html_escape($return->tgl_retur); ?></td>
-						<td><?php echo (int) $return->item_count; ?></td>
-						<td>Rp <?php echo number_format((float) $return->total_retur, 0, ',', '.'); ?></td>
-						<td><?php echo html_escape($return->id_user); ?></td>
-						<td>
-							<?php echo html_escape(ucfirst($return->status === 'completed' ? 'approved' : $return->status)); ?>
-							<?php if ($return->status === 'rejected' && $return->rejection_reason) { ?><br><small><?php echo html_escape($return->rejection_reason); ?></small><?php } ?>
-						</td>
-						<td>
-							<?php if ($return->status === 'pending' && $is_manager) { ?>
-								<form method="post" action="<?php echo site_url('main/sales_return/approve/'.(int) $return->id); ?>" style="margin-bottom:5px;" onsubmit="return window.confirm('Setujui retur ini? Stok dan jurnal akan diperbarui.');">
-									<input type="hidden" name="form_token" value="<?php echo html_escape($form_token); ?>">
-									<button class="btn btn-xs btn-success" type="submit">Setujui</button>
-								</form>
-								<form method="post" action="<?php echo site_url('main/sales_return/reject/'.(int) $return->id); ?>">
-									<input type="hidden" name="form_token" value="<?php echo html_escape($form_token); ?>">
-									<div class="input-group input-group-sm"><input class="form-control" name="rejection_reason" maxlength="500" placeholder="Alasan penolakan" required><span class="input-group-btn"><button class="btn btn-danger" type="submit">Tolak</button></span></div>
-								</form>
-							<?php } elseif ($return->status === 'pending') { ?>
-								<span class="text-muted">Menunggu manager</span>
-							<?php } elseif ($return->approved_by) { ?>
-								<small>Disetujui oleh <?php echo html_escape($return->approved_by); ?></small>
-							<?php } elseif ($return->rejected_by) { ?>
-								<small>Ditolak oleh <?php echo html_escape($return->rejected_by); ?></small>
-							<?php } ?>
-						</td>
-					</tr>
-				<?php } ?>
-				<?php if (count($returns) === 0) { ?>
-					<tr><td colspan="8" class="text-center">Belum ada retur penjualan.</td></tr>
-				<?php } ?>
-			</tbody>
+			<tbody></tbody>
 		</table>
 	</div>
 </div>
