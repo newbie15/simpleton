@@ -515,7 +515,21 @@ class Petty_cash extends CI_Controller
 			$outstanding = $supplier_receipt
 				? $this->_receipt_outstanding((int) $supplier_receipt->id, TRUE, (int) $transaction->id)
 				: FALSE;
-			$fund_balance = $this->_fund_balance((int) $fund->id, $transaction->transaction_date);
+			$payment_source_account = $fund_account;
+			$payment_source_balance = $this->_fund_balance((int) $fund->id, $transaction->transaction_date);
+			if (!empty($transaction->funding_source_account_id)) {
+				$payment_source_account = $this->db->query(
+					'SELECT * FROM acc_accounts WHERE id = ? AND is_active = 1 AND type = ? AND normal_balance = ? FOR UPDATE',
+					array((int) $transaction->funding_source_account_id, 'asset', 'debit')
+				)->row();
+				if ($payment_source_account &&
+					!in_array($payment_source_account->code, array('1101', '1102', '1106', '1107'), TRUE)) {
+					$payment_source_account = NULL;
+				}
+				$payment_source_balance = $payment_source_account
+					? $this->_account_balance((int) $payment_source_account->id, $transaction->transaction_date)
+					: FALSE;
+			}
 			$payable = $this->db->where('code', '2101')
 				->where('is_active', 1)
 				->where('type', 'liability')
@@ -523,17 +537,18 @@ class Petty_cash extends CI_Controller
 				->get('acc_accounts')->row();
 			if (!$supplier_receipt || $outstanding === FALSE ||
 				$outstanding + 0.0001 < (float) $transaction->amount ||
-				$fund_balance === FALSE ||
-				$fund_balance + 0.0001 < (float) $transaction->amount || !$payable) {
+				$payment_source_balance === FALSE ||
+				$payment_source_balance + 0.0001 < (float) $transaction->amount ||
+				!$payment_source_account || !$payable) {
 				$this->db->trans_rollback();
 				$this->db->db_debug = $previous_db_debug;
-				$this->_message('Hutang supplier atau saldo dana tidak mencukupi untuk pembayaran ini.', FALSE);
+				$this->_message('Hutang supplier atau saldo akun sumber tidak mencukupi untuk pembayaran ini.', FALSE);
 				return;
 			}
 			$lines = array(
 				array('account' => '2101', 'debit' => $transaction->amount, 'credit' => 0,
 					'memo' => 'Pembayaran supplier '.$transaction->counterparty.' '.$supplier_receipt->receipt_number),
-				array('account' => $fund_account_code, 'debit' => 0, 'credit' => $transaction->amount,
+				array('account' => $payment_source_account->code, 'debit' => 0, 'credit' => $transaction->amount,
 					'memo' => 'Kas dibayarkan ke supplier '.$transaction->counterparty)
 			);
 		}
@@ -703,12 +718,32 @@ class Petty_cash extends CI_Controller
 		if (!is_file($path) || !is_readable($path)) {
 			show_error('File bukti transaksi kas tidak ditemukan.', 404);
 		}
-		$this->load->helper('download');
 		$file_data = file_get_contents($path);
 		if ($file_data === FALSE) {
 			show_error('File bukti transaksi kas tidak dapat dibaca.', 500);
 		}
-		force_download('bukti-'.$transaction->transaction_number.'-'.basename($path), $file_data);
+		$file_info = finfo_open(FILEINFO_MIME_TYPE);
+		$mime_type = $file_info ? finfo_file($file_info, $path) : FALSE;
+		if ($file_info) {
+			finfo_close($file_info);
+		}
+		if (!in_array($mime_type, array('application/pdf', 'image/jpeg', 'image/png'), TRUE)) {
+			show_error('Format file bukti transaksi kas tidak didukung untuk ditampilkan.', 415);
+		}
+		$extension = $mime_type === 'application/pdf' ? 'pdf' :
+			($mime_type === 'image/png' ? 'png' : 'jpg');
+		$filename = 'bukti-'.preg_replace('/[^A-Za-z0-9_-]/', '', $transaction->transaction_number).'.'.$extension;
+		$this->output
+			->set_content_type($mime_type)
+			->set_header('Content-Disposition: inline; filename="'.$filename.'"')
+			->set_header('X-Content-Type-Options: nosniff')
+			->set_header('Cache-Control: private, no-store, max-age=0')
+			->set_output($file_data);
+	}
+
+	public function proof_file($transaction_id = NULL)
+	{
+		$this->proof($transaction_id);
 	}
 
 	private function _save_proof()

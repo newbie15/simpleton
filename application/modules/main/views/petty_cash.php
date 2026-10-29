@@ -281,7 +281,7 @@
 							<?php echo html_escape($transaction->counterparty ? $transaction->counterparty.' — ' : ''); ?>
 							<?php echo html_escape($transaction->description); ?><br>
 							Bukti: <?php echo html_escape($transaction->evidence_reference); ?>
-							<?php if ($transaction->proof_filename) { ?><br><a href="<?php echo site_url('main/petty_cash/proof/'.(int) $transaction->id); ?>">Lihat lampiran</a><?php } ?>
+							<?php if ($transaction->proof_filename) { ?><br><a href="<?php echo site_url('main/petty_cash/proof/'.(int) $transaction->id); ?>" class="js-proof-preview">Lihat lampiran</a><?php } ?>
 						</td>
 						<td><?php echo html_escape($transaction->creator_name); ?><br>
 							<?php

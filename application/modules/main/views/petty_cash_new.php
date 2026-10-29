@@ -175,7 +175,7 @@ foreach ($funds as $fund) {
 							<?php echo html_escape($transaction->transaction_date.' · '.(isset($transaction_type_labels[$transaction->transaction_type]) ? $transaction_type_labels[$transaction->transaction_type] : $transaction->transaction_type)); ?>
 							<span class="pull-right"><?php echo $format_rupiah($transaction->amount); ?></span><br>
 							<?php echo html_escape($transaction->description); ?><br>
-							<small>Oleh <?php echo html_escape($transaction->creator_name); ?> · Bukti <?php echo html_escape($transaction->evidence_reference); ?><?php if ($transaction->proof_filename) { ?> · <a href="<?php echo site_url('main/petty_cash/proof/'.(int) $transaction->id); ?>">Lihat lampiran</a><?php } ?></small>
+							<small>Oleh <?php echo html_escape($transaction->creator_name); ?> · Bukti <?php echo html_escape($transaction->evidence_reference); ?><?php if ($transaction->proof_filename) { ?> · <a href="<?php echo site_url('main/petty_cash/proof/'.(int) $transaction->id); ?>" class="js-proof-preview">Lihat lampiran</a><?php } ?></small>
 							<?php if ($transaction->status === 'rejected' && $transaction->rejection_reason) { ?><p class="text-danger"><?php echo html_escape($transaction->rejection_reason); ?></p><?php } ?>
 							<?php if ($is_approver && $transaction->status === 'pending' && (string) $transaction->created_by !== (string) $this->ion_auth->get_user_id()) { ?>
 								<hr>

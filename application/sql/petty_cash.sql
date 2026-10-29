@@ -48,7 +48,9 @@ CREATE TABLE IF NOT EXISTS `acc_cash_transactions` (
   UNIQUE KEY `idx_acc_cash_transaction_journal` (`journal_id`),
   KEY `idx_acc_cash_transaction_fund_date` (`fund_id`,`transaction_date`,`status`),
   KEY `idx_acc_cash_transaction_status_date` (`status`,`transaction_date`),
-  KEY `idx_acc_cash_transaction_receipt` (`goods_receipt_id`,`status`)
+  KEY `idx_acc_cash_transaction_receipt` (`goods_receipt_id`,`status`),
+  KEY `idx_acc_cash_transaction_type_date` (`transaction_type`,`transaction_date`,`id`),
+  KEY `idx_acc_cash_transaction_receipt_type_status` (`goods_receipt_id`,`transaction_type`,`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 CREATE TABLE IF NOT EXISTS `acc_cash_closings` (
@@ -71,3 +73,31 @@ INSERT IGNORE INTO `acc_cash_funds`
    `imprest_limit`, `is_active`, `created_at`, `created_by`)
 VALUES
   ('CASH-POS', 'Laci Kasir POS', 'cashier', 'cashier', NULL, '0.00', 1, NOW(), 'system');
+
+SET @cash_type_date_index_exists = (
+  SELECT COUNT(1) FROM INFORMATION_SCHEMA.STATISTICS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'acc_cash_transactions'
+    AND INDEX_NAME = 'idx_acc_cash_transaction_type_date'
+);
+SET @petty_cash_sql = IF(
+  @cash_type_date_index_exists = 0,
+  'CREATE INDEX `idx_acc_cash_transaction_type_date` ON `acc_cash_transactions` (`transaction_type`, `transaction_date`, `id`)',
+  'SELECT 1'
+);
+PREPARE petty_cash_stmt FROM @petty_cash_sql;
+EXECUTE petty_cash_stmt;
+DEALLOCATE PREPARE petty_cash_stmt;
+
+SET @cash_receipt_type_status_index_exists = (
+  SELECT COUNT(1) FROM INFORMATION_SCHEMA.STATISTICS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'acc_cash_transactions'
+    AND INDEX_NAME = 'idx_acc_cash_transaction_receipt_type_status'
+);
+SET @petty_cash_sql = IF(
+  @cash_receipt_type_status_index_exists = 0,
+  'CREATE INDEX `idx_acc_cash_transaction_receipt_type_status` ON `acc_cash_transactions` (`goods_receipt_id`, `transaction_type`, `status`)',
+  'SELECT 1'
+);
+PREPARE petty_cash_stmt FROM @petty_cash_sql;
+EXECUTE petty_cash_stmt;
+DEALLOCATE PREPARE petty_cash_stmt;
