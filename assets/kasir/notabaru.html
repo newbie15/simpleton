@@ -33,13 +33,14 @@
     <tr>
       <td style="vertical-align: top;">QTY<br></td>
       <td style="vertical-align: top; text-align: center;">NAMA<br></td>
-      <td style="vertical-align: top; text-align: right;">HARGA<br></td>
+      <td style="vertical-align: top; text-align: right;">HARGA incl. PPN<br></td>
       <td style="vertical-align: top; text-align: right;">JUMLAH<br></td>
     </tr>
     <tbody id="cart"></tbody>
 
     <tr><td colspan="4" rowspan="1">&nbsp;</td></tr>
-    <tr><td colspan="4" rowspan="1">PPN 10% : <span id="ppnx">Rp x.xxx.xxx</span></td></tr>
+    <tr><td colspan="4" rowspan="1">DPP : <span id="dppx">Rp 0</span></td></tr>
+    <tr><td colspan="4" rowspan="1">PPN : <span id="ppnx">Rp 0</span></td></tr>
     <tr><td colspan="4" rowspan="1"></td></tr>
     <tr>
       <!-- <td colspan="4" rowspan="1">Tanda Terima</td> -->
@@ -107,8 +108,9 @@
     // alert();
     var shtml = "";
     var total = 0;
+    var dppTotal = 0;
     var pajak = 0;
-    var buff = 0;
+    var ppnRate = Number(window.ppnRate) || 11;
     var res;
 
     $.ajax({
@@ -148,10 +150,12 @@
       //   <td style="vertical-align: top; text-align: right;">'+ (element[2]*element[3]).toLocaleString() +'</td>\
       // </tr>\
       // ';
-      buff = (element[2] * element[3]);
-
-      total+= buff + (buff * element[5]);
-      pajak+= (buff * element[5]);
+      var unitGross = Number(element[2]) || 0;
+      var quantity = Number(element[3]) || 0;
+      var unitDpp = Math.round(unitGross * 100 / (100 + ppnRate));
+      total += unitGross * quantity;
+      dppTotal += unitDpp * quantity;
+      pajak += (unitGross - unitDpp) * quantity;
     });
 
     // $("#cart").html(shtml);
@@ -176,7 +180,8 @@
       $("#receipt-change").text("Rp " + Number(window.kembalian || 0).toLocaleString("id-ID"));
       $("#receipt-cash-row").show();
     }
-    $("#ppnx").html("Rp "+pajak.toLocaleString("id-ID"));
+    $("#dppx").text("Rp " + dppTotal.toLocaleString("id-ID"));
+    $("#ppnx").text("Rp " + pajak.toLocaleString("id-ID"));
     var date = new Date();
     var d = date.getDate();
     var m = date.getMonth() + 1;

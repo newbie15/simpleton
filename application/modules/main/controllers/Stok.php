@@ -15,6 +15,9 @@ class Stok extends CI_Controller
 	{
 		$crud = new grocery_CRUD();
 		$crud->set_table('stok');
+		$crud->display_as('harga', 'Harga jual (sudah termasuk PPN)');
+		$crud->unset_columns('ppn');
+		$crud->unset_fields('ppn');
 		$data = $crud->render();
 		$data->judul_besar = 'Stok';
 		$data->judul_kecil = 'Lihat dan kelola stok barang';

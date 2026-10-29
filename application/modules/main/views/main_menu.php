@@ -16,6 +16,7 @@ $back_end_items = array(
 	array('vouchers', 'Voucher', 'main/voucher', 'fa-ticket', isset($m_vouchers)),
 	array('sales_return', 'Retur Penjualan', 'main/sales_return', 'fa-reply', isset($m_sales_return)),
 	array('accounting', 'Tagihan & Validasi', 'main/sales_billing', 'fa-check-circle', isset($m_sales_billing)),
+	array('accounting', 'Pengaturan PPN', 'main/vat_settings', 'fa-percent', isset($m_vat_settings)),
 	array('supplier_return', 'Retur Supplier', 'main/supplier_return', 'fa-reply-all', isset($m_supplier_return)),
 	array('accounting', 'Buku Akun (Gnucash-style)', 'main/accounting_book', 'fa-sitemap', isset($m_accounting_book)),
 	array('accounting', 'Accounting V3 — Spreadsheet', 'main/accounting_grid', 'fa-table', isset($m_accounting_grid)),

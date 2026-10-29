@@ -7,17 +7,6 @@ $(document).ready(function(){
     var limit;
     var totl;
     var show;
-    var pajak_active = window.localStorage.getItem("simpleton_pajak_active") === "true";
-    $("#pajak-active").prop("checked", pajak_active).on("change", function () {
-        if (dx.length > 0) {
-            alert("Kosongkan keranjang atau mulai transaksi baru sebelum mengubah status pajak.");
-            $(this).prop("checked", pajak_active);
-            return;
-        }
-        pajak_active = this.checked;
-        window.localStorage.setItem("simpleton_pajak_active", pajak_active ? "true" : "false");
-        window.location.reload();
-    });
 
     function check_limit_belanja(n){
         $("#limit").load("http://localhost/simpleton/index.php/main/ajax/limit_belanja/" + n, function(response, status, xhr) {
@@ -86,20 +75,9 @@ $(document).ready(function(){
 
     function updatettl(){
         var total = 0;
-        if (pajak_active) {
-            var pajek = 0;
-            var pjk;
-            dx.forEach(element => {
-                console.log(element);
-                pjk = ((parseFloat(element[2]) * parseFloat(element[3]) * parseFloat(element[5])));
-                total += (parseFloat(element[2]) * parseFloat(element[3])) + pjk;
-                pajek += pjk;
-            });
-        }else{
-            dx.forEach(element => {
-                total += element[2] * element[3];
-            });
-        }
+        dx.forEach(element => {
+            total += element[2] * element[3];
+        });
         $("#ttx").html("Total Rp " + formatRupiah(Math.round(total)));
         // $("#ttx").html("Total Rp " + pajek.toLocaleString());
         totl = total;
@@ -236,7 +214,7 @@ $(document).ready(function(){
     function add(kode,kuantiti){
         var sama = 0;
         var index = 0;
-        var len, ln, last, pajak;
+        var len, ln, last;
         dx.forEach(element => {
             // console.log(element[0]);
             if (kode == element[0]){
@@ -269,23 +247,11 @@ $(document).ready(function(){
 
                         var nama = data[0] || "";
                         var hargaStr = (data[1] || "").trim();
-                        var ppnStr = (data[2] || "").trim();
-
-                        // Validate numeric values
                         var harga = parseFloat(hargaStr);
                         if (isNaN(harga) || harga <= 0) {
                             console.log("Invalid harga: " + hargaStr);
                             alert("Harga barang tidak valid. Hubungi admin.");
                             return;
-                        }
-
-                        if (pajak_active) {
-                            var ppn = parseFloat(ppnStr);
-                            if (isNaN(ppn) || ppn < 0) {
-                                console.log("Invalid ppn: " + ppnStr);
-                                alert("PPN barang tidak valid. Hubungi admin.");
-                                return;
-                            }
                         }
 
                         var exist = $("#cart-list").html();
@@ -303,12 +269,7 @@ $(document).ready(function(){
                         len = dx.length;
                         ln = len + 1;
                         last = '=C' + ln + '*D' + ln;
-                        if(pajak_active){
-                            pajak = '=E' +ln + '*F' + ln;
-                            dx.push([kode, nama, harga, kuantiti, last, ppn, pajak]);
-                        }else{
-                            dx.push([kode, nama, harga, kuantiti, last]);
-                        }
+                        dx.push([kode, nama, harga, kuantiti, last]);
                         console.log(dx);
                         $('#my').jexcel('setData', dx, true);
                         updatettl();
@@ -438,14 +399,8 @@ $(document).ready(function(){
         { type: 'numeric' },
         { type: 'numeric' },
     ];
-    var baseColHeaders = ['kode', 'nama barang', 'harga','kuantiti', 'jumlah'];
+    var baseColHeaders = ['kode', 'nama barang', 'harga incl. PPN','kuantiti', 'jumlah'];
     var baseColWidths = [100, 250, 150, 75, 150];
-
-    if (pajak_active) {
-        baseColumns.push({ type: 'numeric' }, { type: 'numeric' });
-        baseColHeaders.push('ppn', 'pajak');
-        baseColWidths.push(75, 150);
-    }
 
     $('#my').jexcel({
         data: dx,
@@ -714,11 +669,7 @@ $(document).ready(function(){
         var timestamp = (new Date()).getTime();
         var requestId = npk + "-" + timestamp + "-" + Math.floor(Math.random() * 1000000);
         var items = cartRows.map(function (row) {
-            return {
-                barcode: row[0],
-                qty: row[3],
-                ppn: pajak_active ? row[5] : 0
-            };
+            return { barcode: row[0], qty: row[3] };
         });
         return {
             rows: cartRows,
@@ -769,10 +720,8 @@ $(document).ready(function(){
         $("[data-checkout-field]").find("input").prop("disabled", false);
         $("#checkout-retry-notice").hide().text("");
         $("#checkout-modal").modal("hide");
-        var receiptUrl = pajak_active
-            ? "http://localhost/simpleton/assets/kasir/notabaru.html"
-            : "http://localhost/simpleton/assets/kasir/nota.html";
-        receiptUrl += "?v=20261024-short-receipt-number&nota=" + encodeURIComponent(completedCheckout.receiptNo);
+        var receiptUrl = $("#receipt-reprint-url").val() + "?print=1&nota="
+            + encodeURIComponent(completedCheckout.receiptNo);
         var receipt = window.open(receiptUrl, "targetWindow", "toolbar=no,location=no,status=no,menubar=no,scrollbars=yes,resizable=yes,width=250,height=500");
         dx = [];
         $("#my").jexcel("setData", dx, true);
@@ -794,6 +743,7 @@ $(document).ready(function(){
             receipt.no = completedCheckout.receiptNo;
             receipt.nkasir = completedCheckout.cashierName;
             receipt.metodePembayaran = completedCheckout.paymentMethod;
+            receipt.ppnRate = parseFloat($("#ppn-rate").val());
             receipt.totalTagihan = response.data ? response.data.total_tagihan : totl;
             receipt.diskonVoucher = response.data ? response.data.diskon_voucher : 0;
             receipt.kembalian = response.data ? response.data.kembalian : 0;

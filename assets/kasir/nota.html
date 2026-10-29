@@ -34,7 +34,7 @@
     <tr>
       <td style="vertical-align: top;">QTY<br></td>
       <td style="vertical-align: top; text-align: center;">NAMA<br></td>
-      <td style="vertical-align: top; text-align: right;">HARGA<br></td>
+      <td style="vertical-align: top; text-align: right;">HARGA incl. PPN<br></td>
       <td style="vertical-align: top; text-align: right;">JUMLAH<br></td>
     </tr>
     <tbody id="cart"></tbody>
@@ -55,6 +55,8 @@ Rp 65.100<br>
       </td>
     </tr> -->
     <tr><td colspan="4" rowspan="1">&nbsp;</td></tr>
+    <tr><td colspan="4" rowspan="1">DPP : <span id="dppx">Rp 0</span></td></tr>
+    <tr><td colspan="4" rowspan="1">PPN : <span id="ppnx">Rp 0</span></td></tr>
     <tr><td colspan="4" rowspan="1"></td></tr>
     <tr>
       <!-- <td colspan="4" rowspan="1">Tanda Terima</td> -->
@@ -124,6 +126,9 @@ Rp 65.100<br>
     // alert();
     var shtml = "";
     var total = 0;
+    var dppTotal = 0;
+    var ppnTotal = 0;
+    var ppnRate = Number(window.ppnRate) || 11;
     var res;
 
     $.ajax({
@@ -164,7 +169,12 @@ Rp 65.100<br>
       // </tr>\
       // ';
 
-      total+= element[2] * element[3];
+      var unitGross = Number(element[2]) || 0;
+      var quantity = Number(element[3]) || 0;
+      var unitDpp = Math.round(unitGross * 100 / (100 + ppnRate));
+      total += unitGross * quantity;
+      dppTotal += unitDpp * quantity;
+      ppnTotal += (unitGross - unitDpp) * quantity;
 
     });
 
@@ -185,6 +195,8 @@ Rp 65.100<br>
     } else {
       $("#ttlx").text("TOTAL Rp "+receiptTotal.toLocaleString("id-ID"));
     }
+    $("#dppx").text("Rp " + dppTotal.toLocaleString("id-ID"));
+    $("#ppnx").text("Rp " + ppnTotal.toLocaleString("id-ID"));
     if (window.metodePembayaran === "tunai") {
       $("#receipt-cash").text("Rp " + Number(window.nominalBayar || 0).toLocaleString("id-ID"));
       $("#receipt-change").text("Rp " + Number(window.kembalian || 0).toLocaleString("id-ID"));

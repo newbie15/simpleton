@@ -237,7 +237,12 @@ class Ajax extends CI_Controller {
     {
         $nota = $this->input->post('no', TRUE);
         $query = $this->db->query("
-            SELECT penjualan.qty,stok.nama,penjualan.harga,penjualan.jumlah FROM penjualan,stok
+            SELECT penjualan.qty,stok.nama,
+                CASE WHEN penjualan.dpp_satuan IS NOT NULL THEN penjualan.harga
+                    ELSE penjualan.harga * (1 + COALESCE(penjualan.ppn, 0)) END AS harga,
+                CASE WHEN penjualan.dpp_satuan IS NOT NULL THEN penjualan.jumlah
+                    ELSE penjualan.jumlah + penjualan.jumlah * COALESCE(penjualan.ppn, 0) END AS jumlah
+            FROM penjualan,stok
             where penjualan.kode = stok.barcode and
             penjualan.nota = ? order by penjualan.id asc
         ", array($nota));
@@ -274,7 +279,12 @@ class Ajax extends CI_Controller {
         $end = date('Y-m-d', strtotime($date.' +1 day')).' 00:00:00';
         $rows = $this->db->query("
             SELECT sale.nota, sale.id_karyawan AS npk, employee.nama, employee.bagian,
-                sale.kode AS barcode, product.nama AS item, sale.harga, sale.qty, sale.jumlah,
+                sale.kode AS barcode, product.nama AS item,
+                CASE WHEN sale.dpp_satuan IS NOT NULL THEN sale.harga
+                    ELSE sale.harga * (1 + COALESCE(sale.ppn, 0)) END AS harga,
+                sale.qty,
+                CASE WHEN sale.dpp_satuan IS NOT NULL THEN sale.jumlah
+                    ELSE sale.jumlah + sale.jumlah * COALESCE(sale.ppn, 0) END AS jumlah,
                 sale.metode_pembayaran
             FROM penjualan sale
             LEFT JOIN stok product ON product.barcode = sale.kode
@@ -306,14 +316,17 @@ class Ajax extends CI_Controller {
 
         $rows = $this->db->query("
             SELECT DATE(sale.tgl) AS tanggal, sale.nota, sale.id_karyawan AS npk,
-                employee.nama, SUM(sale.jumlah) AS total_transaksi,
+                employee.nama, SUM(CASE WHEN sale.dpp_satuan IS NOT NULL THEN sale.jumlah
+                    ELSE sale.jumlah + sale.jumlah * COALESCE(sale.ppn, 0) END) AS total_transaksi,
                 SUM(COALESCE(approved_return.amount, 0)) AS retur_disetujui,
-                SUM(sale.jumlah - COALESCE(approved_return.amount, 0)) AS tertagih
+                SUM(CASE WHEN sale.dpp_satuan IS NOT NULL THEN sale.jumlah
+                    ELSE sale.jumlah + sale.jumlah * COALESCE(sale.ppn, 0) END -
+                    COALESCE(approved_return.amount, 0)) AS tertagih
             FROM penjualan sale
             LEFT JOIN karyawan employee ON employee.npk = sale.id_karyawan
             LEFT JOIN (
                 SELECT return_item.penjualan_id,
-                    SUM(return_item.harga_satuan * return_item.qty_retur) AS amount
+                    SUM(return_item.subtotal) AS amount
                 FROM retur_penjualan_items return_item
                 JOIN retur_penjualan return_header ON return_header.id = return_item.retur_id
                 WHERE return_header.status IN ('approved', 'completed')
@@ -341,14 +354,17 @@ class Ajax extends CI_Controller {
 
         $rows = $this->db->query("
             SELECT sale.id_karyawan AS npk, employee.nama, employee.bagian,
-                SUM(sale.jumlah) AS total_transaksi,
+                SUM(CASE WHEN sale.dpp_satuan IS NOT NULL THEN sale.jumlah
+                    ELSE sale.jumlah + sale.jumlah * COALESCE(sale.ppn, 0) END) AS total_transaksi,
                 SUM(COALESCE(approved_return.amount, 0)) AS retur_disetujui,
-                SUM(sale.jumlah - COALESCE(approved_return.amount, 0)) AS tertagih
+                SUM(CASE WHEN sale.dpp_satuan IS NOT NULL THEN sale.jumlah
+                    ELSE sale.jumlah + sale.jumlah * COALESCE(sale.ppn, 0) END -
+                    COALESCE(approved_return.amount, 0)) AS tertagih
             FROM penjualan sale
             LEFT JOIN karyawan employee ON employee.npk = sale.id_karyawan
             LEFT JOIN (
                 SELECT return_item.penjualan_id,
-                    SUM(return_item.harga_satuan * return_item.qty_retur) AS amount
+                    SUM(return_item.subtotal) AS amount
                 FROM retur_penjualan_items return_item
                 JOIN retur_penjualan return_header ON return_header.id = return_item.retur_id
                 WHERE return_header.status IN ('approved', 'completed')
@@ -380,7 +396,8 @@ class Ajax extends CI_Controller {
             SELECT DATE_FORMAT(sale.tgl, '%Y-%m') AS periode,
                 COUNT(DISTINCT CONCAT(DATE(sale.tgl), ':', sale.nota)) AS jumlah_transaksi,
                 SUM(sale.qty) AS qty_terjual,
-                SUM(sale.jumlah) AS jumlah_penjualan
+                SUM(CASE WHEN sale.dpp_satuan IS NOT NULL THEN sale.jumlah
+                    ELSE sale.jumlah + sale.jumlah * COALESCE(sale.ppn, 0) END) AS jumlah_penjualan
             FROM penjualan sale
             WHERE sale.tgl >= ? AND sale.tgl < ?
             GROUP BY DATE_FORMAT(sale.tgl, '%Y-%m')
@@ -448,7 +465,12 @@ class Ajax extends CI_Controller {
         $start = $tgl.' 00:00:00';
         $end = date('Y-m-d', strtotime($tgl.' +1 day')).' 00:00:00';
         $query = $this->db->query("
-            SELECT penjualan.nota,karyawan.npk,karyawan.nama,karyawan.bagian,stok.barcode,stok.nama as item,penjualan.harga,penjualan.qty,penjualan.jumlah
+            SELECT penjualan.nota,karyawan.npk,karyawan.nama,karyawan.bagian,stok.barcode,stok.nama as item,
+                CASE WHEN penjualan.dpp_satuan IS NOT NULL THEN penjualan.harga
+                    ELSE penjualan.harga * (1 + COALESCE(penjualan.ppn, 0)) END AS harga,
+                penjualan.qty,
+                CASE WHEN penjualan.dpp_satuan IS NOT NULL THEN penjualan.jumlah
+                    ELSE penjualan.jumlah + penjualan.jumlah * COALESCE(penjualan.ppn, 0) END AS jumlah
             FROM penjualan,stok,karyawan
             WHERE penjualan.kode = stok.barcode AND
             karyawan.npk = penjualan.id_karyawan AND
@@ -529,7 +551,12 @@ class Ajax extends CI_Controller {
         }
 
         $query = $this->db->query("
-            SELECT penjualan.nota,karyawan.npk,karyawan.nama,karyawan.bagian,stok.barcode,stok.nama as item,penjualan.harga,penjualan.qty,penjualan.jumlah
+            SELECT penjualan.nota,karyawan.npk,karyawan.nama,karyawan.bagian,stok.barcode,stok.nama as item,
+                CASE WHEN penjualan.dpp_satuan IS NOT NULL THEN penjualan.harga
+                    ELSE penjualan.harga * (1 + COALESCE(penjualan.ppn, 0)) END AS harga,
+                penjualan.qty,
+                CASE WHEN penjualan.dpp_satuan IS NOT NULL THEN penjualan.jumlah
+                    ELSE penjualan.jumlah + penjualan.jumlah * COALESCE(penjualan.ppn, 0) END AS jumlah
             FROM penjualan,stok,karyawan
             WHERE penjualan.kode = stok.barcode AND
             karyawan.npk = penjualan.id_karyawan AND

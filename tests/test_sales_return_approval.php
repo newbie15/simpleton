@@ -41,9 +41,9 @@ $assert(strpos($reject, "'status' => 'rejected'") !== FALSE &&
 $assert(strpos($migration, "enum('pending','approved','rejected','completed','cancelled')") !== FALSE &&
 	strpos($migration, 'rejection_reason') !== FALSE,
 	'Migration adds approval states and decision audit fields.');
-$assert(strpos($view, 'Setujui') !== FALSE && strpos($view, 'Tolak') !== FALSE &&
-	strpos($view, 'Menunggu manager') !== FALSE,
-	'Return UI exposes manager decisions and pending status.');
+$assert(strpos($source, 'Setujui') !== FALSE && strpos($source, 'Tolak') !== FALSE &&
+	strpos($source, 'Menunggu manager') !== FALSE && strpos($view, 'sales-return-history') !== FALSE,
+	'Return controller exposes manager decisions and view renders the return history.');
 $assert(strpos($ajax, "return_header.status IN ('approved', 'completed')") !== FALSE &&
 	strpos($ajax, 'AS tertagih') !== FALSE &&
 	strpos($ajax, 'AS retur_disetujui') !== FALSE,

@@ -64,7 +64,9 @@
 						<tbody>
 							<?php foreach ($items as $item) {
 								$remaining = max(0, (int) $item->qty_terjual - (int) $item->qty_sudah_diretur);
-								$unit_price = (float) $item->harga * (1 + (float) $item->ppn);
+								$unit_price = $item->dpp_satuan !== NULL
+									? (float) $item->harga
+									: (float) $item->harga * (1 + (float) $item->ppn);
 							?>
 								<tr>
 									<td><?php echo html_escape($item->nama ? $item->nama : $item->barcode); ?></td>

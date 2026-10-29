@@ -86,12 +86,19 @@ class Kasir extends CI_Controller {
 			if (strlen($nota) > 64) {
 				show_error('Nomor nota tidak valid.', 400);
 			}
+			if (!$this->db->field_exists('dpp_satuan', 'penjualan') ||
+				!$this->db->field_exists('ppn_satuan', 'penjualan')) {
+				show_error('Skema PPN penjualan belum tersedia. Jalankan application/sql/sales_tax_inclusive.sql.', 500);
+			}
 			$receipt = $this->db->query("
 				SELECT sale.nota, sale.id_karyawan AS npk, MIN(sale.tgl) AS transaction_date,
 					COALESCE(employee.nama, sale.id_karyawan) AS employee_name,
 					COALESCE(NULLIF(CONCAT_WS(' ', cashier.first_name, cashier.last_name), ''), cashier.username, payment.id_user, sale.id_user) AS cashier_name,
 					COALESCE(payment.metode_pembayaran, sale.metode_pembayaran, '') AS payment_method,
-					COALESCE(payment.total_tagihan, SUM(sale.jumlah + sale.jumlah * sale.ppn), SUM(sale.jumlah)) AS total_paid,
+					COALESCE(payment.total_tagihan,
+						SUM(CASE WHEN sale.dpp_satuan IS NOT NULL THEN sale.jumlah
+							ELSE sale.jumlah + sale.jumlah * COALESCE(sale.ppn, 0) END),
+						SUM(sale.jumlah)) AS total_paid,
 					COALESCE(payment.diskon_voucher, 0) AS voucher_discount,
 					COALESCE(payment.kode_voucher, '') AS voucher_code,
 					COALESCE(payment.nominal_bayar, 0) AS amount_paid,
@@ -112,18 +119,36 @@ class Kasir extends CI_Controller {
 			}
 			$receipt->items = $this->db->query("
 				SELECT sale.kode AS barcode, COALESCE(stock.nama, sale.kode) AS product_name,
-					sale.qty, sale.harga, sale.jumlah, sale.ppn
+					sale.qty, sale.harga, sale.jumlah, sale.ppn,
+					sale.dpp_satuan, sale.ppn_satuan
 				FROM penjualan sale
 				LEFT JOIN stok stock ON stock.barcode = sale.kode
 				WHERE sale.nota = ?
 				ORDER BY sale.id ASC
 			", array($nota))->result();
+			$this->load->library('sales_tax');
+			$receipt->dpp_total = 0;
+			$receipt->ppn_total = 0;
+			$receipt->gross_total = 0;
+			foreach ($receipt->items as $item) {
+				$amounts = $this->sales_tax->sale_amounts($item);
+				$item->dpp_total = $amounts['dpp'];
+				$item->ppn_total = $amounts['ppn'];
+				$item->gross_total = $amounts['gross'];
+				$item->gross_price = (int) $item->qty > 0
+					? $amounts['gross'] / (int) $item->qty : (float) $item->harga;
+				$receipt->dpp_total += $amounts['dpp'];
+				$receipt->ppn_total += $amounts['ppn'];
+				$receipt->gross_total += $amounts['gross'];
+			}
 		}
 
+		$auto_print = trim((string) $this->input->get('print', TRUE)) === '1';
 		$data = array(
 			'nota' => $nota,
 			'receipt' => $receipt,
-			'error' => $this->session->flashdata('receipt_error')
+			'error' => $this->session->flashdata('receipt_error'),
+			'auto_print' => $auto_print
 		);
 		$this->load->view('pos_receipt_reprint', $data);
 	}
@@ -146,8 +171,11 @@ class Kasir extends CI_Controller {
 		$nomor_ref = $input['nomor_referensi'];
 		$bank_tujuan = $input['bank_tujuan'];
 		if (!$this->db->table_exists('pos_receipt_sequences') ||
-			!$this->db->field_exists('checkout_request_id', 'penjualan_pembayaran')) {
-			$this->_checkout_json(FALSE, 'Skema nomor nota pendek belum tersedia. Jalankan application/sql/pos_receipt_sequence.sql.');
+			!$this->db->field_exists('checkout_request_id', 'penjualan_pembayaran') ||
+			!$this->db->table_exists('sales_tax_settings') ||
+			!$this->db->field_exists('dpp_satuan', 'penjualan') ||
+			!$this->db->field_exists('ppn_satuan', 'penjualan')) {
+			$this->_checkout_json(FALSE, 'Skema checkout/PPN belum tersedia. Jalankan application/sql/pos_receipt_sequence.sql dan application/sql/sales_tax_inclusive.sql.');
 			return;
 		}
 
@@ -165,6 +193,14 @@ class Kasir extends CI_Controller {
 		if (!$this->db->trans_begin()) {
 			$this->db->db_debug = $previous_db_debug;
 			$this->_checkout_json(FALSE, 'Transaksi gagal dan belum tercatat. Database tidak dapat memulai penyimpanan.');
+			return;
+		}
+		$this->load->library('sales_tax');
+		$tax_rate = $this->sales_tax->current_rate(TRUE);
+		if ($tax_rate === FALSE) {
+			$this->db->trans_rollback();
+			$this->db->db_debug = $previous_db_debug;
+			$this->_checkout_json(FALSE, 'Tarif PPN tidak tersedia atau tidak valid. Hubungi admin/accounting sebelum checkout.');
 			return;
 		}
 
@@ -247,7 +283,7 @@ class Kasir extends CI_Controller {
 		}
 
 		// Simpan tiap baris penjualan & kurangi stok
-		$errors = $this->_persist_sale_lines($resolved_items, $nota, $id_user, $id_karyawan, $sale_time, $payment_method);
+		$errors = $this->_persist_sale_lines($resolved_items, $nota, $id_user, $id_karyawan, $sale_time, $payment_method, $tax_rate);
 
 		if (count($errors) > 0) {
 			$this->db->trans_rollback();
@@ -429,10 +465,9 @@ class Kasir extends CI_Controller {
 			}
 			$barcode = trim((string) $item['barcode']);
 			$qty = (string) $item['qty'];
-			$ppn = isset($item['ppn']) ? $item['ppn'] : 0;
 			if ($barcode === '' || strlen($barcode) > 64 ||
 				!preg_match('/^[1-9][0-9]*$/', $qty) ||
-				!is_numeric($ppn) || (float) $ppn < 0 ||
+				(float) $qty > 2147483647 ||
 				isset($seen_barcodes[$barcode])) {
 				$this->_checkout_json(FALSE, 'Barcode atau qty barang pada keranjang tidak valid.');
 				return FALSE;
@@ -440,8 +475,7 @@ class Kasir extends CI_Controller {
 			$seen_barcodes[$barcode] = TRUE;
 			$clean_items[] = array(
 				'barcode' => $barcode,
-				'qty' => (int) $qty,
-				'ppn' => (float) $ppn
+				'qty' => (int) $qty
 			);
 		}
 		return $clean_items;
@@ -472,6 +506,11 @@ class Kasir extends CI_Controller {
 			$product = $product_query->row();
 			if (!$product) {
 				$errors[] = 'Barcode '.$item['barcode'].' tidak ditemukan di stok.';
+				continue;
+			}
+			if ((int) $product->harga <= 0 ||
+				(float) $product->harga * (int) $item['qty'] > 2147483647) {
+				$errors[] = $product->nama.' memiliki harga atau jumlah transaksi yang tidak valid.';
 				continue;
 			}
 			if ($product->average_cost === NULL || (float) $product->average_cost <= 0) {
@@ -519,7 +558,6 @@ class Kasir extends CI_Controller {
 			$resolved_items[] = array(
 				'product'      => $product,
 				'qty'          => $item['qty'],
-				'ppn'          => $item['ppn'],
 				'unbox_actions' => $unbox_actions,
 			);
 		}
@@ -528,17 +566,13 @@ class Kasir extends CI_Controller {
 	}
 
 	/**
-	 * Hitung total tagihan (harga * qty + PPN per baris).
+	 * Harga katalog sudah termasuk PPN sehingga tidak ditambahkan lagi.
 	 */
 	private function _checkout_subtotal($resolved_items)
 	{
 		$total_tagihan = 0;
 		foreach ($resolved_items as $item) {
-			$subtotal = (int) $item['product']->harga * $item['qty'];
-			if ($item['ppn'] > 0) {
-				$subtotal += $subtotal * (float) $item['ppn'];
-			}
-			$total_tagihan += $subtotal;
+			$total_tagihan += (int) $item['product']->harga * $item['qty'];
 		}
 		return $total_tagihan;
 	}
@@ -546,12 +580,13 @@ class Kasir extends CI_Controller {
 	/**
 	 * Kurangi stok (termasuk buka dus) dan tulis baris penjualan. Return daftar error.
 	 */
-	private function _persist_sale_lines($resolved_items, $nota, $id_user, $id_karyawan, $sale_time, $payment_method)
+	private function _persist_sale_lines($resolved_items, $nota, $id_user, $id_karyawan, $sale_time, $payment_method, $tax_rate)
 	{
 		$errors = array();
 		foreach ($resolved_items as $item) {
 			$product = $item['product'];
 			$qty = $item['qty'];
+			$unit_amounts = $this->sales_tax->inclusive_amounts((int) $product->harga, $tax_rate);
 
 			if (count($item['unbox_actions']) > 0) {
 				foreach ($item['unbox_actions'] as $unbox_action) {
@@ -595,7 +630,9 @@ class Kasir extends CI_Controller {
 				'harga'            => (int) $product->harga,
 				'qty'              => $qty,
 				'jumlah'           => (int) $product->harga * $qty,
-				'ppn'              => $item['ppn'],
+				'ppn'              => $tax_rate / 100,
+				'dpp_satuan'       => $unit_amounts['dpp'],
+				'ppn_satuan'       => $unit_amounts['ppn'],
 				'hpp'              => $product->average_cost,
 				'metode_pembayaran' => $payment_method,
 			));
@@ -610,8 +647,10 @@ class Kasir extends CI_Controller {
 	{
 		$this->load->library('accounting');
 		$sale_totals = $this->db->query("
-			SELECT COALESCE(SUM(jumlah), 0) AS gross_sales,
-				COALESCE(SUM(jumlah * ppn), 0) AS tax_total,
+			SELECT COALESCE(SUM(CASE WHEN dpp_satuan IS NOT NULL
+					THEN dpp_satuan * qty ELSE jumlah END), 0) AS net_sales,
+				COALESCE(SUM(CASE WHEN ppn_satuan IS NOT NULL
+					THEN ppn_satuan * qty ELSE jumlah * COALESCE(ppn, 0) END), 0) AS tax_total,
 				COALESCE(SUM(hpp * qty), 0) AS cogs_total
 			FROM penjualan
 			WHERE nota = ?
@@ -621,7 +660,7 @@ class Kasir extends CI_Controller {
 		$payment_amount = round((float) $total_tagihan, 2);
 		$discount_amount = round((float) $diskon_voucher, 2);
 		$tax_amount = round((float) $sale_totals->tax_total, 2);
-		$gross_amount = round((float) $sale_totals->gross_sales, 2);
+		$net_sales_amount = round((float) $sale_totals->net_sales, 2);
 		if ($discount_amount > 0) {
 			$marketing_account = $this->db->get_where('acc_accounts', array(
 				'code' => '6104',
@@ -649,11 +688,11 @@ class Kasir extends CI_Controller {
 				'memo' => 'Beban pemasaran voucher '.$kode_voucher.' untuk nota '.$nota
 			);
 		}
-		if ($gross_amount > 0) {
+		if ($net_sales_amount > 0) {
 			$journal_lines[] = array(
 				'account' => '4101',
 				'debit' => 0,
-				'credit' => $gross_amount,
+				'credit' => $net_sales_amount,
 				'memo' => 'Penjualan nota '.$nota
 			);
 		}

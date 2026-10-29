@@ -64,22 +64,22 @@ $payment_labels = array(
 			<div><span>Pembayaran</span><span><?php echo html_escape(isset($payment_labels[$receipt->payment_method]) ? $payment_labels[$receipt->payment_method] : $receipt->payment_method); ?></span></div>
 		</div>
 		<table>
-			<thead><tr><th>Barang</th><th class="numeric">Qty</th><th class="numeric">Harga</th><th class="numeric">Jumlah</th></tr></thead>
+			<thead><tr><th>Barang</th><th class="numeric">Qty</th><th class="numeric">Harga incl. PPN</th><th class="numeric">Jumlah</th></tr></thead>
 			<tbody>
-			<?php $tax_total = 0; foreach ($receipt->items as $item) { $tax_total += (float) $item->jumlah * (float) $item->ppn; ?>
+			<?php foreach ($receipt->items as $item) { ?>
 				<tr>
 					<td><?php echo html_escape($item->product_name); ?><br><small><?php echo html_escape($item->barcode); ?></small></td>
 					<td class="numeric"><?php echo number_format((int) $item->qty); ?></td>
-					<td class="numeric"><?php echo $format_rupiah($item->harga); ?></td>
-					<td class="numeric"><?php echo $format_rupiah($item->jumlah); ?></td>
+					<td class="numeric"><?php echo $format_rupiah($item->gross_price); ?></td>
+					<td class="numeric"><?php echo $format_rupiah($item->gross_total); ?></td>
 				</tr>
 			<?php } ?>
 			</tbody>
 		</table>
 		<div class="meta">
-			<div><span>Subtotal</span><span><?php echo $format_rupiah((float) $receipt->total_paid + (float) $receipt->voucher_discount - $tax_total); ?></span></div>
-			<?php if ($tax_total > 0) { ?><div><span>PPN</span><span><?php echo $format_rupiah($tax_total); ?></span></div><?php } ?>
-			<div class="total"><span>Total belanja</span><span><?php echo $format_rupiah((float) $receipt->total_paid + (float) $receipt->voucher_discount); ?></span></div>
+			<div><span>DPP</span><span><?php echo $format_rupiah($receipt->dpp_total); ?></span></div>
+			<div><span>PPN</span><span><?php echo $format_rupiah($receipt->ppn_total); ?></span></div>
+			<div class="total"><span>Total belanja (termasuk PPN)</span><span><?php echo $format_rupiah($receipt->gross_total); ?></span></div>
 			<?php if ((float) $receipt->voucher_discount > 0) { ?><div><span>Voucher <?php echo html_escape($receipt->voucher_code); ?></span><span>- <?php echo $format_rupiah($receipt->voucher_discount); ?></span></div><div class="total"><span>Sisa bayar</span><span><?php echo $format_rupiah($receipt->total_paid); ?></span></div><?php } ?>
 			<?php if (in_array($receipt->payment_method, array('tunai', 'cash'), TRUE)) { ?><div><span>Tunai diterima</span><span><?php echo $format_rupiah($receipt->amount_paid); ?></span></div><div><span>Kembalian</span><span><?php echo $format_rupiah($receipt->change_amount); ?></span></div><?php } ?>
 		</div>
@@ -96,6 +96,7 @@ window.addEventListener('load', function () {
 	JsBarcode('#receipt-barcode', <?php echo json_encode((string) $receipt->nota); ?>, {
 		format: 'CODE128', displayValue: true, fontSize: 12, height: 42, margin: 2
 	});
+	<?php if ($auto_print) { ?>window.setTimeout(function () { window.print(); }, 100);<?php } ?>
 });
 </script>
 <?php } ?>

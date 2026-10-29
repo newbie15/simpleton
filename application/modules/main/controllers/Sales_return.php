@@ -39,6 +39,7 @@ class Sales_return extends CI_Controller
 				$data['items'] = $this->db->query("
 					SELECT sale.id, sale.kode AS barcode, stock.nama,
 						sale.qty AS qty_terjual, sale.harga, sale.ppn,
+						sale.dpp_satuan, sale.ppn_satuan,
 						COALESCE((
 							SELECT SUM(return_item.qty_retur)
 							FROM retur_penjualan_items return_item
@@ -261,7 +262,8 @@ class Sales_return extends CI_Controller
 		}
 
 		$sale_rows = $this->db->query("
-			SELECT id, nota, id_karyawan, kode, harga, qty, ppn, hpp
+			SELECT id, nota, id_karyawan, kode, harga, qty, ppn, hpp,
+				dpp_satuan, ppn_satuan
 			FROM penjualan
 			WHERE nota = ?
 			ORDER BY id ASC
@@ -299,7 +301,10 @@ class Sales_return extends CI_Controller
 				continue;
 			}
 
-			$subtotal = round((float) $sale_row->harga * $selection['qty'] * (1 + (float) $sale_row->ppn), 2);
+			$unit_gross = $sale_row->dpp_satuan !== NULL
+				? (float) $sale_row->harga
+				: (float) $sale_row->harga * (1 + (float) $sale_row->ppn);
+			$subtotal = round($unit_gross * $selection['qty'], 2);
 			$return_items[] = array(
 				'sale' => $sale_row,
 				'qty' => $selection['qty'],
@@ -406,7 +411,8 @@ class Sales_return extends CI_Controller
 			SELECT return_item.id, return_item.penjualan_id, return_item.barcode,
 				return_item.qty_retur, return_item.subtotal, return_item.kondisi,
 				return_item.kembali_ke_stok, sale.nota, sale.id_karyawan,
-				sale.harga, sale.qty AS qty_terjual, sale.ppn, sale.hpp, sale.metode_pembayaran
+				sale.harga, sale.qty AS qty_terjual, sale.ppn, sale.hpp, sale.metode_pembayaran,
+				sale.dpp_satuan, sale.ppn_satuan
 			FROM retur_penjualan_items return_item
 			JOIN penjualan sale ON sale.id = return_item.penjualan_id
 			WHERE return_item.retur_id = ? AND sale.nota = ?
@@ -443,7 +449,9 @@ class Sales_return extends CI_Controller
 				continue;
 			}
 			$total_return += (float) $item->subtotal;
-			$tax_return += round((float) $item->harga * (int) $item->qty_retur * (float) $item->ppn, 2);
+			$tax_return += $item->ppn_satuan !== NULL
+				? round((float) $item->ppn_satuan * (int) $item->qty_retur, 2)
+				: round((float) $item->harga * (int) $item->qty_retur * (float) $item->ppn, 2);
 			if ((int) $item->kembali_ke_stok === 1) {
 				$stock = $this->db->query('SELECT id FROM stok WHERE barcode = ? FOR UPDATE', array($item->barcode))->row();
 				if (!$stock) {

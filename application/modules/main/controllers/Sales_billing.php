@@ -293,12 +293,15 @@ class Sales_billing extends CI_Controller
 		return $this->db->query("
 			SELECT return_header.nota_penjualan AS nota, return_header.id_karyawan AS npk,
 				MAX(COALESCE(return_header.approved_at, return_header.tgl_retur)) AS approved_at,
-				SUM(return_item.harga_satuan * return_item.qty_retur) AS amount,
+				SUM(return_item.subtotal) AS amount,
 				MAX(original.total_sales) AS original_total
 			FROM retur_penjualan return_header
 			JOIN retur_penjualan_items return_item ON return_item.retur_id = return_header.id
 			JOIN (
-				SELECT nota, id_karyawan, SUM(jumlah) AS total_sales, MAX(tgl) AS last_sale
+				SELECT nota, id_karyawan,
+					SUM(CASE WHEN dpp_satuan IS NOT NULL THEN jumlah
+						ELSE jumlah + jumlah * COALESCE(ppn, 0) END) AS total_sales,
+					MAX(tgl) AS last_sale
 				FROM penjualan GROUP BY nota, id_karyawan
 			) original ON original.nota = return_header.nota_penjualan
 				AND original.id_karyawan = return_header.id_karyawan
@@ -320,8 +323,12 @@ class Sales_billing extends CI_Controller
 			SELECT sale.nota, MIN(sale.tgl) AS transaction_date,
 				MIN(sale.id_karyawan) AS npk, COUNT(*) AS line_count,
 				COUNT(DISTINCT sale.id_karyawan) AS npk_count,
-				SUM(sale.jumlah) AS total_sales,
-				SUM(sale.jumlah * COALESCE(sale.ppn, 0)) AS tax_total,
+				SUM(CASE WHEN sale.dpp_satuan IS NOT NULL
+					THEN sale.dpp_satuan * sale.qty ELSE sale.jumlah END) AS dpp_total,
+				SUM(CASE WHEN sale.ppn_satuan IS NOT NULL
+					THEN sale.ppn_satuan * sale.qty ELSE sale.jumlah * COALESCE(sale.ppn, 0) END) AS tax_total,
+				SUM(CASE WHEN sale.dpp_satuan IS NOT NULL
+					THEN sale.jumlah ELSE sale.jumlah + sale.jumlah * COALESCE(sale.ppn, 0) END) AS gross_total,
 				SUM(CASE WHEN sale.qty <= 0 OR sale.harga <= 0 OR sale.jumlah <> sale.harga * sale.qty THEN 1 ELSE 0 END) AS invalid_lines,
 				payment.nota AS payment_nota, payment.total_tagihan, payment.diskon_voucher,
 				payment.metode_pembayaran
@@ -346,7 +353,7 @@ class Sales_billing extends CI_Controller
 		if ($row->payment_nota === NULL) {
 			$issues[] = 'Header pembayaran nota tidak ditemukan.';
 		} else {
-			$gross = (float) $row->total_sales + (float) $row->tax_total;
+			$gross = (float) $row->dpp_total + (float) $row->tax_total;
 			$expected = $gross - (float) $row->diskon_voucher;
 			if ((float) $row->diskon_voucher < 0 || $expected < 0 ||
 				abs($expected - (float) $row->total_tagihan) > 0.01) {
@@ -365,7 +372,7 @@ class Sales_billing extends CI_Controller
 			$issues[] = 'Jurnal POS untuk nota ini belum terposting.';
 		}
 		$return = $this->db->query("
-			SELECT COALESCE(SUM(return_item.harga_satuan * return_item.qty_retur), 0) AS amount
+			SELECT COALESCE(SUM(return_item.subtotal), 0) AS amount
 			FROM retur_penjualan_items return_item
 			JOIN retur_penjualan return_header ON return_header.id = return_item.retur_id
 			WHERE return_header.nota_penjualan = ?
@@ -374,14 +381,15 @@ class Sales_billing extends CI_Controller
 				AND COALESCE(return_header.approved_at, return_header.tgl_retur) < ?
 		", array($nota, $start.' 00:00:00', date('Y-m-d', strtotime($end.' +1 day')).' 00:00:00'))->row();
 		$approved_returns = $return ? (float) $return->amount : 0;
-		$billable_total = $this->_billable_total((float) $row->total_sales, $approved_returns);
+		$sales_due = max(0, (float) $row->gross_total - (float) $row->diskon_voucher);
+		$billable_total = $this->_billable_total($sales_due, $approved_returns);
 		return array(
 			'nota' => $row->nota,
 			'npk' => (string) $row->npk,
 			'transaction_date' => substr($row->transaction_date, 0, 10),
 			'valid' => empty($issues),
 			'issues' => $issues,
-			'total_sales' => (float) $row->total_sales,
+			'total_sales' => $sales_due,
 			'approved_returns' => $approved_returns,
 			'billable_total' => $billable_total
 		);
@@ -404,7 +412,7 @@ class Sales_billing extends CI_Controller
 		$returns = $this->db->query("
 			SELECT return_header.nota_penjualan AS nota, sale.id_karyawan AS npk,
 				MAX(COALESCE(return_header.approved_at, return_header.tgl_retur)) AS approved_at,
-				SUM(return_item.harga_satuan * return_item.qty_retur) AS amount
+				SUM(return_item.subtotal) AS amount
 			FROM retur_penjualan return_header
 			JOIN retur_penjualan_items return_item ON return_item.retur_id = return_header.id
 			JOIN penjualan sale ON sale.id = return_item.penjualan_id

@@ -80,7 +80,9 @@ class Member extends CI_Controller
 
 			$data['purchases'] = $this->db->query("
 				SELECT sale.nota, MAX(sale.tgl) AS purchased_at, COUNT(*) AS item_count,
-					COALESCE(MAX(payment.total_tagihan), SUM(sale.jumlah)) AS amount,
+					COALESCE(MAX(payment.total_tagihan),
+						SUM(CASE WHEN sale.dpp_satuan IS NOT NULL THEN sale.jumlah
+							ELSE sale.jumlah + sale.jumlah * COALESCE(sale.ppn, 0) END)) AS amount,
 					COALESCE(NULLIF(MAX(payment.metode_pembayaran), ''), NULLIF(MAX(sale.metode_pembayaran), ''), 'tidak_tercatat') AS payment_method
 				FROM penjualan sale
 				LEFT JOIN penjualan_pembayaran payment ON payment.nota = sale.nota
@@ -98,7 +100,12 @@ class Member extends CI_Controller
 					$receipts[] = $purchase->nota;
 				}
 				$purchase_items = $this->db
-					->select('sale.id, sale.nota, sale.kode, (SELECT MAX(stock.nama) FROM stok stock WHERE stock.barcode = sale.kode) AS product_name, sale.harga, sale.qty AS quantity, sale.jumlah', FALSE)
+					->select('sale.id, sale.nota, sale.kode, (SELECT MAX(stock.nama) FROM stok stock WHERE stock.barcode = sale.kode) AS product_name,
+						CASE WHEN sale.dpp_satuan IS NOT NULL THEN sale.harga
+							ELSE sale.harga * (1 + COALESCE(sale.ppn, 0)) END AS harga,
+						sale.qty AS quantity,
+						CASE WHEN sale.dpp_satuan IS NOT NULL THEN sale.jumlah
+							ELSE sale.jumlah + sale.jumlah * COALESCE(sale.ppn, 0) END AS jumlah', FALSE)
 					->from('penjualan sale')
 					->where_in('sale.nota', $receipts)
 					->where('sale.id_karyawan', $npk)

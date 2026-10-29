@@ -5,7 +5,13 @@ class Penjualan extends CI_Controller
 {
 	public function index()
 	{
+		$this->load->database();
 		$this->load->helper('url');
+		$this->load->library('sales_tax');
+		$tax_rate = $this->sales_tax->current_rate();
+		if ($tax_rate === FALSE) {
+			show_error('Pengaturan PPN belum tersedia atau nilainya tidak valid. Jalankan application/sql/sales_tax_inclusive.sql.', 500);
+		}
 		$data['css_file'] = array(
 			base_url('assets/datatables/css/jquery.dataTables.min.css'),
 			base_url('assets/jexcel/css/jquery.jexcel.css'),
@@ -19,11 +25,14 @@ class Penjualan extends CI_Controller
 			base_url('assets/jexcel/js/excel-formula.min.js'),
 			base_url('assets/jexcel/js/numeral.min.js'),
 			base_url('assets/easyautocomplete/jquery.easy-autocomplete.min.js'),
-			base_url('assets/kasir/kasir.js?v=20261025-limit-format')
+			base_url('assets/kasir/kasir.js?v=20261029-inclusive-vat')
 		);
+		$receipt_url = site_url('main/kasir/reprint');
 		$data['m_penjualan'] = TRUE;
 		$data['output'] = '
 		<main role="main" class="col-md-9 ml-sm-auto col-lg-10 px-4">
+		  <input type="hidden" id="receipt-reprint-url" value="'.html_escape($receipt_url).'">
+		  <input type="hidden" id="ppn-rate" value="'.html_escape((string) $tax_rate).'">
 		  <br>
           <div class="row">
             <div class="col-sm-4">
@@ -55,13 +64,7 @@ class Penjualan extends CI_Controller
                 <div class="small" style="margin-top: 8px;">Belanja bulan ini: <strong id="limit"></strong></div>
                 <div class="small" style="margin-top: 4px;">Limit belanja: <strong id="limit_belanja"></strong></div>
                 <div style="margin-top: 14px; font-size: 22px; font-weight: bold;" id="ttx">Total Rp 0</div>
-                <div class="checkbox" style="margin-top: 12px;">
-                  <label style="font-weight: normal;">
-                    <input type="checkbox" id="pajak-active">
-                    Aktifkan pajak (PPN)
-                  </label>
-                </div>
-                <span class="help-block" style="margin: 0;">Atur sebelum scan barang.</span>
+                <div class="small text-muted" style="margin-top: 12px;">Harga sudah termasuk PPN '.html_escape(number_format($tax_rate, 2, ',', '.')).'%.</div>
               </div>
             </div>
             <div class="col-sm-4 text-center">
