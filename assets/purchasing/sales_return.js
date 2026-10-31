@@ -2,6 +2,36 @@
 	'use strict';
 
 	$(function () {
+		var searchType = $('#search-type');
+		var notaSearch = $('#nota-search-value');
+		var npkSearch = $('#npk-search-value');
+		var npkSource = npkSearch.data('npk-source');
+		var npkAutocompleteInitialized = false;
+
+		function configureMemberSearch() {
+			var isMemberSearch = searchType.val() === 'npk';
+			notaSearch.prop('disabled', isMemberSearch).prop('required', !isMemberSearch)
+				.closest('#nota-search-container').toggle(!isMemberSearch);
+			npkSearch.prop('disabled', !isMemberSearch).prop('required', isMemberSearch)
+				.closest('#npk-search-container').toggle(isMemberSearch);
+			if (isMemberSearch && !npkAutocompleteInitialized &&
+				$.isFunction(npkSearch.easyAutocomplete)) {
+				npkSearch.easyAutocomplete({
+					url: npkSource,
+					getValue: 'nama',
+					list: {
+						match: {
+							enabled: true
+						}
+					}
+				});
+				npkAutocompleteInitialized = true;
+			}
+		}
+
+		configureMemberSearch();
+		searchType.on('change', configureMemberSearch);
+
 		var table = $('#sales-return-history');
 		if (!table.length) {
 			return;

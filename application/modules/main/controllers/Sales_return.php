@@ -22,8 +22,21 @@ class Sales_return extends CI_Controller
 
 	public function index()
 	{
-		$nota = trim((string) $this->input->get('nota', TRUE));
+		$search_type = trim((string) $this->input->get('search_type', TRUE));
+		$search_value = trim((string) $this->input->get('search_value', TRUE));
+		if (!in_array($search_type, array('nota', 'npk'), TRUE)) {
+			$search_type = 'nota';
+		}
+		$search_value = substr($search_value, 0, 64);
+		$nota = $search_type === 'nota' ? $search_value : '';
+		$npk = $search_type === 'npk' ? substr($search_value, 0, 32) : '';
 		$data['nota'] = $nota;
+		$data['npk'] = $npk;
+		$data['search_type'] = $search_type;
+		$data['search_value'] = $search_value;
+		$data['purchase_history'] = array();
+		$data['history_employee'] = NULL;
+		$data['npk_search_performed'] = FALSE;
 		$data['sale'] = NULL;
 		$data['items'] = array();
 		if ($nota !== '' && strlen($nota) <= 64) {
@@ -54,6 +67,19 @@ class Sales_return extends CI_Controller
 				", array($nota))->result();
 			}
 		}
+		if ($npk !== '') {
+			$employee = $this->db->query("
+				SELECT npk, nama FROM karyawan
+				WHERE npk = ? OR CONCAT(nama, '-', npk) = ?
+				LIMIT 1
+			", array($npk, $search_value))->row();
+			if ($employee) {
+				$data['history_employee'] = $employee;
+				$data['npk'] = $employee->npk;
+				$data['purchase_history'] = $this->_purchase_history($employee->npk);
+				$data['npk_search_performed'] = TRUE;
+			}
+		}
 		$data['notice'] = $this->session->flashdata('sales_return_notice');
 		$data['error'] = $this->session->flashdata('sales_return_error');
 		$data['form_token'] = $this->_form_token();
@@ -62,15 +88,76 @@ class Sales_return extends CI_Controller
 		$data['judul_kecil'] = 'Pengajuan retur menunggu persetujuan manager';
 		$data['m_sales_return'] = TRUE;
 		$data['css_file'] = array(
-			base_url('assets/adminlte/plugins/datatables/dataTables.bootstrap.css')
+			base_url('assets/adminlte/plugins/datatables/dataTables.bootstrap.css'),
+			base_url('assets/easyautocomplete/easy-autocomplete.min.css')
 		);
 		$data['js_file'] = array(
 			base_url('assets/adminlte/plugins/datatables/jquery.dataTables.min.js'),
 			base_url('assets/adminlte/plugins/datatables/dataTables.bootstrap.min.js'),
-			base_url('assets/purchasing/sales_return.js?v=20261029-server-side')
+			base_url('assets/easyautocomplete/jquery.easy-autocomplete.min.js'),
+			base_url('assets/purchasing/sales_return.js?v=20261030-return-history')
 		);
 		$data['output'] = $this->load->view('sales_return', $data, TRUE);
 		$this->load->view('welcome_message', $data);
+	}
+
+	private function _purchase_history($npk)
+	{
+		$purchases = $this->db->query("
+			SELECT sale.nota, MAX(sale.tgl) AS purchased_at, COUNT(*) AS item_count,
+				COALESCE(MAX(payment.total_tagihan),
+					SUM(CASE WHEN sale.dpp_satuan IS NOT NULL THEN sale.jumlah
+						ELSE sale.jumlah + sale.jumlah * COALESCE(sale.ppn, 0) END)) AS amount,
+				COALESCE(NULLIF(MAX(payment.metode_pembayaran), ''),
+					NULLIF(MAX(sale.metode_pembayaran), ''), 'tidak_tercatat') AS payment_method
+			FROM penjualan sale
+			LEFT JOIN penjualan_pembayaran payment ON payment.nota = sale.nota
+			WHERE sale.id_karyawan = ?
+			GROUP BY sale.nota
+			ORDER BY MAX(sale.tgl) DESC, sale.nota DESC
+			LIMIT 50
+		", array($npk))->result();
+		if (empty($purchases)) {
+			return array();
+		}
+
+		$receipts = array();
+		foreach ($purchases as $purchase) {
+			$receipts[] = $purchase->nota;
+			$purchase->items = array();
+		}
+		$purchase_items = $this->db
+			->select("sale.nota, sale.id, sale.kode AS barcode,
+				(SELECT MAX(stock.nama) FROM stok stock WHERE stock.barcode = sale.kode) AS product_name,
+				sale.qty AS quantity,
+				CASE WHEN sale.dpp_satuan IS NOT NULL THEN sale.harga
+					ELSE sale.harga * (1 + COALESCE(sale.ppn, 0)) END AS unit_price,
+				CASE WHEN sale.dpp_satuan IS NOT NULL THEN sale.jumlah
+					ELSE sale.jumlah + sale.jumlah * COALESCE(sale.ppn, 0) END AS line_total,
+				COALESCE((
+					SELECT SUM(return_item.qty_retur)
+					FROM retur_penjualan_items return_item
+					JOIN retur_penjualan return_header ON return_header.id = return_item.retur_id
+					WHERE return_item.penjualan_id = sale.id
+						AND return_header.status IN ('pending', 'approved', 'completed')
+				), 0) AS qty_returned", FALSE)
+			->from('penjualan sale')
+			->where_in('sale.nota', $receipts)
+			->where('sale.id_karyawan', $npk)
+			->order_by('sale.tgl', 'DESC')
+			->order_by('sale.id', 'ASC')
+			->get()
+			->result();
+		$items_by_receipt = array();
+		foreach ($purchase_items as $item) {
+			$items_by_receipt[$item->nota][] = $item;
+		}
+		foreach ($purchases as $purchase) {
+			$purchase->items = isset($items_by_receipt[$purchase->nota])
+				? $items_by_receipt[$purchase->nota]
+				: array();
+		}
+		return $purchases;
 	}
 
 	public function returns_data()
@@ -378,7 +465,7 @@ class Sales_return extends CI_Controller
 		}
 		$this->db->db_debug = $previous_db_debug;
 		$this->session->set_flashdata('sales_return_notice', 'Retur '.$return_number.' diajukan untuk persetujuan manager. Total pengajuan: Rp '.number_format($total_return, 0, ',', '.').'. Stok dan jurnal belum berubah.');
-		redirect('main/sales_return?nota='.rawurlencode($nota));
+		redirect('main/sales_return');
 	}
 
 	public function approve($return_id = NULL)
@@ -544,7 +631,7 @@ class Sales_return extends CI_Controller
 		}
 		$this->db->db_debug = $previous_db_debug;
 		$this->session->set_flashdata('sales_return_notice', 'Retur '.$return->nomor_retur.' disetujui; stok dan jurnal telah diperbarui.');
-		redirect('main/sales_return?nota='.rawurlencode($return->nota_penjualan));
+		redirect('main/sales_return');
 	}
 
 	public function reject($return_id = NULL)
@@ -580,7 +667,7 @@ class Sales_return extends CI_Controller
 			$this->_redirect_error('Retur gagal ditolak.');
 		}
 		$this->session->set_flashdata('sales_return_notice', 'Retur '.$return->nomor_retur.' ditolak; tidak ada stok atau jurnal yang berubah.');
-		redirect('main/sales_return?nota='.rawurlencode($return->nota_penjualan));
+		redirect('main/sales_return');
 	}
 
 	private function _is_positive_integer($value)

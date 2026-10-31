@@ -31,7 +31,11 @@
 				<?php } ?>
 				<?php if (!$items) { ?><tr><td colspan="9" class="text-muted">Draft belum memiliki rincian barang.</td></tr><?php } ?>
 				</tbody>
-				<tfoot><tr><th colspan="7" class="text-right">Total retur</th><th class="text-right"><?php echo $format_rupiah($return->total_nominal); ?></th><th></th></tr></tfoot>
+				<tfoot>
+					<tr><th colspan="7" class="text-right">Subtotal barang</th><th class="text-right"><?php echo $format_rupiah((float) $return->total_nominal - (float) $return->ppn_nominal); ?></th><th></th></tr>
+					<tr><th colspan="7" class="text-right">PPN diretur</th><th class="text-right"><?php echo $format_rupiah($return->ppn_nominal); ?></th><th></th></tr>
+					<tr><th colspan="7" class="text-right">Total retur</th><th class="text-right"><?php echo $format_rupiah($return->total_nominal); ?></th><th></th></tr>
+				</tfoot>
 			</table>
 		</div>
 	</div>

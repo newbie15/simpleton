@@ -40,20 +40,24 @@ class Supplier_return extends CI_Controller
 		$data['drafts'] = $this->db->query("
 			SELECT return_header.id, return_header.nomor_retur, return_header.goods_receipt_id,
 				return_header.tgl_retur, return_header.total_nominal, return_header.id_user,
+				COALESCE(NULLIF(TRIM(CONCAT_WS(' ', operator.first_name, operator.last_name)), ''), operator.username, return_header.id_user) AS operator_name,
 				supplier.name AS supplier_name, receipt.receipt_number
 			FROM retur_supplier return_header
 			JOIN suppliers supplier ON supplier.id = return_header.supplier_id
 			LEFT JOIN goods_receipts receipt ON receipt.id = return_header.goods_receipt_id
+			LEFT JOIN users operator ON operator.id = return_header.id_user
 			WHERE return_header.status = 'draft'
 			ORDER BY return_header.id DESC
 		")->result();
 		$data['history'] = $this->db->query("
 			SELECT return_header.id, return_header.nomor_retur, return_header.goods_receipt_id,
 				return_header.tgl_retur, return_header.total_nominal, return_header.id_user,
+				COALESCE(NULLIF(TRIM(CONCAT_WS(' ', operator.first_name, operator.last_name)), ''), operator.username, return_header.id_user) AS operator_name,
 				supplier.name AS supplier_name, receipt.receipt_number
 			FROM retur_supplier return_header
 			JOIN suppliers supplier ON supplier.id = return_header.supplier_id
 			LEFT JOIN goods_receipts receipt ON receipt.id = return_header.goods_receipt_id
+			LEFT JOIN users operator ON operator.id = return_header.id_user
 			WHERE return_header.status = 'final'
 			ORDER BY return_header.id DESC
 			LIMIT 50
@@ -65,6 +69,11 @@ class Supplier_return extends CI_Controller
 		$data['judul_besar'] = 'Retur Supplier';
 		$data['judul_kecil'] = 'Draft retur menunggu persetujuan admin atau pengurus';
 		$data['m_supplier_return'] = TRUE;
+		$data['css_file'] = array(base_url('assets/adminlte/plugins/datatables/dataTables.bootstrap.css'));
+		$data['js_file'] = array(
+			base_url('assets/adminlte/plugins/datatables/jquery.dataTables.min.js'),
+			base_url('assets/adminlte/plugins/datatables/dataTables.bootstrap.min.js')
+		);
 		$data['output'] = $this->load->view('supplier_return', $data, TRUE);
 		$this->load->view('welcome_message', $data);
 	}
@@ -235,6 +244,10 @@ class Supplier_return extends CI_Controller
 			$total_amount += $line_total;
 		}
 
+		$goods_total = round($total_amount, 2);
+		$ppn_returned = $this->_calculate_return_ppn((int) $receipt_id, $receipt_items, $goods_total);
+		$total_amount = round($goods_total + $ppn_returned, 2);
+
 		$operator_id = (string) $this->ion_auth->get_user_id();
 		if ($operator_id === '' || strlen($operator_id) > 32) {
 			show_error('Identitas petugas tidak valid.', 500);
@@ -248,7 +261,7 @@ class Supplier_return extends CI_Controller
 			'id_user' => $operator_id,
 			'tgl_retur' => date('Y-m-d H:i:s'),
 			'total_nominal' => $total_amount,
-			'alasan' => $reason,
+			'ppn_nominal' => $ppn_returned,
 			'status' => 'draft'
 		));
 		$return_id = (int) $this->db->insert_id();
@@ -395,6 +408,8 @@ class Supplier_return extends CI_Controller
 		}
 		if (count($errors) === 0) {
 			$return_amount = round((float) $return_header->total_nominal, 2);
+			$return_ppn = min($return_amount, round((float) $return_header->ppn_nominal, 2));
+			$return_goods = round($return_amount - $return_ppn, 2);
 			$journal_lines = array();
 			if ($return_amount > 0) {
 				$journal_lines[] = array(
@@ -403,12 +418,22 @@ class Supplier_return extends CI_Controller
 					'credit' => 0,
 					'memo' => 'Pengurangan hutang retur supplier '.$return_header->nomor_retur
 				);
-				$journal_lines[] = array(
-					'account' => '1104',
-					'debit' => 0,
-					'credit' => $return_amount,
-					'memo' => 'Pengurangan persediaan retur supplier '.$return_header->nomor_retur
-				);
+				if ($return_goods > 0) {
+					$journal_lines[] = array(
+						'account' => '1104',
+						'debit' => 0,
+						'credit' => $return_goods,
+						'memo' => 'Pengurangan persediaan retur supplier '.$return_header->nomor_retur
+					);
+				}
+				if ($return_ppn > 0) {
+					$journal_lines[] = array(
+						'account' => '1105',
+						'debit' => 0,
+						'credit' => $return_ppn,
+						'memo' => 'Pengurangan PPN masukan retur supplier '.$return_header->nomor_retur
+					);
+				}
 			}
 			$this->load->library('accounting');
 			if (!$this->accounting->post_journal(
@@ -491,6 +516,30 @@ class Supplier_return extends CI_Controller
 			GROUP BY order_item.barcode
 			ORDER BY order_item.product_name ASC, order_item.barcode ASC
 		", array($receipt_id, $receipt_id, $receipt_id))->result();
+	}
+
+	private function _calculate_return_ppn($receipt_id, $receipt_items, $goods_total)
+	{
+		$receipt = $this->db->select('ppn_nominal')->where('id', $receipt_id)->get('goods_receipts')->row();
+		$receipt_ppn = $receipt ? round((float) $receipt->ppn_nominal, 2) : 0;
+		$receipt_goods = 0;
+		$available_goods = 0;
+		foreach ($receipt_items as $item) {
+			$receipt_goods += (float) $item->unit_price * (int) $item->qty_received;
+			$available_goods += (float) $item->unit_price * (int) $item->qty_available;
+		}
+		if ($receipt_ppn <= 0 || $receipt_goods <= 0) {
+			return 0;
+		}
+		$returned = $this->db->query(
+			"SELECT COALESCE(SUM(ppn_nominal), 0) AS amount FROM retur_supplier WHERE goods_receipt_id = ? AND status = 'final'",
+			array($receipt_id)
+		)->row();
+		$remaining_ppn = max(0, round($receipt_ppn - (float) $returned->amount, 2));
+		if ($goods_total >= round($available_goods, 2)) {
+			return $remaining_ppn;
+		}
+		return min($remaining_ppn, round($receipt_ppn * $goods_total / $receipt_goods, 2));
 	}
 
 	private function _is_positive_integer($value)

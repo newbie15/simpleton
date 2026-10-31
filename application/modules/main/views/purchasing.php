@@ -379,26 +379,16 @@
 				<div class="panel panel-warning">
 					<div class="panel-heading"><strong>Barang di luar PO</strong></div>
 					<div class="panel-body">
-						<p class="help-block">Khusus manager/pengurus. Cari atau scan produk lalu tekan Enter. Untuk barang baru, cari nama dulu, scan barcode, lalu isi qty dan harga beli sesuai faktur.</p>
+						<div class="form-group adhoc-product-picker" style="position:relative;">
+							<label for="adhoc-search">Tambah barang (barcode / nama)</label>
+							<input class="form-control" id="adhoc-search" data-adhoc-search autocomplete="off" placeholder="Scan barcode atau cari nama barang lalu tekan Enter">
+							<div class="list-group" data-adhoc-results style="display:none;position:absolute;z-index:2002;top:100%;left:0;right:0;max-height:260px;overflow-y:auto;margin:0;"></div>
+							<p class="help-block">Khusus manager/pengurus. Scan barcode langsung menambahkan barang (format qty*barcode didukung). Barang baru: ketik nama lalu Enter, kemudian scan barcode. Isi qty dan harga beli sesuai faktur.</p>
+						</div>
 						<div class="table-responsive"><table class="table table-condensed table-bordered">
-							<thead><tr><th>Scan / cari barang</th><th>Nama barang bila baru</th><th>Qty diterima</th><th>Harga satuan</th><th></th></tr></thead>
-							<tbody id="adhoc-receipt-rows">
-								<tr>
-									<td>
-										<div class="adhoc-product-picker" style="position:relative;">
-											<input class="form-control" data-adhoc-search autocomplete="off" placeholder="Scan barcode atau cari nama">
-											<input type="hidden" name="adhoc[0][barcode]" data-adhoc-barcode>
-											<div class="list-group" data-adhoc-results style="display:none;position:absolute;z-index:1000;top:100%;left:0;right:0;max-height:220px;overflow:auto;margin:0;"></div>
-										</div>
-									</td>
-									<td><input class="form-control" name="adhoc[0][name]" data-adhoc-name maxlength="64"></td>
-									<td><input class="form-control" type="number" min="0" step="1" name="adhoc[0][qty]" value="0"></td>
-									<td><input class="form-control" type="number" min="0" step="1" name="adhoc[0][unit_price]"></td>
-									<td><button class="btn btn-xs btn-default" type="button" data-remove-adhoc>Hapus</button></td>
-								</tr>
-							</tbody>
+							<thead><tr><th>Barcode</th><th>Nama barang</th><th style="width:140px">Qty diterima</th><th style="width:160px">Harga satuan</th><th style="width:70px"></th></tr></thead>
+							<tbody id="adhoc-receipt-rows"></tbody>
 						</table></div>
-						<button class="btn btn-xs btn-default" id="add-adhoc-row" type="button"><i class="fa fa-plus"></i> Tambah baris</button>
 					</div>
 				</div>
 				<?php } ?>
@@ -413,7 +403,7 @@
 								$comparison = (int) $item->is_adhoc === 1 ? 'Ad-hoc' : ((int) $item->qty_received > (int) $item->qty_ordered ? 'Lebih diterima' :
 									($remaining === 0 ? 'Sesuai' : 'Menunggu'));
 							?>
-								<tr>
+								<tr data-barcode="<?php echo html_escape($item->barcode); ?>">
 									<td><?php echo (int) $item->is_adhoc === 1 ? '<span class="label label-warning">Ad-hoc</span>' : 'PO'; ?></td>
 									<td><?php echo html_escape($item->barcode); ?></td>
 									<td><?php echo html_escape($item->product_name); ?></td>
@@ -589,31 +579,6 @@
 		}
 		ppnInput.addEventListener('input', updateReceiptTotal);
 		updateReceiptTotal();
-	}());
-	(function () {
-		var rows = document.getElementById('adhoc-receipt-rows');
-		var add = document.getElementById('add-adhoc-row');
-		if (!rows || !add) { return; }
-		var next = 1;
-		add.addEventListener('click', function () {
-			var row = document.createElement('tr');
-			row.innerHTML = '<td><div class="adhoc-product-picker" style="position:relative;">' +
-				'<input class="form-control" data-adhoc-search autocomplete="off" placeholder="Scan barcode atau cari nama">' +
-				'<input type="hidden" name="adhoc[' + next + '][barcode]" data-adhoc-barcode>' +
-				'<div class="list-group" data-adhoc-results style="display:none;position:absolute;z-index:1000;top:100%;left:0;right:0;max-height:220px;overflow:auto;margin:0;"></div></div></td>' +
-				'<td><input class="form-control" maxlength="64" name="adhoc[' + next + '][name]" data-adhoc-name></td>' +
-				'<td><input class="form-control" type="number" min="0" step="1" value="0" name="adhoc[' + next + '][qty]"></td>' +
-				'<td><input class="form-control" type="number" min="0" step="1" name="adhoc[' + next + '][unit_price]"></td>' +
-				'<td><button class="btn btn-xs btn-default" type="button" data-remove-adhoc>Hapus</button></td>';
-			rows.appendChild(row);
-			next++;
-		});
-		rows.addEventListener('click', function (event) {
-			if (event.target && event.target.hasAttribute('data-remove-adhoc')) {
-				var row = event.target.closest('tr');
-				if (row) { row.parentNode.removeChild(row); }
-			}
-		});
 	}());
 	</script>
 <?php } ?>

@@ -3,186 +3,268 @@
 
 	var form = document.getElementById('receipt-form');
 	var rows = document.getElementById('adhoc-receipt-rows');
-	if (!form || !rows) {
+	var input = document.getElementById('adhoc-search');
+	if (!form || !rows || !input) {
 		return;
 	}
 
+	var picker = input.closest('.adhoc-product-picker');
+	var resultsBox = picker.querySelector('[data-adhoc-results]');
 	var searchUrl = form.getAttribute('data-product-search-url');
-	var requestDelay = 200;
+	var defaultPlaceholder = input.placeholder;
+	var products = [];
+	var activeIndex = -1;
+	var sequence = 0;
+	var timer = null;
+	var request = null;
+	var pendingName = '';
+	var nextIndex = 0;
 
-	function rowParts(input) {
-		var picker = input.closest('.adhoc-product-picker');
-		var row = input.closest('tr');
-		return {
-			picker: picker,
-			row: row,
-			barcode: picker.querySelector('[data-adhoc-barcode]'),
-			name: row.querySelector('[data-adhoc-name]'),
-			quantity: row.querySelector('[name$="[qty]"]'),
-			results: picker.querySelector('[data-adhoc-results]')
-		};
-	}
-
-	function hideResults(input) {
-		var parts = rowParts(input);
-		parts.results.style.display = 'none';
-		parts.results.innerHTML = '';
-	}
-
-	function chooseProduct(input, product) {
-		var parts = rowParts(input);
-		parts.barcode.value = product.barcode;
-		parts.name.value = product.nama;
-		input.value = product.barcode + ' - ' + product.nama;
-		hideResults(input);
-		if (parts.quantity) {
-			parts.quantity.focus();
+	function hideResults() {
+		window.clearTimeout(timer);
+		sequence++;
+		if (request) {
+			request.abort();
+			request = null;
 		}
+		resultsBox.style.display = 'none';
+		resultsBox.innerHTML = '';
+		products = [];
+		activeIndex = -1;
 	}
 
-	function displayResults(input, products, term) {
-		if (input.value.trim() !== term) {
+	function updateActive() {
+		Array.prototype.forEach.call(resultsBox.children, function (option, index) {
+			option.classList.toggle('active', index === activeIndex);
+		});
+	}
+
+	function renderResults(list) {
+		products = list;
+		activeIndex = list.length ? 0 : -1;
+		resultsBox.innerHTML = '';
+		if (!list.length) {
+			resultsBox.style.display = 'none';
 			return;
 		}
-		var parts = rowParts(input);
-		parts.results.innerHTML = '';
-		input._adhocProducts = products;
-		input._adhocSearchTerm = term;
-		if (!products.length) {
-			parts.results.style.display = 'none';
-			return;
-		}
-		products.forEach(function (product, index) {
+		list.forEach(function (product, index) {
 			var option = document.createElement('button');
 			option.type = 'button';
 			option.className = 'list-group-item';
-			option.setAttribute('data-product-index', String(index));
+			option.style.width = '100%';
+			option.style.textAlign = 'left';
 			option.textContent = product.barcode + ' - ' + product.nama;
-			parts.results.appendChild(option);
+			option.addEventListener('mousedown', function (event) {
+				event.preventDefault();
+				addProduct(product, 1);
+			});
+			option.addEventListener('mouseenter', function () {
+				activeIndex = index;
+				updateActive();
+			});
+			resultsBox.appendChild(option);
 		});
-		parts.results.style.display = 'block';
+		resultsBox.style.display = 'block';
+		updateActive();
 	}
 
-	function search(input, term, onComplete) {
-		if (!term || !searchUrl) {
-			displayResults(input, [], term);
-			if (onComplete) {
-				onComplete([]);
-			}
-			return;
+	function search(term, callback) {
+		var current = ++sequence;
+		if (request) {
+			request.abort();
 		}
-		var request = new XMLHttpRequest();
-		request.open('GET', searchUrl + '?q=' + encodeURIComponent(term), true);
-		request.onreadystatechange = function () {
-			if (request.readyState !== 4 || input.value.trim() !== term) {
+		var xhr = new XMLHttpRequest();
+		request = xhr;
+		xhr.open('GET', searchUrl + '?q=' + encodeURIComponent(term), true);
+		xhr.onreadystatechange = function () {
+			if (xhr.readyState !== 4 || current !== sequence) {
 				return;
 			}
-			var products = [];
-			if (request.status >= 200 && request.status < 300) {
+			var list = [];
+			if (xhr.status >= 200 && xhr.status < 300) {
 				try {
-					var response = JSON.parse(request.responseText);
-					products = response.products || [];
+					list = JSON.parse(xhr.responseText).products || [];
 				} catch (error) {
-					products = [];
+					list = [];
 				}
 			}
-			displayResults(input, products, term);
-			if (onComplete) {
-				onComplete(products);
+			if (callback) {
+				callback(list);
+			} else {
+				renderResults(list);
 			}
 		};
-		request.send();
+		xhr.send();
 	}
 
-	rows.addEventListener('input', function (event) {
-		var input = event.target.closest('[data-adhoc-search]');
-		if (!input) {
+	function bumpQuantity(field, quantity) {
+		field.value = (parseInt(field.value, 10) || 0) + quantity;
+		field.dispatchEvent(new Event('input', { bubbles: true }));
+	}
+
+	function findRow(scope, barcode, inside) {
+		var found = null;
+		Array.prototype.forEach.call(scope.querySelectorAll('tr[data-barcode]'), function (row) {
+			if (rows.contains(row) === inside && row.getAttribute('data-barcode') === barcode) {
+				found = row;
+			}
+		});
+		return found;
+	}
+
+	function makeInput(name, type, value) {
+		var field = document.createElement('input');
+		field.className = 'form-control';
+		field.name = name;
+		if (type) {
+			field.type = type;
+		}
+		if (type === 'number') {
+			field.min = '0';
+			field.step = '1';
+		}
+		field.value = value;
+		return field;
+	}
+
+	function appendRow(barcode, name, isNew, quantity) {
+		var index = nextIndex++;
+		var prefix = 'adhoc[' + index + ']';
+		var row = document.createElement('tr');
+		row.setAttribute('data-barcode', barcode);
+
+		var cellBarcode = document.createElement('td');
+		cellBarcode.textContent = barcode;
+		var hidden = makeInput(prefix + '[barcode]', 'hidden', barcode);
+		hidden.className = '';
+		cellBarcode.appendChild(hidden);
+
+		var nameInput = makeInput(prefix + '[name]', 'text', name);
+		nameInput.maxLength = 64;
+		nameInput.readOnly = !isNew;
+		var qtyInput = makeInput(prefix + '[qty]', 'number', quantity);
+		var priceInput = makeInput(prefix + '[unit_price]', 'number', '');
+		priceInput.placeholder = 'Harga beli';
+
+		var remove = document.createElement('button');
+		remove.type = 'button';
+		remove.className = 'btn btn-xs btn-default';
+		remove.setAttribute('data-remove-adhoc', '');
+		remove.textContent = 'Hapus';
+
+		[cellBarcode, nameInput, qtyInput, priceInput, remove].forEach(function (node, i) {
+			var cell = i === 0 ? node : document.createElement('td');
+			if (i > 0) {
+				cell.appendChild(node);
+			}
+			row.appendChild(cell);
+		});
+		rows.appendChild(row);
+		return { name: nameInput, price: priceInput };
+	}
+
+	function resetInput() {
+		input.value = '';
+		input.placeholder = pendingName ? 'Scan barcode untuk "' + pendingName + '", lalu Enter' : defaultPlaceholder;
+		hideResults();
+		input.focus();
+	}
+
+	function addProduct(product, quantity) {
+		var barcode = String(product.barcode);
+		var poRow = findRow(form, barcode, false);
+		var poQty = poRow ? poRow.querySelector('.receipt-quantity') : null;
+		if (poQty && !poQty.disabled) {
+			bumpQuantity(poQty, quantity);
+			pendingName = '';
+			resetInput();
 			return;
 		}
-		input.placeholder = 'Scan barcode atau cari nama';
-		var parts = rowParts(input);
-		parts.barcode.value = '';
-		if (input._adhocTimer) {
-			window.clearTimeout(input._adhocTimer);
+		var existing = findRow(rows, barcode, true);
+		if (existing) {
+			bumpQuantity(existing.querySelector('[name$="[qty]"]'), quantity);
+			pendingName = '';
+			resetInput();
+			return;
 		}
-		var term = input.value.trim();
-		input._adhocTimer = window.setTimeout(function () {
-			search(input, term);
-		}, requestDelay);
+		var isNew = !product.nama;
+		var created = appendRow(barcode, product.nama || pendingName, isNew, quantity);
+		pendingName = '';
+		resetInput();
+		(isNew && !created.name.value ? created.name : created.price).focus();
+	}
+
+	input.addEventListener('input', function () {
+		window.clearTimeout(timer);
+		var term = this.value.trim();
+		hideResults();
+		if (!term) {
+			return;
+		}
+		timer = window.setTimeout(function () {
+			search(term);
+		}, 180);
 	});
 
-	rows.addEventListener('keydown', function (event) {
-		var input = event.target.closest('[data-adhoc-search]');
-		if (!input) {
-			return;
-		}
-		if (event.key === 'Escape') {
-			hideResults(input);
-			return;
-		}
-		if (event.key !== 'Enter') {
-			return;
-		}
-		event.preventDefault();
-		var term = input.value.trim();
-		var products = input._adhocSearchTerm === term ? (input._adhocProducts || []) : [];
-		if (products.length) {
-			var exact = products.filter(function (product) {
-				return String(product.barcode).toLowerCase() === term.toLowerCase();
-			})[0];
-			chooseProduct(input, exact || products[0]);
-			return;
-		}
-		search(input, term, function (matches) {
-			if (matches.length) {
-				var exact = matches.filter(function (product) {
+	input.addEventListener('keydown', function (event) {
+		if (event.key === 'ArrowDown' && products.length) {
+			event.preventDefault();
+			activeIndex = (activeIndex + 1) % products.length;
+			updateActive();
+		} else if (event.key === 'ArrowUp' && products.length) {
+			event.preventDefault();
+			activeIndex = activeIndex <= 0 ? products.length - 1 : activeIndex - 1;
+			updateActive();
+		} else if (event.key === 'Escape') {
+			hideResults();
+		} else if (event.key === 'Enter') {
+			event.preventDefault();
+			event.stopPropagation();
+			window.clearTimeout(timer);
+			if (products.length && activeIndex >= 0) {
+				addProduct(products[activeIndex], 1);
+				return;
+			}
+			var value = this.value.trim();
+			if (!value) {
+				return;
+			}
+			var match = value.match(/^(\d+)\*(.+)$/);
+			var quantity = match ? parseInt(match[1], 10) : 1;
+			var term = match ? match[2].trim() : value;
+			if (!term || quantity < 1) {
+				return;
+			}
+			search(term, function (list) {
+				var exact = list.filter(function (product) {
 					return String(product.barcode).toLowerCase() === term.toLowerCase();
 				})[0];
-				chooseProduct(input, exact || matches[0]);
-				return;
-			}
-			var parts = rowParts(input);
-			if (/\s/.test(term)) {
-				parts.name.value = term;
-				input.value = '';
-				input.placeholder = 'Scan barcode barang baru, lalu Enter';
-				parts.results.innerHTML = '';
-				var hint = document.createElement('div');
-				hint.className = 'list-group-item text-muted';
-				hint.textContent = 'Nama disiapkan. Scan barcode barang baru.';
-				parts.results.appendChild(hint);
-				parts.results.style.display = 'block';
-				input.focus();
-				return;
-			}
-			parts.barcode.value = term;
-			if (parts.name && !parts.name.value.trim()) {
-				parts.name.focus();
-			} else {
-				input.value = '';
-				input.placeholder = 'Scan barcode barang baru, lalu Enter';
-				input.focus();
-			}
-			hideResults(input);
-		});
+				if (exact) {
+					addProduct(exact, quantity);
+				} else if (list.length) {
+					renderResults(list);
+				} else if (/\s/.test(term)) {
+					pendingName = term.substring(0, 64);
+					resetInput();
+				} else {
+					addProduct({ barcode: term, nama: '' }, quantity);
+				}
+			});
+		}
 	});
 
 	rows.addEventListener('click', function (event) {
-		var option = event.target.closest('[data-product-index]');
-		if (!option) {
-			return;
-		}
-		var picker = option.closest('.adhoc-product-picker');
-		var input = picker.querySelector('[data-adhoc-search]');
-		var product = (input._adhocProducts || [])[parseInt(option.getAttribute('data-product-index'), 10)];
-		if (product) {
-			chooseProduct(input, product);
+		if (event.target && event.target.hasAttribute('data-remove-adhoc')) {
+			var row = event.target.closest('tr');
+			if (row) {
+				row.parentNode.removeChild(row);
+			}
 		}
 	});
 
 	document.addEventListener('click', function (event) {
-		if (!event.target.closest('.adhoc-product-picker')) {
-			rows.querySelectorAll('[data-adhoc-search]').forEach(hideResults);
+		if (!picker.contains(event.target)) {
+			hideResults();
 		}
 	});
 }());

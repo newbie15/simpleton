@@ -11,7 +11,7 @@
 	<div class="box box-primary">
 		<div class="box-header with-border"><h3 class="box-title">Pilih penerimaan untuk retur</h3></div>
 		<div class="box-body table-responsive">
-			<table class="table table-bordered table-striped">
+			<table class="table table-bordered table-striped js-datatable">
 				<thead><tr><th>No. penerimaan</th><th>Tanggal</th><th>Surat jalan</th><th>Supplier</th><th>Qty diterima</th><th>Aksi</th></tr></thead>
 				<tbody>
 					<?php foreach ($receipts as $receipt) { ?>
@@ -28,9 +28,6 @@
 							</td>
 						</tr>
 					<?php } ?>
-					<?php if (count($receipts) === 0) { ?>
-						<tr><td colspan="6" class="text-center">Belum ada penerimaan barang.</td></tr>
-					<?php } ?>
 				</tbody>
 			</table>
 		</div>
@@ -40,7 +37,7 @@
 <div class="box box-warning">
 	<div class="box-header with-border"><h3 class="box-title">Draft Menunggu Persetujuan</h3></div>
 	<div class="box-body table-responsive">
-		<table class="table table-bordered table-striped">
+		<table class="table table-bordered table-striped js-datatable">
 			<thead><tr><th>No. retur</th><th>Penerimaan</th><th>Supplier</th><th>Tanggal</th><th>Total</th><th>Diajukan oleh</th><th>Aksi</th></tr></thead>
 			<tbody>
 				<?php foreach ($drafts as $draft) { ?>
@@ -50,7 +47,7 @@
 						<td><?php echo html_escape($draft->supplier_name); ?></td>
 						<td><?php echo html_escape($draft->tgl_retur); ?></td>
 						<td>Rp <?php echo number_format((float) $draft->total_nominal, 0, ',', '.'); ?></td>
-						<td><?php echo html_escape($draft->id_user); ?></td>
+						<td><?php echo html_escape($draft->operator_name); ?></td>
 						<td>
 							<a class="btn btn-xs btn-default" href="<?php echo site_url('main/supplier_return/preview/'.(int) $draft->id); ?>">Lihat dulu</a>
 							<?php if ($can_approve) { ?>
@@ -63,9 +60,6 @@
 						</td>
 					</tr>
 				<?php } ?>
-				<?php if (count($drafts) === 0) { ?>
-					<tr><td colspan="7" class="text-center">Tidak ada draft yang menunggu persetujuan.</td></tr>
-				<?php } ?>
 			</tbody>
 		</table>
 	</div>
@@ -74,7 +68,7 @@
 <div class="box box-default">
 	<div class="box-header with-border"><h3 class="box-title">Riwayat Retur Final</h3></div>
 	<div class="box-body table-responsive">
-		<table class="table table-bordered table-striped">
+		<table class="table table-bordered table-striped js-datatable">
 			<thead><tr><th>No. retur</th><th>Penerimaan</th><th>Supplier</th><th>Tanggal</th><th>Total</th><th>Petugas</th></tr></thead>
 			<tbody>
 				<?php foreach ($history as $return) { ?>
@@ -84,13 +78,25 @@
 						<td><?php echo html_escape($return->supplier_name); ?></td>
 						<td><?php echo html_escape($return->tgl_retur); ?></td>
 						<td>Rp <?php echo number_format((float) $return->total_nominal, 0, ',', '.'); ?></td>
-						<td><?php echo html_escape($return->id_user); ?><br><a class="btn btn-xs btn-default" href="<?php echo site_url('main/supplier_return/preview/'.(int) $return->id); ?>">Lihat</a></td>
+						<td><?php echo html_escape($return->operator_name); ?><br><a class="btn btn-xs btn-default" href="<?php echo site_url('main/supplier_return/preview/'.(int) $return->id); ?>">Lihat</a></td>
 					</tr>
-				<?php } ?>
-				<?php if (count($history) === 0) { ?>
-					<tr><td colspan="6" class="text-center">Belum ada retur supplier yang difinalisasi.</td></tr>
 				<?php } ?>
 			</tbody>
 		</table>
 	</div>
 </div>
+
+<script>
+window.addEventListener('load', function () {
+	if (!window.jQuery || !jQuery.fn.DataTable) { return; }
+	jQuery('table.js-datatable').each(function () {
+		var last = jQuery(this).find('thead th').length - 1;
+		var plain = jQuery(this).find('thead th:last').text() === 'Aksi' ? [last] : [];
+		jQuery(this).DataTable({
+			order: [],
+			columnDefs: [{ orderable: false, targets: plain }],
+			language: { emptyTable: 'Tidak ada data', zeroRecords: 'Tidak ditemukan', search: 'Cari:', lengthMenu: 'Tampilkan _MENU_', info: '_START_-_END_ dari _TOTAL_', paginate: { previous: 'Sebelumnya', next: 'Berikutnya' } }
+		});
+	});
+});
+</script>

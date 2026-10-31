@@ -39,6 +39,7 @@
 					</tbody>
 				</table>
 			</div>
+			<p class="help-block">PPN faktur penerimaan ikut diretur secara proporsional dan dihitung otomatis saat draft disimpan, karena barang yang diretur tidak jadi dibayar.</p>
 			<div class="form-group">
 				<label for="return-reason">Alasan retur supplier</label>
 				<textarea class="form-control" id="return-reason" name="alasan" rows="3" maxlength="2000" required></textarea>

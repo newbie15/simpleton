@@ -1098,7 +1098,7 @@ class Purchasing extends CI_Controller {
 			);
 		} elseif ($data['page'] === 'receive') {
 			$data['js_file'] = array(
-				base_url('assets/purchasing/adhoc_product_search.js?v=20261024-adhoc-product-search')
+				base_url('assets/purchasing/adhoc_product_search.js?v=20261031-adhoc-sales-style')
 			);
 		}
 		$data['output'] = $this->load->view('purchasing', $data, TRUE);
