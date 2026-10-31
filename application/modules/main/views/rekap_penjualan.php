@@ -1,5 +1,30 @@
 <?php defined('BASEPATH') OR exit('No direct script access allowed'); ?>
-<div id="exTab2" class="container" data-ajax-base="<?php echo html_escape($ajax_base); ?>">
+<style>
+	#exTab2 {
+		width: 100%;
+		padding-left: 0;
+		padding-right: 0;
+	}
+
+	#exTab2 .jexcel_container {
+		display: block;
+		width: 100% !important;
+		box-sizing: border-box;
+	}
+
+	#exTab2 .jexcel_content {
+		display: block;
+		width: auto !important;
+		overflow-x: auto;
+	}
+
+	#exTab2 .jexcel {
+		display: table;
+		width: auto !important;
+		table-layout: fixed;
+	}
+</style>
+<div id="exTab2" class="container-fluid" data-ajax-base="<?php echo html_escape($ajax_base); ?>">
 	<ul class="nav nav-tabs">
 		<li class="active"><a id="h" href="#harian">Harian</a></li>
 		<li><a id="m" href="#perorangan">Perorangan</a></li>

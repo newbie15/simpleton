@@ -5,6 +5,10 @@ class Rekap_penjualan extends CI_Controller
 {
 	public function index()
 	{
+		$this->load->library('page_access');
+		if (!$this->page_access->can_access('rekap_penjualan')) {
+			show_error('Anda tidak memiliki akses ke rekap penjualan.', 403);
+		}
 		$this->load->helper('url');
 		$data['css_file'] = array(
 			base_url('assets/jexcel/css/jexcel.css'),
@@ -13,7 +17,7 @@ class Rekap_penjualan extends CI_Controller
 		);
 		$data['js_file'] = array(
 			base_url('assets/easyautocomplete/jquery.easy-autocomplete.min.js'),
-			base_url('assets/kasir/rekap.js?v=20261024-return-net-billing'),
+			base_url('assets/kasir/rekap.js?v=20261030-fill-report-columns'),
 			base_url('assets/jexcel/js/jexcel.js'),
 			base_url('assets/jexcel/js/jsuites.js'),
 			base_url('assets/papaparse/papaparse.min.js')

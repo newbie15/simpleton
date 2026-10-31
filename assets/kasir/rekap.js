@@ -38,6 +38,32 @@ $(document).ready(function () {
         select.value = String(centerYear);
     }
 
+    function moneyColumn(width) {
+        return { type: 'numeric', width: width, mask: '#.##,##', decimal: ',', money: true };
+    }
+
+    function fitColumnsToWidth(container, columns) {
+        var availableWidth = container.parentElement.clientWidth;
+        var columnsWidth = columns.reduce(function (total, column) {
+            return total + (parseFloat(column.width) || 50);
+        }, 0);
+        var extraWidth = availableWidth - columnsWidth - 50;
+        if (extraWidth <= 0 || columnsWidth <= 0) {
+            return columns;
+        }
+
+        var distributedWidth = 0;
+        columns.forEach(function (column, index) {
+            var baseWidth = parseFloat(column.width) || 50;
+            var addedWidth = index === columns.length - 1
+                ? extraWidth - distributedWidth
+                : Math.floor(extraWidth * baseWidth / columnsWidth);
+            column.width = baseWidth + addedWidth;
+            distributedWidth += addedWidth;
+        });
+        return columns;
+    }
+
     function reportUrl(name, period, extra, download) {
         var url = ajaxBase + '/' + name + '/' + period;
         if (extra !== null && extra !== undefined) {
@@ -71,6 +97,16 @@ $(document).ready(function () {
                     return value !== '';
                 });
             });
+            rows.forEach(function (row) {
+                columns.forEach(function (column, index) {
+                    if (column.money && row[index] !== undefined && row[index] !== '') {
+                        var amount = Number(row[index]);
+                        if (isFinite(amount)) {
+                            row[index] = amount.toFixed(2);
+                        }
+                    }
+                });
+            });
             if (!rows.length) {
                 container.textContent = 'Tidak ada data untuk filter ini.';
                 return;
@@ -81,6 +117,7 @@ $(document).ready(function () {
                 configuredColumn.title = headers[index] || '';
                 return configuredColumn;
             });
+            fitColumnsToWidth(container, reportColumns);
             jexcel(container, {
                 data: rows,
                 search: true,
@@ -103,9 +140,11 @@ $(document).ready(function () {
             { type: 'text', width: 100 },
             { type: 'text', width: 100 },
             { type: 'text', width: 250 },
-            { type: 'text', width: 80 },
+            moneyColumn(100),
             { type: 'text', width: 60 },
-            { type: 'text', width: 100 },
+            moneyColumn(120),
+            moneyColumn(120),
+            moneyColumn(120),
             { type: 'text', width: 140 }
         ];
     }
@@ -142,9 +181,9 @@ $(document).ready(function () {
             { type: 'text', width: 180 },
             { type: 'text', width: 100 },
             { type: 'text', width: 200 },
-            { type: 'text', width: 130 },
-            { type: 'text', width: 130 },
-            { type: 'text', width: 130 }
+            moneyColumn(150),
+            moneyColumn(150),
+            moneyColumn(150)
         ], 30);
     }
 
@@ -157,9 +196,9 @@ $(document).ready(function () {
             { type: 'text', width: 100 },
             { type: 'text', width: 220 },
             { type: 'text', width: 180 },
-            { type: 'text', width: 140 },
-            { type: 'text', width: 140 },
-            { type: 'text', width: 140 }
+            moneyColumn(150),
+            moneyColumn(150),
+            moneyColumn(150)
         ], 30);
     }
 
@@ -169,7 +208,9 @@ $(document).ready(function () {
             { type: 'text', width: 160 },
             { type: 'numeric', width: 180 },
             { type: 'numeric', width: 160 },
-            { type: 'numeric', width: 200 }
+            moneyColumn(170),
+            moneyColumn(170),
+            moneyColumn(170)
         ], 12);
     }
 

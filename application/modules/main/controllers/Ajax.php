@@ -269,6 +269,7 @@ class Ajax extends CI_Controller {
 
     public function data_harian()
     {
+        $this->_require_sales_report_access();
         $date = $this->uri->segment(4);
         if (!is_string($date) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) ||
             date('Y-m-d', strtotime($date)) !== $date) {
@@ -285,16 +286,28 @@ class Ajax extends CI_Controller {
                 sale.qty,
                 CASE WHEN sale.dpp_satuan IS NOT NULL THEN sale.jumlah
                     ELSE sale.jumlah + sale.jumlah * COALESCE(sale.ppn, 0) END AS jumlah,
+                ROUND(COALESCE(approved_return.amount, 0), 2) AS retur_disetujui,
+                ROUND(CASE WHEN sale.dpp_satuan IS NOT NULL THEN sale.jumlah
+                    ELSE sale.jumlah + sale.jumlah * COALESCE(sale.ppn, 0) END -
+                    COALESCE(approved_return.amount, 0), 2) AS tertagih,
                 sale.metode_pembayaran
             FROM penjualan sale
             LEFT JOIN stok product ON product.barcode = sale.kode
             LEFT JOIN karyawan employee ON employee.npk = sale.id_karyawan
+            LEFT JOIN (
+                SELECT return_item.penjualan_id,
+                    SUM(return_item.subtotal) AS amount
+                FROM retur_penjualan_items return_item
+                JOIN retur_penjualan return_header ON return_header.id = return_item.retur_id
+                WHERE return_header.status IN ('approved', 'completed')
+                GROUP BY return_item.penjualan_id
+            ) approved_return ON approved_return.penjualan_id = sale.id
             WHERE sale.tgl >= ? AND sale.tgl < ?
             ORDER BY sale.tgl ASC, sale.id ASC
         ", array($start, $end))->result_array();
         $this->_sales_csv(
             array('nota', 'npk', 'nama', 'bagian', 'barcode', 'item', 'harga', 'qty', 'jumlah',
-                'metode_pembayaran'),
+                'retur_disetujui', 'tertagih', 'metode_pembayaran'),
             $rows,
             'data_harian_'.$date.'.csv',
             $this->uri->segment(5) === 'd'
@@ -303,6 +316,7 @@ class Ajax extends CI_Controller {
 
     public function data_perorangan()
     {
+        $this->_require_sales_report_access();
         $period = $this->uri->segment(4);
         $npk = $this->uri->segment(5);
         $range = $this->_sales_month_range($period);
@@ -316,12 +330,12 @@ class Ajax extends CI_Controller {
 
         $rows = $this->db->query("
             SELECT DATE(sale.tgl) AS tanggal, sale.nota, sale.id_karyawan AS npk,
-                employee.nama, SUM(CASE WHEN sale.dpp_satuan IS NOT NULL THEN sale.jumlah
-                    ELSE sale.jumlah + sale.jumlah * COALESCE(sale.ppn, 0) END) AS total_transaksi,
-                SUM(COALESCE(approved_return.amount, 0)) AS retur_disetujui,
-                SUM(CASE WHEN sale.dpp_satuan IS NOT NULL THEN sale.jumlah
+                employee.nama, ROUND(SUM(CASE WHEN sale.dpp_satuan IS NOT NULL THEN sale.jumlah
+                    ELSE sale.jumlah + sale.jumlah * COALESCE(sale.ppn, 0) END), 2) AS total_transaksi,
+                ROUND(SUM(COALESCE(approved_return.amount, 0)), 2) AS retur_disetujui,
+                ROUND(SUM(CASE WHEN sale.dpp_satuan IS NOT NULL THEN sale.jumlah
                     ELSE sale.jumlah + sale.jumlah * COALESCE(sale.ppn, 0) END -
-                    COALESCE(approved_return.amount, 0)) AS tertagih
+                    COALESCE(approved_return.amount, 0)), 2) AS tertagih
             FROM penjualan sale
             LEFT JOIN karyawan employee ON employee.npk = sale.id_karyawan
             LEFT JOIN (
@@ -346,6 +360,7 @@ class Ajax extends CI_Controller {
 
     public function data_bulanan()
     {
+        $this->_require_sales_report_access();
         $period = $this->uri->segment(4);
         $range = $this->_sales_month_range($period);
         if ($range === FALSE) {
@@ -354,12 +369,12 @@ class Ajax extends CI_Controller {
 
         $rows = $this->db->query("
             SELECT sale.id_karyawan AS npk, employee.nama, employee.bagian,
-                SUM(CASE WHEN sale.dpp_satuan IS NOT NULL THEN sale.jumlah
-                    ELSE sale.jumlah + sale.jumlah * COALESCE(sale.ppn, 0) END) AS total_transaksi,
-                SUM(COALESCE(approved_return.amount, 0)) AS retur_disetujui,
-                SUM(CASE WHEN sale.dpp_satuan IS NOT NULL THEN sale.jumlah
+                ROUND(SUM(CASE WHEN sale.dpp_satuan IS NOT NULL THEN sale.jumlah
+                    ELSE sale.jumlah + sale.jumlah * COALESCE(sale.ppn, 0) END), 2) AS total_transaksi,
+                ROUND(SUM(COALESCE(approved_return.amount, 0)), 2) AS retur_disetujui,
+                ROUND(SUM(CASE WHEN sale.dpp_satuan IS NOT NULL THEN sale.jumlah
                     ELSE sale.jumlah + sale.jumlah * COALESCE(sale.ppn, 0) END -
-                    COALESCE(approved_return.amount, 0)) AS tertagih
+                    COALESCE(approved_return.amount, 0)), 2) AS tertagih
             FROM penjualan sale
             LEFT JOIN karyawan employee ON employee.npk = sale.id_karyawan
             LEFT JOIN (
@@ -384,6 +399,7 @@ class Ajax extends CI_Controller {
 
     public function data_tahunan()
     {
+        $this->_require_sales_report_access();
         $year = $this->uri->segment(4);
         if (!is_string($year) || !preg_match('/^\d{4}$/', $year) ||
             (int) $year < 2000 || (int) $year > 2100) {
@@ -396,15 +412,28 @@ class Ajax extends CI_Controller {
             SELECT DATE_FORMAT(sale.tgl, '%Y-%m') AS periode,
                 COUNT(DISTINCT CONCAT(DATE(sale.tgl), ':', sale.nota)) AS jumlah_transaksi,
                 SUM(sale.qty) AS qty_terjual,
-                SUM(CASE WHEN sale.dpp_satuan IS NOT NULL THEN sale.jumlah
-                    ELSE sale.jumlah + sale.jumlah * COALESCE(sale.ppn, 0) END) AS jumlah_penjualan
+                ROUND(SUM(CASE WHEN sale.dpp_satuan IS NOT NULL THEN sale.jumlah
+                    ELSE sale.jumlah + sale.jumlah * COALESCE(sale.ppn, 0) END), 2) AS jumlah_penjualan,
+                ROUND(SUM(COALESCE(approved_return.amount, 0)), 2) AS retur_disetujui,
+                ROUND(SUM(CASE WHEN sale.dpp_satuan IS NOT NULL THEN sale.jumlah
+                    ELSE sale.jumlah + sale.jumlah * COALESCE(sale.ppn, 0) END -
+                    COALESCE(approved_return.amount, 0)), 2) AS tertagih
             FROM penjualan sale
+            LEFT JOIN (
+                SELECT return_item.penjualan_id,
+                    SUM(return_item.subtotal) AS amount
+                FROM retur_penjualan_items return_item
+                JOIN retur_penjualan return_header ON return_header.id = return_item.retur_id
+                WHERE return_header.status IN ('approved', 'completed')
+                GROUP BY return_item.penjualan_id
+            ) approved_return ON approved_return.penjualan_id = sale.id
             WHERE sale.tgl >= ? AND sale.tgl < ?
             GROUP BY DATE_FORMAT(sale.tgl, '%Y-%m')
             ORDER BY periode ASC
         ", array($start, $end))->result_array();
         $this->_sales_csv(
-            array('periode', 'jumlah_transaksi', 'qty_terjual', 'jumlah_penjualan'),
+            array('periode', 'jumlah_transaksi', 'qty_terjual', 'jumlah_penjualan',
+                'retur_disetujui', 'tertagih'),
             $rows,
             'data_tahunan_'.$year.'.csv',
             $this->uri->segment(5) === 'd'
@@ -453,6 +482,7 @@ class Ajax extends CI_Controller {
         fclose($stream);
 
         $this->output->set_content_type('text/csv', 'utf-8');
+        $this->output->set_header('Cache-Control: no-store, private');
         if ($download) {
             $this->output->set_header('Content-Disposition: attachment; filename="'.$filename.'"');
         }
@@ -460,6 +490,7 @@ class Ajax extends CI_Controller {
     }
 
     public function rekap_harian(){
+        $this->_require_sales_report_access();
         date_default_timezone_set('Asia/Jakarta');
         $tgl = date('Y-m-d');
         $start = $tgl.' 00:00:00';
@@ -513,6 +544,7 @@ class Ajax extends CI_Controller {
     }
 
     public function rekap_perorangan(){
+        $this->_require_sales_report_access();
         $seg_periode = $this->uri->segment(4);
         $npk = $this->uri->segment(5);
 
@@ -594,6 +626,14 @@ class Ajax extends CI_Controller {
                 $values[] = isset($row[$column]) ? $row[$column] : '';
             }
             echo implode($separator, $values)."\n";
+        }
+    }
+
+    private function _require_sales_report_access()
+    {
+        $this->load->library('page_access');
+        if (!$this->page_access->can_access('rekap_penjualan')) {
+            show_error('Anda tidak memiliki akses ke rekap penjualan.', 403);
         }
     }
 
