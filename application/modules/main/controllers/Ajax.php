@@ -6,8 +6,19 @@ class Ajax extends CI_Controller {
         parent::__construct();
         $this->load->database();
         $this->load->helper('url');
-        
-        // $this->load->library('grocery_CRUD');
+        $this->load->library('ion_auth');
+        if (!$this->ion_auth->logged_in()) {
+            if ($this->input->is_ajax_request() || $this->input->method(TRUE) === 'POST') {
+                $this->output
+                    ->set_status_header(401)
+                    ->set_content_type('application/json', 'utf-8')
+                    ->set_output(json_encode(array('status' => 'error', 'message' => 'Unauthorized')));
+                $this->output->_display();
+                exit;
+            } else {
+                redirect('auth/login', 'refresh');
+            }
+        }
     }
 
     public function index()
@@ -99,6 +110,9 @@ class Ajax extends CI_Controller {
     }
 
     public function upload_excel(){
+        if (!$this->ion_auth->is_admin()) {
+            show_error('Akses ditolak.', 403);
+        }
         if(isset($_POST) == true){
             //generate unique file name
             $fileName = time().'_'.basename($_FILES["file"]["name"]);
@@ -207,6 +221,9 @@ class Ajax extends CI_Controller {
     }
 
     public function upload_excel_karyawan(){
+        if (!$this->ion_auth->is_admin()) {
+            show_error('Akses ditolak.', 403);
+        }
         if(isset($_POST) == true){
             //generate unique file name
             $fileName = time().'_'.basename($_FILES["file"]["name"]);

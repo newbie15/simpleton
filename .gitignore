@@ -1,3 +1,16 @@
 # my private modules
 application/modules/chart
 assets/uploads
+
+# Backups and SQL dumps
+/backups/
+*.sql.gz
+*.7z
+*.sql.bak
+!simpleton (2).sql
+
+# Local binaries and tools
+/tools/
+
+# Local secrets
+/docs/apikey.txt

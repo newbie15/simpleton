@@ -158,18 +158,28 @@ class Kasir extends CI_Controller {
 			show_404();
 		}
 
+		$this->load->library('ion_auth');
+		if (!$this->ion_auth->logged_in()) {
+			$this->_checkout_json(FALSE, 'Sesi Anda telah berakhir atau belum login. Silakan login kembali.');
+			return;
+		}
+
 		$input = $this->_checkout_input();
 		if ($input === FALSE) {
 			return;
 		}
 		$request_id = $input['request_id'];
-		$id_user = $input['id_user'];
+		$id_user = (string) $this->ion_auth->get_user_id();
+		if ($id_user === '' || $id_user === '0') {
+			$id_user = $input['id_user'];
+		}
 		$id_karyawan = $input['id_karyawan'];
 		$payment_method = $input['payment_method'];
 		$nominal_bayar = $input['nominal_bayar'];
 		$kode_voucher = $input['kode_voucher'];
 		$nomor_ref = $input['nomor_referensi'];
 		$bank_tujuan = $input['bank_tujuan'];
+
 		if (!$this->db->table_exists('pos_receipt_sequences') ||
 			!$this->db->field_exists('checkout_request_id', 'penjualan_pembayaran') ||
 			!$this->db->table_exists('sales_tax_settings') ||
@@ -260,6 +270,32 @@ class Kasir extends CI_Controller {
 			$voucher_id_used = $voucher_result['voucher_id'];
 			$voucher_coupon_id_used = $voucher_result['coupon_id'];
 			$total_tagihan = max(0, $total_tagihan - $diskon_voucher);
+		}
+
+		// Validasi limit belanja potong_gaji di dalam transaksi (dengan row locking karyawan)
+		if ($payment_method === 'potong_gaji') {
+			$emp = $this->db->query("SELECT npk, limit_belanja FROM karyawan WHERE npk = ? FOR UPDATE", array($id_karyawan))->row();
+			if (!$emp) {
+				$this->db->trans_rollback();
+				$this->db->db_debug = $previous_db_debug;
+				$this->_checkout_json(FALSE, 'Data karyawan (NPK) tidak ditemukan.');
+				return;
+			}
+			$current_month = date('m');
+			$current_year = date('Y');
+			$spent = (float) $this->db->query("
+				SELECT COALESCE(SUM(total_tagihan), 0) AS total 
+				FROM penjualan_pembayaran 
+				WHERE id_karyawan = ? AND metode_pembayaran = 'potong_gaji'
+				  AND MONTH(waktu_transaksi) = ? AND YEAR(waktu_transaksi) = ?
+			", array($id_karyawan, $current_month, $current_year))->row()->total;
+
+			if (($spent + $total_tagihan) > (float) $emp->limit_belanja) {
+				$this->db->trans_rollback();
+				$this->db->db_debug = $previous_db_debug;
+				$this->_checkout_json(FALSE, 'Limit belanja karyawan tidak mencukupi (terpakai Rp '.number_format($spent, 0, ',', '.').', limit Rp '.number_format($emp->limit_belanja, 0, ',', '.').'). Gunakan metode pembayaran lain.');
+				return;
+			}
 		}
 
 		$is_cash = ($payment_method === 'tunai' || $payment_method === 'cash');
@@ -420,6 +456,13 @@ class Kasir extends CI_Controller {
 			!in_array($payment_method, $allowed_methods, TRUE) ||
 			!is_array($items) || count($items) === 0) {
 			$this->_checkout_json(FALSE, 'Data checkout tidak valid. Periksa NPK, kasir, metode pembayaran, dan keranjang.');
+			return FALSE;
+		}
+
+		// Validasi NPK karyawan eksistensi
+		$emp = $this->db->query("SELECT npk, limit_belanja FROM karyawan WHERE npk = ?", array($id_karyawan))->row();
+		if (!$emp) {
+			$this->_checkout_json(FALSE, 'Data karyawan (NPK) tidak ditemukan.');
 			return FALSE;
 		}
 
@@ -945,10 +988,22 @@ class Kasir extends CI_Controller {
 	}
 
 	public function delete_excel($f){
-		unlink(dirname(__FILE__) .'\..\..\..\..\assets\uploads\\'.$f.".xls");
+		$this->load->library('ion_auth');
+		if (!$this->ion_auth->logged_in() || !$this->ion_auth->is_admin()) {
+			show_error('Akses ditolak.', 403);
+		}
+		$clean_f = basename($f);
+		$target = dirname(__FILE__) .'/../../../../assets/uploads/'.$clean_f.".xls";
+		if (file_exists($target)) {
+			unlink($target);
+		}
 	}
 
 	public function excel($file){
+		$this->load->library('ion_auth');
+		if (!$this->ion_auth->logged_in() || !$this->ion_auth->is_admin()) {
+			show_error('Akses ditolak.', 403);
+		}
 		date_default_timezone_set("Asia/Jakarta");
 		// $file = $_POST['filename'];
 		// $this->load->helper('file');

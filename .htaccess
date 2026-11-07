@@ -1,5 +1,14 @@
 <IfModule mod_rewrite.c>
 RewriteEngine On
+
+# SEC-01: Blokir akses langsung ke berkas sensitif, sistem versi, script, dokumen, backup, dan database dump
+RewriteRule ^(\.git|scripts|python|backups|docs|tests|tools)(/|$) - [F,L]
+RewriteRule ^application/sql(/|$) - [F,L]
+RewriteRule \.(sql|7z|ini|log|md)$ - [F,L]
+RewriteRule ^assets/uploads/.*\.(xls|xlsx|csv|txt)$ - [F,L]
+RewriteRule ^(composer\.json|composer\.lock|IDEA\.md)$ - [F,L]
+
+# Routing standar CodeIgniter
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^(.*)$ index.php/$1 [L] 
