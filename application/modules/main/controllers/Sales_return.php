@@ -227,11 +227,18 @@ class Sales_return extends CI_Controller
 		$rows = $this->db->query("
 			SELECT return_header.id, return_header.nomor_retur, return_header.nota_penjualan,
 				return_header.tgl_retur, return_header.total_retur, return_header.id_user,
+				COALESCE(user.first_name, return_header.id_user) AS user_name,
 				return_header.status, return_header.rejection_reason,
 				return_header.approved_by, return_header.rejected_by,
+				COALESCE(approver.first_name, return_header.approved_by) AS approved_by_name,
+				COALESCE(rejector.first_name, return_header.rejected_by) AS rejected_by_name,
 				(SELECT COUNT(*) FROM retur_penjualan_items return_item
-					WHERE return_item.retur_id = return_header.id) AS item_count
+					WHERE return_item.retur_id = return_header.id) AS item_count,
+				CASE WHEN EXISTS (SELECT 1 FROM sales_billing_items billing WHERE billing.nota = return_header.nota_penjualan) THEN 1 ELSE 0 END AS nota_billed
 			FROM retur_penjualan return_header
+			LEFT JOIN users user ON user.id = return_header.id_user
+			LEFT JOIN users approver ON approver.id = return_header.approved_by
+			LEFT JOIN users rejector ON rejector.id = return_header.rejected_by
 			".$base_where.$search_sql."
 			ORDER BY ".$order_by.' '.$order_direction.', return_header.id DESC'.
 			' LIMIT '.$length.' OFFSET '.$start,
@@ -248,10 +255,14 @@ class Sales_return extends CI_Controller
 				'item_count' => (int) $return->item_count,
 				'total_retur' => (float) $return->total_retur,
 				'id_user' => $return->id_user,
+				'user_name' => $return->user_name,
 				'status' => $return->status,
 				'rejection_reason' => $return->rejection_reason,
 				'approved_by' => $return->approved_by,
+				'approved_by_name' => $return->approved_by_name,
 				'rejected_by' => $return->rejected_by,
+				'rejected_by_name' => $return->rejected_by_name,
+				'nota_billed' => (int) $return->nota_billed,
 				'action_html' => $this->_return_action_html($return)
 			);
 		}
@@ -287,6 +298,8 @@ class Sales_return extends CI_Controller
 		$data = array(
 			'return' => $return,
 			'items' => $items,
+			'is_manager' => $this->_is_manager(),
+			'form_token' => $this->_form_token(),
 			'judul_besar' => 'Detail retur penjualan',
 			'judul_kecil' => $return->nomor_retur,
 			'm_sales_return' => TRUE
@@ -314,6 +327,19 @@ class Sales_return extends CI_Controller
 		if (!is_array($posted_restock)) {
 			$posted_restock = array();
 		}
+
+		// Check if nota is already billed
+		$billed = $this->db->query("
+			SELECT 1 FROM sales_billing_items WHERE nota = ? LIMIT 1
+		", array($nota))->row();
+		if ($billed) {
+			$this->_redirect_error('Nota sudah tertagih. Tidak dapat menginput retur untuk nota yang sudah tertagih.');
+		}
+
+		// If nota validated, reset to Not Validated after retur approved
+		$validated = $this->db->query("
+			SELECT 1 FROM sales_validation_items WHERE nota = ? AND status = 'valid' LIMIT 1
+		", array($nota))->row();
 
 		$selected = array();
 		foreach ($posted_qty as $sale_id => $quantity) {
@@ -617,6 +643,9 @@ class Sales_return extends CI_Controller
 			log_message('error', 'Gagal menyetujui retur '.$return->nomor_retur.': '.$error);
 			$this->_redirect_error('Retur gagal disetujui: '.$error);
 		}
+
+		$this->db->delete('sales_validation_items', array('nota' => $return->nota_penjualan));
+
 		$updated = $this->db->where('id', (int) $return_id)->where('status', 'pending')->update('retur_penjualan', array(
 			'status' => 'approved',
 			'approved_by' => (string) $this->ion_auth->get_user_id(),
@@ -692,28 +721,27 @@ class Sales_return extends CI_Controller
 	{
 		$view_url = site_url('main/sales_return/view/'.(int) $return->id);
 		$view_button = '<a class="btn btn-xs btn-info" href="'.html_escape($view_url).'"><i class="fa fa-eye" aria-hidden="true"></i> Lihat</a>';
-		if ($return->status === 'pending' && $this->_is_manager()) {
-			$token = html_escape($this->_form_token());
-			$id = (int) $return->id;
-			$approve_url = site_url('main/sales_return/approve/'.$id);
-			$reject_url = site_url('main/sales_return/reject/'.$id);
-			return $view_button.'<div style="margin-top:5px"></div><form method="post" action="'.html_escape($approve_url).'" style="margin-bottom:5px;" onsubmit="return window.confirm(\'Setujui retur ini? Stok dan jurnal akan diperbarui.\');">'.
-				'<input type="hidden" name="form_token" value="'.$token.'">'.
-				'<button class="btn btn-xs btn-success" type="submit">Setujui</button></form>'.
-				'<form method="post" action="'.html_escape($reject_url).'">'.
-				'<input type="hidden" name="form_token" value="'.$token.'">'.
-				'<div class="input-group input-group-sm"><input class="form-control" name="rejection_reason" maxlength="500" placeholder="Alasan penolakan" required><span class="input-group-btn"><button class="btn btn-danger" type="submit">Tolak</button></span></div></form>';
+		
+		if ($return->status !== 'pending') {
+			return $view_button;
 		}
-		if ($return->status === 'pending') {
-			return $view_button.'<div style="margin-top:5px"></div><span class="text-muted">Menunggu manager</span>';
+		
+		if (!$this->_is_manager()) {
+			return $view_button;
 		}
-		if ($return->approved_by) {
-			return $view_button.'<br><small>Disetujui oleh '.html_escape($return->approved_by).'</small>';
-		}
-		if ($return->rejected_by) {
-			return $view_button.'<br><small>Ditolak oleh '.html_escape($return->rejected_by).'</small>';
-		}
-		return $view_button;
+		
+		$token = html_escape($this->_form_token());
+		$id = (int) $return->id;
+		$approve_url = site_url('main/sales_return/approve/'.$id);
+		$reject_url = site_url('main/sales_return/reject/'.$id);
+		
+		return $view_button.'<div style="margin-top:5px"></div>'.
+			'<form method="post" action="'.html_escape($approve_url).'" style="margin-bottom:5px;" onsubmit="return window.confirm(\'Setujui retur ini? Stok dan jurnal akan diperbarui.\');">'.
+			'<input type="hidden" name="form_token" value="'.$token.'">'.
+			'<button class="btn btn-xs btn-success" type="submit" style="width:100%">Setujui</button></form>'.
+			'<form method="post" action="'.html_escape($reject_url).'" style="margin:0">'.
+			'<input type="hidden" name="form_token" value="'.$token.'">'.
+			'<div class="input-group input-group-sm"><input class="form-control" name="rejection_reason" maxlength="500" placeholder="Alasan penolakan" required><span class="input-group-btn"><button class="btn btn-danger" type="submit">Tolak</button></span></div></form>';
 	}
 
 	private function _is_manager()

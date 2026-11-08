@@ -33,8 +33,17 @@ $assert($invoke('_is_date', array('2026-10-10')) === TRUE, 'Accepts a real calen
 $assert($invoke('_is_date', array('2026-02-30')) === FALSE, 'Rejects an impossible calendar date.');
 
 $view = file_get_contents($base.DIRECTORY_SEPARATOR.'views'.DIRECTORY_SEPARATOR.'petty_cash_new.php');
+$cashier_view = file_get_contents($base.DIRECTORY_SEPARATOR.'views'.DIRECTORY_SEPARATOR.'petty_cash_cashier.php');
 $legacy_view = file_get_contents($base.DIRECTORY_SEPARATOR.'views'.DIRECTORY_SEPARATOR.'petty_cash.php');
 $legacy_controller = file_get_contents($base.DIRECTORY_SEPARATOR.'controllers'.DIRECTORY_SEPARATOR.'Petty_cash.php');
+$assert(strpos($cashier_view, 'name="transaction_type" value="expense"') !== FALSE &&
+	strpos($cashier_view, 'name="expense_account_id"') !== FALSE &&
+	strpos($cashier_view, 'name="proof_file"') !== FALSE &&
+	strpos($cashier_view, 'name="return_to" value="main/petty_cash/cashier"') !== FALSE,
+	'Cashier workspace submits a simple expense with its proof through the established handler.');
+$assert(strpos($legacy_controller, "return_to === 'main/petty_cash/cashier'") !== FALSE &&
+	strpos($legacy_controller, "in_group('kasir')") !== FALSE,
+	'Cashier workspace is limited to cashier or approver groups and returns to its own page.');
 $assert(strpos($view, 'main/petty_cash/submit_transaction') !== FALSE &&
 	strpos($view, 'main/petty_cash/approve/') !== FALSE &&
 	strpos($view, 'main/petty_cash/close_day') !== FALSE, 'New workspace uses the established transaction and approval handlers.');

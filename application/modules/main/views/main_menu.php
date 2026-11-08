@@ -11,6 +11,7 @@ $front_end_items = array(
 $back_end_groups = array(
 	array('Pembelian & Stok', 'fa-truck', array(
 		array('purchasing', 'Purchasing', 'main/purchasing', 'fa-truck', isset($m_purchasing)),
+		array('purchasing', 'Riwayat HPP', 'main/hpp', 'fa-line-chart', isset($m_hpp)),
 		array('supplier_return', 'Retur Supplier', 'main/supplier_return', 'fa-reply-all', isset($m_supplier_return)),
 		array('petty_cash', 'Pembayaran Supplier', 'main/management_payments', 'fa-credit-card', isset($m_management_payments), array('admin', 'management', 'pengurus')),
 		array('suppliers', 'Supplier', 'main/purchasing/suppliers', 'fa-building', isset($m_supplier)),
@@ -22,22 +23,26 @@ $back_end_groups = array(
 		array('rekap_penjualan', 'Rekap Penjualan', 'main/rekap_penjualan', 'fa-line-chart', isset($m_rekap)),
 		array('sales_return', 'Retur Penjualan', 'main/sales_return', 'fa-reply', isset($m_sales_return)),
 		array('accounting', 'Tagihan & Validasi', 'main/sales_billing', 'fa-check-circle', isset($m_sales_billing)),
-		array('accounting', 'Pengaturan PPN', 'main/vat_settings', 'fa-percent', isset($m_vat_settings)),
+		array('accounting', 'Pengaturan PPN', 'main/vat_settings', 'fa-calculator', isset($m_vat_settings)),
 		array('vouchers', 'Voucher', 'main/voucher', 'fa-ticket', isset($m_vouchers)),
 	)),
 	array('Akuntansi & Kas', 'fa-book', array(
+		array('accounting', 'Akuntansi Terpadu (Utama)', 'main/accounting_unified', 'fa-star text-yellow', isset($m_accounting_unified)),
 		array('accounting', 'Buku Akun (Gnucash-style)', 'main/accounting_book', 'fa-sitemap', isset($m_accounting_book)),
 		array('accounting', 'Accounting V3 — Spreadsheet', 'main/accounting_grid', 'fa-table', isset($m_accounting_grid)),
 		array('accounting', 'Accounting V2 — Buku Besar', 'main/accounting_new', 'fa-book', isset($m_accounting_new)),
 		array('accounting', 'Accounting (Lama)', 'main/accounting', 'fa-book', isset($m_accounting)),
-		array('petty_cash', 'Petty Cash V3 — Spreadsheet', 'main/petty_cash_grid', 'fa-table', isset($m_petty_cash_grid)),
-		array('petty_cash', 'Kas & Petty Cash V2', 'main/petty_cash_new', 'fa-money', isset($m_petty_cash_new)),
-		array('petty_cash', 'Kas & Petty Cash (Lama)', 'main/petty_cash', 'fa-money', isset($m_petty_cash)),
+		array('petty_cash', 'Catat Pengeluaran Kas Kecil', 'main/petty_cash/cashier', 'fa-money', isset($m_petty_cash_cashier), array('kasir')),
+		array('petty_cash', 'Petty Cash V3 — Spreadsheet', 'main/petty_cash_grid', 'fa-table', isset($m_petty_cash_grid), array('admin', 'management', 'pengurus')),
+		array('petty_cash', 'Kas & Petty Cash V2', 'main/petty_cash_new', 'fa-money', isset($m_petty_cash_new), array('admin', 'management', 'pengurus')),
+		array('petty_cash', 'Kas & Petty Cash (Lama)', 'main/petty_cash', 'fa-money', isset($m_petty_cash), array('admin', 'management', 'pengurus')),
+		array('bank_reconciliation', 'Rekonsiliasi Bank', 'main/bank_reconciliation', 'fa-university', isset($m_bank_reconciliation)),
 	)),
 	array('Anggota & Data', 'fa-users', array(
 		array('karyawan', 'Karyawan', 'main/karyawan', 'fa-users', isset($m_karyawan)),
 		array('kartu', 'Kartu Anggota', 'main/kartu/batch', 'fa-credit-card', isset($m_kartu)),
 		array('kamera', 'Foto Anggota', 'main/kamera', 'fa-camera', isset($m_foto)),
+		array('simpanan', 'Manajemen Simpanan', 'main/simpanan', 'fa-money', isset($m_simpanan)),
 		array('users', 'Manajemen User', 'auth/index', 'fa-user', isset($m_user) || isset($m_auth_index)),
 		array('update_data', 'Update Data', 'main/data_update', 'fa-upload', isset($m_update)),
 	)),
@@ -59,7 +64,8 @@ foreach ($back_end_groups as $group_index => $group) {
 $back_end_active = FALSE;
 foreach ($back_end_items as $item) {
 	$back_end_active = $back_end_active || $item[4];
-}$front_end_visible = FALSE;
+}
+$front_end_visible = FALSE;
 foreach ($front_end_items as $item) {
 	if ($can_show_menu_item($item)) {
 		$front_end_visible = TRUE;

@@ -162,6 +162,237 @@ class Petty_cash extends CI_Controller
 		$this->load->view('welcome_message', $data);
 	}
 
+	public function cashier()
+	{
+		if (!$this->ion_auth->in_group('kasir') && !$this->_is_approver()) {
+			show_error('Halaman pencatatan kas kecil hanya tersedia untuk kasir dan pengurus.', 403);
+		}
+
+		$user_id = (string) $this->ion_auth->get_user_id();
+		$current_user = $this->ion_auth->user()->row();
+		$cashier_name = $current_user ? (trim($current_user->first_name.' '.$current_user->last_name) ? trim($current_user->first_name.' '.$current_user->last_name) : $current_user->username) : 'Kasir';
+		$today = date('Y-m-d');
+		$cashier_cash = $this->_cashier_register_preview($today);
+		if ($cashier_cash === FALSE) {
+			show_error('Akun kas tunai 1101 tidak tersedia. Hubungi pengurus sebelum melakukan pengecekan laci POS.', 500);
+		}
+		$cashier_fund = $this->db->query("
+			SELECT id FROM acc_cash_funds
+			WHERE fund_slot = 'cashier' AND is_active = 1
+			LIMIT 1
+		")->row();
+		$cashier_closing = $cashier_fund ? $this->db->get_where('acc_cash_closings', array(
+			'fund_id' => (int) $cashier_fund->id,
+			'closing_date' => $today
+		))->row() : NULL;
+		$funds = $this->db->query("
+			SELECT id, fund_code, name, custodian_user_id, imprest_limit
+			FROM acc_cash_funds
+			WHERE fund_type = 'petty' AND is_active = 1
+				AND (custodian_user_id IS NULL OR custodian_user_id = ?)
+			ORDER BY name ASC
+		", array($user_id))->result();
+		$total_balance = 0;
+		$has_balance_issue = FALSE;
+		foreach ($funds as $fund) {
+			$balance = $this->_fund_balance((int) $fund->id, date('Y-m-d'));
+			$fund->balance = $balance === FALSE ? NULL : (float) $balance;
+			if ($fund->balance === NULL) {
+				$has_balance_issue = TRUE;
+			} else {
+				$total_balance += $fund->balance;
+			}
+		}
+
+		$expense_accounts = $this->db->where('type', 'expense')
+			->where('is_active', 1)->order_by('code', 'ASC')->get('acc_accounts')->result();
+		foreach ($expense_accounts as $account) {
+			$account->cashier_label = preg_replace('/^Beban\\s+/i', '', $account->name);
+		}
+		$transactions = $this->db->query("
+			SELECT cash_tx.id, cash_tx.transaction_number, cash_tx.transaction_date,
+				cash_tx.amount, cash_tx.description, cash_tx.status,
+				cash_tx.rejection_reason, cash_tx.counterparty, fund.name AS fund_name,
+				expense.name AS expense_name
+			FROM acc_cash_transactions cash_tx
+			JOIN acc_cash_funds fund ON fund.id = cash_tx.fund_id
+			LEFT JOIN acc_accounts expense ON expense.id = cash_tx.expense_account_id
+			WHERE cash_tx.created_by = ? AND fund.fund_type = 'petty'
+			ORDER BY cash_tx.id DESC
+			LIMIT 15
+		", array($user_id))->result();
+
+		$today_spending = $this->db->query("
+			SELECT cash_tx.id, cash_tx.transaction_number, cash_tx.transaction_date,
+				cash_tx.amount, cash_tx.description, cash_tx.counterparty,
+				cash_tx.status, fund.name AS fund_name,
+				COALESCE(expense.name, 'Pengeluaran Umum') AS expense_name
+			FROM acc_cash_transactions cash_tx
+			JOIN acc_cash_funds fund ON fund.id = cash_tx.fund_id
+			LEFT JOIN acc_accounts expense ON expense.id = cash_tx.expense_account_id
+			WHERE cash_tx.transaction_date = ?
+				AND cash_tx.transaction_type = 'expense'
+				AND fund.fund_type = 'petty'
+			ORDER BY cash_tx.id DESC
+		", array($today))->result();
+
+		$today_spending_total = 0;
+		$today_spending_pending = 0;
+		$today_spending_posted = 0;
+		foreach ($today_spending as $sp) {
+			$today_spending_total += (float) $sp->amount;
+			if ($sp->status === 'pending') {
+				$today_spending_pending += (float) $sp->amount;
+			} elseif ($sp->status === 'posted') {
+				$today_spending_posted += (float) $sp->amount;
+			}
+		}
+
+		$data = array(
+			'cashier_cash' => $cashier_cash,
+			'cashier_closing' => $cashier_closing,
+			'cashier_name' => $cashier_name,
+			'funds' => $funds,
+			'total_balance' => $total_balance,
+			'has_balance_issue' => $has_balance_issue,
+			'expense_accounts' => $expense_accounts,
+			'transactions' => $transactions,
+			'today_spending' => $today_spending,
+			'today_spending_total' => $today_spending_total,
+			'today_spending_pending' => $today_spending_pending,
+			'today_spending_posted' => $today_spending_posted,
+			'today_date' => $today,
+			'form_token' => $this->_form_token(),
+			'notice' => $this->session->flashdata('cash_notice'),
+			'error' => $this->session->flashdata('cash_error'),
+			'judul_besar' => 'Catat Pengeluaran Kas Kecil',
+			'judul_kecil' => 'Pencatatan kasir yang cepat dan mudah',
+			'm_petty_cash_cashier' => TRUE
+		);
+		$data['output'] = $this->load->view('petty_cash_cashier', $data, TRUE);
+		$this->load->view('welcome_message', $data);
+	}
+
+	private function _cashier_register_preview($date)
+	{
+		$account = $this->db->get_where('acc_accounts', array('code' => '1101'))->row();
+		if (!$account) {
+			return FALSE;
+		}
+		$opening = $this->db->query("
+			SELECT COALESCE(SUM(item.debit - item.credit), 0) AS balance
+			FROM acc_journal_items item
+			JOIN acc_journals journal ON journal.id = item.journal_id
+			WHERE journal.is_posted = 1 AND journal.date < ? AND item.account_id = ?
+		", array($date, (int) $account->id))->row();
+		if (!$opening) {
+			return FALSE;
+		}
+		$opening_balance = (float) $opening->balance;
+		$movements = $this->db->query("
+			SELECT journal.journal_number, journal.reference_type, journal.reference_id,
+				journal.description, item.memo, item.debit, item.credit
+			FROM acc_journal_items item
+			JOIN acc_journals journal ON journal.id = item.journal_id
+			WHERE journal.is_posted = 1 AND journal.date = ? AND item.account_id = ?
+			ORDER BY journal.id ASC, item.id ASC
+		", array($date, (int) $account->id))->result();
+		$debit_total = 0;
+		$credit_total = 0;
+		$running_balance = $opening_balance;
+		foreach ($movements as $movement) {
+			$movement->debit = (float) $movement->debit;
+			$movement->credit = (float) $movement->credit;
+			$debit_total += $movement->debit;
+			$credit_total += $movement->credit;
+			$running_balance += $movement->debit - $movement->credit;
+			$movement->running_balance = $running_balance;
+		}
+		$today_net = $debit_total - $credit_total;
+		return array(
+			'date' => $date,
+			'opening_balance' => $opening_balance,
+			'debit_total' => $debit_total,
+			'credit_total' => $credit_total,
+			'today_net' => $today_net,
+			'expected_balance' => $running_balance,
+			'movements' => $movements
+		);
+	}
+
+	public function print_voucher($transaction_id = 0)
+	{
+		$transaction_id = (int) $transaction_id;
+		if (!$transaction_id) {
+			show_error('Transaksi tidak valid.', 404);
+		}
+
+		$tx = $this->db->query("
+			SELECT cash_tx.*, fund.name AS fund_name, fund.fund_code,
+				creator.username AS creator_username,
+				COALESCE(NULLIF(CONCAT_WS(' ', creator.first_name, creator.last_name), ''), creator.username) AS creator_name,
+				approver.username AS approver_username,
+				COALESCE(NULLIF(CONCAT_WS(' ', approver.first_name, approver.last_name), ''), approver.username) AS approver_name,
+				expense.code AS expense_code, expense.name AS expense_name
+			FROM acc_cash_transactions cash_tx
+			JOIN acc_cash_funds fund ON fund.id = cash_tx.fund_id
+			JOIN users creator ON creator.id = cash_tx.created_by
+			LEFT JOIN users approver ON approver.id = cash_tx.approved_by
+			LEFT JOIN acc_accounts expense ON expense.id = cash_tx.expense_account_id
+			WHERE cash_tx.id = ?
+		", array($transaction_id))->row();
+
+		if (!$tx) {
+			show_error('Transaksi tidak ditemukan.', 404);
+		}
+
+		$data['tx'] = $tx;
+		$this->load->view('petty_cash_voucher_print', $data);
+	}
+
+	public function request_topup()
+	{
+		$this->_require_post();
+		$fund_id = $this->_positive_id($this->input->post('fund_id', TRUE));
+		$notes = trim((string) $this->input->post('notes', TRUE));
+		$user_id = (int) $this->ion_auth->get_user_id();
+
+		$fund = $fund_id ? $this->_get_fund($fund_id) : NULL;
+		if (!$fund || (int) $fund->is_active !== 1 || $fund->fund_type !== 'petty') {
+			$this->_message('Dana kas kecil tidak valid.', FALSE, 'main/petty_cash/cashier');
+			return;
+		}
+
+		$balance = $this->_fund_balance($fund_id, date('Y-m-d'));
+		$current_balance = $balance === FALSE ? 0 : (float) $balance;
+		$needed_amount = max(0, (float) $fund->imprest_limit - $current_balance);
+
+		if ($needed_amount <= 0) {
+			$needed_amount = (float) $fund->imprest_limit;
+		}
+
+		// Otomatis buat pengajuan pengisian dana kas kecil (funding request pending)
+		$tx_number = 'PC-REQ-'.date('Ymd-His').'-'.strtoupper(substr(md5(uniqid((string) mt_rand(), TRUE)), 0, 4));
+		$desc = 'Permintaan Pengisian Kembali Kas Kecil: ' . $fund->name . ($notes !== '' ? ' (' . $notes . ')' : '');
+
+		$this->db->insert('acc_cash_transactions', array(
+			'transaction_number' => $tx_number,
+			'fund_id' => $fund_id,
+			'transaction_date' => date('Y-m-d'),
+			'transaction_type' => 'funding',
+			'funding_source_account_id' => 21, // Kas Utama 1106
+			'amount' => $needed_amount,
+			'description' => $desc,
+			'counterparty' => 'Kasir Toko',
+			'evidence_reference' => 'Permintaan Kasir via Sistem',
+			'status' => 'pending',
+			'created_by' => $user_id,
+			'created_at' => date('Y-m-d H:i:s')
+		));
+
+		$this->_message('Permintaan pengisian kas kecil sebesar Rp ' . number_format($needed_amount, 0, ',', '.') . ' telah diajukan ke pengurus.', TRUE, 'main/petty_cash/cashier');
+	}
+
 	public function create_fund()
 	{
 		$this->_require_post();
@@ -1040,6 +1271,9 @@ class Petty_cash extends CI_Controller
 		$return_to = $this->input->post('return_to', TRUE);
 		if ($return_to === 'main/management_payments') {
 			redirect('main/management_payments');
+		}
+		if ($return_to === 'main/petty_cash/cashier') {
+			redirect('main/petty_cash/cashier');
 		}
 		redirect($return_to === 'main/petty_cash_new' ? 'main/petty_cash_new' : 'main/petty_cash');
 	}

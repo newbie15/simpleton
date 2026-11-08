@@ -23,6 +23,9 @@ class Purchasing extends CI_Controller {
 		if (!$this->db->table_exists('purchase_order_payment_list')) {
 			show_error('Skema status pembayaran PO belum tersedia. Jalankan application/sql/purchasing_payment_status.sql.', 500);
 		}
+		if (!$this->db->field_exists('average_cost_after', 'goods_receipt_items')) {
+			show_error('Skema riwayat HPP belum tersedia. Jalankan application/sql/inventory_cost_history.sql.', 500);
+		}
 	}
 
 	public function index()
@@ -77,7 +80,8 @@ class Purchasing extends CI_Controller {
 		$error = $this->session->flashdata('purchasing_error');
 		$toolbar = '<div class="row"><div class="col-md-12"><div class="box box-default"><div class="box-body">'
 			.'<a class="btn btn-primary" href="'.site_url('main/purchasing/create').'">Buat Purchase Order</a> '
-			.'<a class="btn btn-default" href="'.site_url('main/purchasing/suppliers').'">Kelola Supplier</a>'
+			.'<a class="btn btn-default" href="'.site_url('main/purchasing/suppliers').'">Kelola Supplier</a> '
+			.'<a class="btn btn-info" href="'.site_url('main/hpp').'">Riwayat HPP</a>'
 			.'</div></div></div></div>';
 		if (!empty($notice)) {
 			$toolbar = '<div class="alert alert-success">'.html_escape($notice).'</div>'.$toolbar;
@@ -891,6 +895,12 @@ class Purchasing extends CI_Controller {
 				$this->db->trans_rollback();
 				$this->_redirect_with_error('Data stok atau HPP tidak ditemukan. Penerimaan tidak disimpan.', 'main/purchasing/receive/'.$order_id);
 			}
+			$old_quantity = (int) $stock->jumlah;
+			$old_cost_total = $old_quantity * (float) $cost->average_cost;
+			$new_average_cost = round(
+				($old_cost_total + (float) $received['subtotal']) / ($old_quantity + $qty),
+				4
+			);
 			$this->db->insert('goods_receipt_items', array(
 				'goods_receipt_id' => $receipt_id,
 				'purchase_order_item_id' => (int) $item->id,
@@ -899,14 +909,9 @@ class Purchasing extends CI_Controller {
 				'discount_type' => $received['discount_type'],
 				'discount_value' => $received['discount_value'],
 				'discount_amount' => $received['discount_amount'],
-				'subtotal' => $received['subtotal']
+				'subtotal' => $received['subtotal'],
+				'average_cost_after' => $new_average_cost
 			));
-			$old_quantity = (int) $stock->jumlah;
-			$old_cost_total = $old_quantity * (float) $cost->average_cost;
-			$new_average_cost = round(
-				($old_cost_total + (float) $received['subtotal']) / ($old_quantity + $qty),
-				4
-			);
 			$this->db->query("
 				UPDATE inventory_costs
 				SET average_cost = ?, updated_at = ?
@@ -939,6 +944,9 @@ class Purchasing extends CI_Controller {
 				$this->db->trans_rollback();
 				$this->_redirect_with_error('Stok atau HPP barang ad-hoc tidak dapat disiapkan.', 'main/purchasing/receive/'.$order_id);
 			}
+			$old_quantity = (int) $stock->jumlah;
+			$new_average_cost = round((($old_quantity * (float) $cost->average_cost) + (float) $received['subtotal']) /
+				($old_quantity + (int) $received['qty']), 4);
 			$this->db->insert('goods_receipt_items', array(
 				'goods_receipt_id' => $receipt_id,
 				'purchase_order_item_id' => (int) $received['item_id'],
@@ -947,11 +955,9 @@ class Purchasing extends CI_Controller {
 				'discount_type' => 'none',
 				'discount_value' => 0,
 				'discount_amount' => 0,
-				'subtotal' => (float) $received['subtotal']
+				'subtotal' => (float) $received['subtotal'],
+				'average_cost_after' => $new_average_cost
 			));
-			$old_quantity = (int) $stock->jumlah;
-			$new_average_cost = round((($old_quantity * (float) $cost->average_cost) + (float) $received['subtotal']) /
-				($old_quantity + (int) $received['qty']), 4);
 			$this->db->query('UPDATE inventory_costs SET average_cost = ?, updated_at = ? WHERE product_id = ? AND barcode = ?', array(
 				$new_average_cost, $received_at, (int) $received['product_id'], $received['barcode']
 			));

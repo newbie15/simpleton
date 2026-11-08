@@ -114,6 +114,8 @@ class Petty_cash_new extends CI_Controller
 			}
 		}
 
+		$requested_transaction_id = $this->_positive_id($this->input->get('transaction_id', TRUE));
+		$transaction_filter = $requested_transaction_id ? ' WHERE cash_tx.id = ?' : '';
 		$transactions = $this->db->query("
 			SELECT cash_tx.id, cash_tx.transaction_number, cash_tx.transaction_date,
 				cash_tx.transaction_type, cash_tx.amount, cash_tx.counterparty,
@@ -132,9 +134,10 @@ class Petty_cash_new extends CI_Controller
 			LEFT JOIN acc_accounts source ON source.id = cash_tx.funding_source_account_id
 			LEFT JOIN acc_accounts expense ON expense.id = cash_tx.expense_account_id
 			LEFT JOIN goods_receipts receipt ON receipt.id = cash_tx.goods_receipt_id
+			".$transaction_filter."
 			ORDER BY cash_tx.id DESC
 			LIMIT 100
-		")->result();
+		", $requested_transaction_id ? array($requested_transaction_id) : array())->result();
 		$closings = $this->db->query("
 			SELECT closing.*, fund.fund_code, fund.name AS fund_name,
 				close_user.username AS closed_by_name

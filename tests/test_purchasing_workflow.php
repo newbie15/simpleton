@@ -33,17 +33,18 @@ $assert(strpos($purchasing, 'if (!$locked_order || $locked_order->status !== \'o
 $assert(strpos($purchasing, "'is_adhoc' => 1") !== FALSE &&
 	strpos($purchasing, '\'authorized_by\' => (string) $this->ion_auth->get_user_id()') !== FALSE,
 	'Ad-hoc receipt lines are marked and retain authorizing user audit.');
-$assert(strpos($view, 'Barang di luar PO') !== FALSE && strpos($view, 'name="adhoc[0][barcode]"') !== FALSE,
+$assert(strpos($view, 'Barang di luar PO') !== FALSE && strpos($view, 'id="adhoc-receipt-rows"') !== FALSE &&
+	strpos($adhoc_search, "'[barcode]'") !== FALSE,
 	'Receipt UI has a distinct ad-hoc line section.');
 $assert(strpos($view, 'data-product-search-url=') !== FALSE && strpos($view, 'data-adhoc-search') !== FALSE &&
-	strpos($view, 'data-adhoc-barcode') !== FALSE && strpos($purchasing, 'public function product_search()') !== FALSE,
+	strpos($view, 'data-adhoc-results') !== FALSE && strpos($purchasing, 'public function product_search()') !== FALSE,
 	'Ad-hoc receipt rows expose scan/search inputs backed by product search.');
 $assert(strpos($purchasing, "\$data['js_file'] = array(") !== FALSE &&
 	strpos($purchasing, 'adhoc_product_search.js?v=') !== FALSE,
 	'Receive page loads the search script through the welcome view asset slot.');
-$assert(strpos($adhoc_search, "event.key !== 'Enter'") !== FALSE &&
-	strpos($adhoc_search, 'chooseProduct(input, exact || products[0])') !== FALSE &&
-	strpos($adhoc_search, "parts.barcode.value = term") !== FALSE,
+$assert(strpos($adhoc_search, "event.key === 'Enter'") !== FALSE &&
+	strpos($adhoc_search, 'addProduct(products[activeIndex], 1)') !== FALSE &&
+	strpos($adhoc_search, "addProduct({ barcode: term, nama: '' }, quantity)") !== FALSE,
 	'Ad-hoc search supports Enter selection and manual new-barcode entry.');
 $assert(strpos($payments, 'cash_tx.transaction_type = \'supplier_payment\'') !== FALSE &&
 	strpos($payments, 'outstanding_after_requests') !== FALSE &&

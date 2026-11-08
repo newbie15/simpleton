@@ -74,7 +74,7 @@
 						});
 					}
 				},
-				{ data: 'id_user', render: escapeText },
+				{ data: 'user_name', render: escapeText },
 				{
 					data: null,
 					render: function (row, type) {
@@ -82,10 +82,18 @@
 						if (type !== 'display') {
 							return status + ' ' + (row.rejection_reason || '');
 						}
-						return escapeText(status.charAt(0).toUpperCase() + status.slice(1), 'display') +
-							(row.status === 'rejected' && row.rejection_reason
-								? '<br><small>' + escapeText(row.rejection_reason, 'display') + '</small>'
-								: '');
+						var statusText = escapeText(status.charAt(0).toUpperCase() + status.slice(1), 'display');
+						if (row.status === 'rejected' && row.rejection_reason) {
+							statusText += '<br><small>' + escapeText(row.rejection_reason, 'display') + '</small>';
+						}
+						if ((row.status === 'approved' || row.status === 'completed')) {
+							var approverText = row.approved_by_name ? escapeText(row.approved_by_name, 'display') : '(tidak tercatat)';
+							statusText += '<br><small>Disetujui oleh: ' + approverText + '</small>';
+						}
+						if (row.status === 'rejected' && row.rejected_by_name) {
+							statusText += '<br><small>Ditolak oleh: ' + escapeText(row.rejected_by_name, 'display') + '</small>';
+						}
+						return statusText;
 					}
 				},
 				{ data: 'action_html', orderable: false, searchable: false }

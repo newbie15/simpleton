@@ -40,9 +40,54 @@ class Bank_reconciliation extends CI_Controller
 			? (int) $requested_id
 			: 0;
 		$statement = $statement_id > 0 ? $this->_get_statement($statement_id) : NULL;
-		if (!$statement && count($statements) > 0) {
+		if (!$statement && count($statements) > 0 && $requested_id === NULL) {
 			$statement = $this->_get_statement((int) $statements[0]->id);
 		}
+
+		$bank_account = $this->db->get_where('acc_accounts', array(
+			'code' => '1102',
+			'is_active' => 1
+		))->row();
+
+		$current_bank_balance = 0;
+		$recent_bank_journals = array();
+		if ($bank_account) {
+			$cur_row = $this->db->query("
+				SELECT COALESCE(SUM(item.debit - item.credit), 0) AS balance
+				FROM acc_journal_items item
+				JOIN acc_journals journal ON journal.id = item.journal_id
+				WHERE journal.is_posted = 1 AND item.account_id = ?
+			", array((int) $bank_account->id))->row();
+			$current_bank_balance = $cur_row ? (float) $cur_row->balance : 0;
+
+			$recent_bank_journals = $this->db->query("
+				SELECT journal.date, journal.journal_number, journal.description,
+					journal.reference_type, journal.reference_id,
+					item.id AS journal_item_id, item.memo, item.debit, item.credit,
+					(item.debit - item.credit) AS amount,
+					si.id AS matched_statement_item_id,
+					st.statement_number AS matched_statement_number
+				FROM acc_journal_items item
+				JOIN acc_journals journal ON journal.id = item.journal_id
+				LEFT JOIN acc_bank_statement_items si ON si.matched_journal_item_id = item.id
+				LEFT JOIN acc_bank_statements st ON st.id = si.statement_id
+				WHERE journal.is_posted = 1 AND item.account_id = ?
+				ORDER BY journal.date DESC, journal.id DESC, item.id DESC
+				LIMIT 30
+			", array((int) $bank_account->id))->result();
+		}
+
+		$counts = $this->db->query("
+			SELECT COUNT(*) AS total,
+				COALESCE(SUM(status = 'draft'), 0) AS draft,
+				COALESCE(SUM(status = 'reconciled'), 0) AS reconciled
+			FROM acc_bank_statements
+		")->row();
+		$statement_counts = array(
+			'total' => $counts ? (int) $counts->total : 0,
+			'draft' => $counts ? (int) $counts->draft : 0,
+			'reconciled' => $counts ? (int) $counts->reconciled : 0
+		);
 
 		$items = array();
 		$candidates = array();
@@ -151,18 +196,24 @@ class Bank_reconciliation extends CI_Controller
 		$data['unmatched_book_total'] = $unmatched_book_total;
 		$data['adjusted_statement_balance'] = $adjusted_statement_balance;
 		$data['balance_difference'] = $balance_difference;
+		$data['bank_account'] = $bank_account;
+		$data['current_bank_balance'] = $current_bank_balance;
+		$data['recent_bank_journals'] = $recent_bank_journals;
+		$data['statement_counts'] = $statement_counts;
 		$data['can_manage'] = $this->ion_auth->in_group(array('admin', 'management', 'pengurus'));
 		$data['error'] = $this->session->flashdata('bank_reconciliation_error');
 		$data['notice'] = $this->session->flashdata('bank_reconciliation_notice');
 		$data['judul_besar'] = 'Rekonsiliasi Bank';
 		$data['judul_kecil'] = 'Input rekening koran manual dan pencocokan terhadap jurnal kas bank';
 		$data['m_accounting'] = TRUE;
+		$data['m_bank_reconciliation'] = TRUE;
 		$data['output'] = $this->load->view('bank_reconciliation', $data, TRUE);
 		$this->load->view('welcome_message', $data);
 	}
 
 	public function create_statement()
 	{
+		$this->_require_manage();
 		if ($this->input->method(TRUE) !== 'POST') {
 			show_error('Metode permintaan tidak diizinkan.', 405);
 		}
@@ -227,6 +278,7 @@ class Bank_reconciliation extends CI_Controller
 
 	public function add_item()
 	{
+		$this->_require_manage();
 		$statement_id = $this->_post_id('statement_id');
 		$statement = $statement_id ? $this->_get_statement($statement_id) : NULL;
 		$date = trim((string) $this->input->post('transaction_date', TRUE));
@@ -281,6 +333,7 @@ class Bank_reconciliation extends CI_Controller
 
 	public function remove_item()
 	{
+		$this->_require_manage();
 		$statement_item_id = $this->_post_id('item_id');
 		$previous_db_debug = $this->db->db_debug;
 		$this->db->db_debug = FALSE;
@@ -316,6 +369,7 @@ class Bank_reconciliation extends CI_Controller
 
 	public function match_item()
 	{
+		$this->_require_manage();
 		$statement_item_id = $this->_post_id('statement_item_id');
 		$journal_item_id = $this->_post_id('journal_item_id');
 		$previous_db_debug = $this->db->db_debug;
@@ -378,6 +432,7 @@ class Bank_reconciliation extends CI_Controller
 
 	public function unmatch_item()
 	{
+		$this->_require_manage();
 		$statement_item_id = $this->_post_id('statement_item_id');
 		$previous_db_debug = $this->db->db_debug;
 		$this->db->db_debug = FALSE;
@@ -418,6 +473,7 @@ class Bank_reconciliation extends CI_Controller
 
 	public function reconcile()
 	{
+		$this->_require_manage();
 		$statement_id = $this->_post_id('statement_id');
 		$previous_db_debug = $this->db->db_debug;
 		$this->db->db_debug = FALSE;
@@ -479,6 +535,13 @@ class Bank_reconciliation extends CI_Controller
 			JOIN acc_accounts account ON account.id = statement.account_id
 			WHERE statement.id = ?
 		", array((int) $id))->row();
+	}
+
+	private function _require_manage()
+	{
+		if (!$this->ion_auth->in_group(array('admin', 'management', 'pengurus'))) {
+			show_error('Anda tidak memiliki izin untuk mengubah rekonsiliasi bank.', 403);
+		}
 	}
 
 	private function _post_id($name)

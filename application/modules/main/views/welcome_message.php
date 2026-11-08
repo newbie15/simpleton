@@ -6,6 +6,19 @@
     <title>Simpleton | Dashboard</title>
     <!-- Tell the browser to be responsive to screen width -->
     <meta content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" name="viewport">
+    <script>
+      (function () {
+        try {
+          if (window.localStorage.getItem('simpleton.theme') === 'dark') {
+            document.documentElement.classList.add('theme-dark');
+          }
+        } catch (error) {
+          if (window.console && window.console.warn) {
+            window.console.warn('Preferensi tema tidak dapat dibaca dari penyimpanan browser.', error);
+          }
+        }
+      }());
+    </script>
     <!-- Bootstrap 3.3.5 -->
     <link rel="stylesheet" href="<?= base_url('assets/adminlte/bootstrap/css/bootstrap.min.css') ?>">
     <!-- Font Awesome -->
@@ -24,6 +37,8 @@
     <!-- <link rel="stylesheet" href="<?= base_url('assets/adminlte/plugins/iCheck/flat/blue.css') ?>"> -->
     <!-- bootstrap wysihtml5 - text editor -->
     <!-- <link rel="stylesheet" href="<?= base_url('assets/adminlte/plugins/bootstrap-wysihtml5/bootstrap3-wysihtml5.min.css') ?>"> -->
+    <!-- DataTables -->
+    <link rel="stylesheet" href="<?= base_url('assets/datatables/css/jquery.dataTables.min.css') ?>">
     <?php if (isset($css_files)) { ?>
     <?php
     foreach($css_files as $file): ?>
@@ -36,6 +51,8 @@
       <link type="text/css" rel="stylesheet" href="<?php echo $file; ?>" />
     <?php endforeach; ?>
     <?php } ?>
+    <link rel="stylesheet" href="<?= base_url('assets/misc/theme-toggle.css') ?>?v=3">
+    <link rel="stylesheet" href="<?= base_url('assets/misc/approval-notifications.css') ?>">
   </head>
   <body class="hold-transition skin-blue sidebar-mini">
     <div class="wrapper">
@@ -68,6 +85,14 @@
           ?>
           <div class="navbar-custom-menu">
             <ul class="nav navbar-nav">
+              <?php $this->load->view('approval_notifications'); ?>
+              <li class="theme-toggle-menu">
+                <button type="button" class="theme-toggle-button" id="theme-toggle"
+                  aria-label="Aktifkan tema gelap" aria-pressed="false" title="Aktifkan tema gelap">
+                  <i class="fa fa-moon-o" aria-hidden="true"></i>
+                  <span class="hidden-xs theme-toggle-label">Gelap</span>
+                </button>
+              </li>
               <li class="dropdown user user-menu">
                 <a href="#" class="dropdown-toggle" data-toggle="dropdown">
                   <i class="fa fa-user"></i>
@@ -173,12 +198,16 @@
     <?php } ?>
     <!-- Bootstrap 3.3.5 -->
     <script src="<?= base_url('assets/adminlte/bootstrap/js/bootstrap.min.js') ?>"></script>
+    <!-- DataTables -->
+    <script src="<?= base_url('assets/datatables/js/jquery.dataTables.min.js') ?>"></script>
     <!-- AdminLTE App -->
     <script src="<?= base_url('assets/adminlte/dist/js/app.min.js') ?>"></script>
     <!-- AdminLTE dashboard demo (This is only for demo purposes) -->
     <!-- <script src="<?= base_url('assets/adminlte/dist/js/pages/dashboard.js') ?>"></script> -->
     <!-- AdminLTE for demo purposes -->
     <script src="<?= base_url('assets/adminlte/dist/js/demo.js') ?>"></script>
+    <script src="<?= base_url('assets/misc/theme-toggle.js') ?>"></script>
+    <script src="<?= base_url('assets/misc/approval-notifications.js') ?>"></script>
     <script>
       (function () {
         var modal = document.getElementById('proof-preview-modal');

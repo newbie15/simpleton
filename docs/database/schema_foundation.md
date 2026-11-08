@@ -38,6 +38,12 @@ Menghubungkan barcode kemasan besar (Dus/Pack/Karton) dengan barcode satuan terk
 
 Kupon fisik berserial disimpan terpisah dari voucher master. Pasang migrasi **[application/sql/voucher_coupons.sql](application/sql/voucher_coupons.sql)** untuk membuat `voucher_coupons` dan kolom opsional `voucher_usages.voucher_coupon_id`. Serial unik hanya dapat ditebus sekali; NPK penerima boleh ditautkan pada impor. XLS/XLSX menggunakan kolom `SERIAL_KUPON` dan `NPK` (opsional), ditinjau sebelum konfirmasi impor.
 
+## Import Data Update
+
+Menu **Update Data** menerima file sesuai contoh format stok dan karyawan yang ditampilkan pada halaman. Baris dan header divalidasi sebelum perubahan dimulai; seluruh penggantian stok berjalan dalam transaksi agar data lama tetap ada jika impor gagal.
+
+Untuk impor karyawan dan pemeriksaan billing, jalankan **[application/sql/karyawan_employment_status.sql](../../application/sql/karyawan_employment_status.sql)** satu kali jika kolom belum tersedia. Migrasi ini menambahkan status kerja (`is_active`, `resign_date`) serta data payroll opsional (`nama_bank`, `nomor_rekening`). NPK aktif yang tidak ada pada file update akan ditandai `is_active = 0` dengan `resign_date` tanggal impor. Data karyawan tidak dihapus, dan karyawan yang kembali tercantum di file diaktifkan kembali. Kolom rekening tersedia untuk persiapan, tetapi belum ikut diekspor.
+
 ### 1.3 `penjualan_pembayaran` (Header Pembayaran Transaksi POS)
 Mencatat informasi menyeluruh mengenai metode pembayaran, uang tunai, kembalian, referensi EDC/transfer, dan voucher per nomor nota:
 * `id` (int, PK, auto_increment)
@@ -158,6 +164,9 @@ Jalankan **`application/sql/purchasing_payment_status.sql`** setelah `purchasing
 Hak akses halaman tersedia sebagai key `petty_cash`. Setelah skema akses grup tersedia, jalankan **`application/sql/petty_cash_access.sql`** untuk memberi akses halaman kepada grup kasir, management, dan pengurus; admin memiliki akses otomatis. Kasir dapat mengajukan transaksi; hanya admin, management, dan pengurus dapat membuat dana, menyetujui/menolak transaksi, dan mengesahkan tutup kas.
 
 Saldo tunai lama tidak diimpor otomatis. Sebelum memakai kontrol saldo, cocokkan saldo awal aktual dengan saldo buku; isi kas utama dari akun kas/bank yang saldonya sudah benar, lalu isi petty cash dari kas utama. Tutup kas harian mensyaratkan seluruh pengajuan transaksi sampai tanggal tutup telah diproses. Tutup laci kasir memblokir checkout dan retur tunai berikutnya pada tanggal kalender yang sama, sehingga harus dilakukan setelah transaksi kasir hari itu berhenti. Selisih disimpan untuk tindak lanjut dan tidak membentuk jurnal otomatis.
+
+### Riwayat HPP
+Jalankan **`application/sql/inventory_cost_history.sql`** setelah `purchasing.sql` dan `stock_opname.sql`. Penerimaan Purchasing menyimpan HPP rata-rata setelah setiap penerimaan pada `goods_receipt_items.average_cost_after`; halaman `main/hpp` menampilkan tanggal, supplier, harga beli, diskon, dan HPP tersebut per barang. Input manual memperbarui HPP saat ini dan membuat catatan audit tersendiri di `inventory_cost_history`; sumbernya ditampilkan sebagai **Manual (bukan vendor/supplier)**. Riwayat penerimaan lama tetap menampilkan harga yang tersimpan sebelumnya dan HPP rata-rata setelahnya ditandai belum tercatat jika data historis itu tidak tersedia.
 
 ## 2. Perubahan pada Tabel Eksisting
 

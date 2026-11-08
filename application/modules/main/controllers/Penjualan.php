@@ -25,7 +25,7 @@ class Penjualan extends CI_Controller
 			base_url('assets/jexcel/js/excel-formula.min.js'),
 			base_url('assets/jexcel/js/numeral.min.js'),
 			base_url('assets/easyautocomplete/jquery.easy-autocomplete.min.js'),
-			base_url('assets/kasir/kasir.js?v=20261029-inclusive-vat')
+			base_url('assets/kasir/kasir.js?v=20261101-limit-payment-change')
 		);
 		$receipt_url = site_url('main/kasir/reprint');
 		$data['m_penjualan'] = TRUE;
@@ -49,6 +49,9 @@ class Penjualan extends CI_Controller
                   <option value="edc">EDC (Debit/Kredit)</option>
                   <option value="transfer">Transfer Bank</option>
                 </select>
+                <div id="limit-payment-notice" class="small text-danger" style="display:none;margin-top:5px;">
+                  Limit belanja terlampaui. Gunakan Tunai, QRIS, EDC, atau Transfer.
+                </div>
               </div>
               <div class="form-group">
                 <label for="nkasir">Kasir</label>

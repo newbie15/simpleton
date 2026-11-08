@@ -64,11 +64,11 @@ $payment_labels = array(
 			<div><span>Pembayaran</span><span><?php echo html_escape(isset($payment_labels[$receipt->payment_method]) ? $payment_labels[$receipt->payment_method] : $receipt->payment_method); ?></span></div>
 		</div>
 		<table>
-			<thead><tr><th>Barang</th><th class="numeric">Qty</th><th class="numeric">Harga incl. PPN</th><th class="numeric">Jumlah</th></tr></thead>
+			<thead><tr><th>Barang</th><th class="numeric">Qty</th><th class="numeric">Harga</th><th class="numeric">Jml</th></tr></thead>
 			<tbody>
 			<?php foreach ($receipt->items as $item) { ?>
 				<tr>
-					<td><?php echo html_escape($item->product_name); ?><br><small><?php echo html_escape($item->barcode); ?></small></td>
+					<td><?php echo html_escape($item->product_name); ?></td>
 					<td class="numeric"><?php echo number_format((int) $item->qty); ?></td>
 					<td class="numeric"><?php echo $format_rupiah($item->gross_price); ?></td>
 					<td class="numeric"><?php echo $format_rupiah($item->gross_total); ?></td>
@@ -79,7 +79,7 @@ $payment_labels = array(
 		<div class="meta">
 			<div><span>DPP</span><span><?php echo $format_rupiah($receipt->dpp_total); ?></span></div>
 			<div><span>PPN</span><span><?php echo $format_rupiah($receipt->ppn_total); ?></span></div>
-			<div class="total"><span>Total belanja (termasuk PPN)</span><span><?php echo $format_rupiah($receipt->gross_total); ?></span></div>
+			<div class="total"><span>Total belanja + PPN</span><span><?php echo $format_rupiah($receipt->gross_total); ?></span></div>
 			<?php if ((float) $receipt->voucher_discount > 0) { ?><div><span>Voucher <?php echo html_escape($receipt->voucher_code); ?></span><span>- <?php echo $format_rupiah($receipt->voucher_discount); ?></span></div><div class="total"><span>Sisa bayar</span><span><?php echo $format_rupiah($receipt->total_paid); ?></span></div><?php } ?>
 			<?php if (in_array($receipt->payment_method, array('tunai', 'cash'), TRUE)) { ?><div><span>Tunai diterima</span><span><?php echo $format_rupiah($receipt->amount_paid); ?></span></div><div><span>Kembalian</span><span><?php echo $format_rupiah($receipt->change_amount); ?></span></div><?php } ?>
 		</div>

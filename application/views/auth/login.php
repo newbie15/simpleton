@@ -6,6 +6,19 @@
     <title>Simpleton | Log in</title>
     <!-- Tell the browser to be responsive to screen width -->
     <meta content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" name="viewport">
+    <script>
+      (function () {
+        try {
+          if (window.localStorage.getItem('simpleton.theme') === 'dark') {
+            document.documentElement.classList.add('theme-dark');
+          }
+        } catch (error) {
+          if (window.console && window.console.warn) {
+            window.console.warn('Preferensi tema tidak dapat dibaca dari penyimpanan browser.', error);
+          }
+        }
+      }());
+    </script>
     <!-- Bootstrap 3.3.5 -->
     <link rel="stylesheet" href="<?= base_url('assets/adminlte/bootstrap/css/bootstrap.min.css') ?>">
     <!-- Font Awesome -->
@@ -16,6 +29,7 @@
     <link rel="stylesheet" href="<?= base_url('assets/adminlte/dist/css/AdminLTE.min.css') ?>">
     <!-- iCheck -->
     <link rel="stylesheet" href="<?= base_url('assets/adminlte/plugins/iCheck/square/blue.css') ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/misc/theme-toggle.css') ?>?v=3">
 
     <!-- HTML5 Shim and Respond.js IE8 support of HTML5 elements and media queries -->
     <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
@@ -25,6 +39,11 @@
     <![endif]-->
   </head>
   <body class="hold-transition login-page">
+    <button type="button" class="theme-toggle-button theme-toggle-floating" id="theme-toggle"
+      aria-label="Aktifkan tema gelap" aria-pressed="false" title="Aktifkan tema gelap">
+      <i class="fa fa-moon-o" aria-hidden="true"></i>
+      <span class="theme-toggle-label">Gelap</span>
+    </button>
   <!--<h1><?php echo lang('login_heading');?></h1>
   <p><?php echo lang('login_subheading');?></p>-->
   <?php if ($message): ?>
@@ -75,6 +94,7 @@
     <script src="<?= base_url('assets/adminlte/plugins/jQuery/jQuery-2.1.4.min.js') ?>"></script>
     <!-- Bootstrap 3.3.5 -->
     <script src="<?= base_url('assets/adminlte/bootstrap/js/bootstrap.min.js') ?>"></script>
+    <script src="<?= base_url('assets/misc/theme-toggle.js') ?>"></script>
     <!-- iCheck -->
     <script src="<?= base_url('assets/adminlte/plugins/iCheck/icheck.min.js') ?>"></script>
     <script>

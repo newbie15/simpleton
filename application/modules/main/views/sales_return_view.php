@@ -38,6 +38,23 @@ $status_labels = array(
 	</div>
 </div>
 
+<?php if ($is_manager && $return->status === 'pending') { ?>
+<div class="box box-warning">
+	<div class="box-header with-border"><h3 class="box-title">Persetujuan retur</h3></div>
+	<div class="box-body">
+		<form method="post" action="<?php echo site_url('main/sales_return/approve/'.(int) $return->id); ?>" onsubmit="return confirm('Setujui retur ini? Stok dan jurnal akan diperbarui.');" style="margin-bottom:10px;">
+			<input type="hidden" name="form_token" value="<?php echo html_escape($form_token); ?>">
+			<button class="btn btn-success" type="submit">Setujui retur</button>
+		</form>
+		<form method="post" action="<?php echo site_url('main/sales_return/reject/'.(int) $return->id); ?>">
+			<input type="hidden" name="form_token" value="<?php echo html_escape($form_token); ?>">
+			<label for="return-reason">Alasan penolakan</label>
+			<div class="input-group"><input class="form-control" id="return-reason" name="rejection_reason" maxlength="500" required><span class="input-group-btn"><button class="btn btn-danger" type="submit">Tolak retur</button></span></div>
+		</form>
+	</div>
+</div>
+<?php } ?>
+
 <div class="box box-default">
 	<div class="box-header with-border"><h3 class="box-title">Barang yang diretur</h3></div>
 	<div class="box-body table-responsive">

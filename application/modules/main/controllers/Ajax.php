@@ -110,7 +110,8 @@ class Ajax extends CI_Controller {
     }
 
     public function upload_excel(){
-        if (!$this->ion_auth->is_admin()) {
+        $allowed_groups = array('admin', 'management', 'manager', 'pengurus');
+        if (!$this->ion_auth->in_group($allowed_groups)) {
             show_error('Akses ditolak.', 403);
         }
         if(isset($_POST) == true){
@@ -221,7 +222,8 @@ class Ajax extends CI_Controller {
     }
 
     public function upload_excel_karyawan(){
-        if (!$this->ion_auth->is_admin()) {
+        $allowed_groups = array('admin', 'management', 'manager', 'pengurus');
+        if (!$this->ion_auth->in_group($allowed_groups)) {
             show_error('Akses ditolak.', 403);
         }
         if(isset($_POST) == true){
@@ -307,7 +309,12 @@ class Ajax extends CI_Controller {
                 ROUND(CASE WHEN sale.dpp_satuan IS NOT NULL THEN sale.jumlah
                     ELSE sale.jumlah + sale.jumlah * COALESCE(sale.ppn, 0) END -
                     COALESCE(approved_return.amount, 0), 2) AS tertagih,
-                sale.metode_pembayaran
+                sale.metode_pembayaran,
+                CASE 
+                    WHEN EXISTS (SELECT 1 FROM sales_billing_items billing WHERE billing.nota = sale.nota) THEN 'Tertagih'
+                    WHEN EXISTS (SELECT 1 FROM sales_validation_items validation WHERE validation.nota = sale.nota AND validation.status = 'valid') THEN 'Validated'
+                    ELSE 'Not Validated'
+                END AS status_validasi
             FROM penjualan sale
             LEFT JOIN stok product ON product.barcode = sale.kode
             LEFT JOIN karyawan employee ON employee.npk = sale.id_karyawan
@@ -324,11 +331,105 @@ class Ajax extends CI_Controller {
         ", array($start, $end))->result_array();
         $this->_sales_csv(
             array('nota', 'npk', 'nama', 'bagian', 'barcode', 'item', 'harga', 'qty', 'jumlah',
-                'retur_disetujui', 'tertagih', 'metode_pembayaran'),
+                'retur_disetujui', 'tertagih', 'metode_pembayaran', 'status_validasi'),
             $rows,
             'data_harian_'.$date.'.csv',
             $this->uri->segment(5) === 'd'
         );
+    }
+
+    public function data_tunai()
+    {
+        $this->_require_sales_report_access();
+        $date = $this->uri->segment(4);
+        if (!is_string($date) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) ||
+            date('Y-m-d', strtotime($date)) !== $date) {
+            show_error('Tanggal laporan tidak valid.', 400);
+        }
+
+        $start = $date.' 00:00:00';
+        $end = date('Y-m-d', strtotime($date.' +1 day')).' 00:00:00';
+        $rows = $this->db->query("
+            SELECT DATE_FORMAT(cash_sale.tanggal_transaksi, '%d/%m/%Y %H:%i') AS tanggal,
+                cash_sale.nota, cash_sale.npk, cash_sale.nama, cash_sale.kasir,
+                cash_sale.metode_pembayaran, cash_sale.total_tunai
+            FROM (".$this->_cash_sales_base_sql().") cash_sale
+            WHERE cash_sale.tanggal_transaksi >= ? AND cash_sale.tanggal_transaksi < ?
+                AND LOWER(cash_sale.metode_pembayaran) IN ('tunai', 'cash')
+            ORDER BY cash_sale.tanggal_transaksi ASC, cash_sale.nota ASC
+        ", array($start, $end, $start, $end))->result_array();
+
+        $this->_sales_csv(
+            array('tanggal', 'nota', 'npk', 'nama', 'kasir', 'metode_pembayaran', 'total_tunai'),
+            $rows,
+            'data_tunai_'.$date.'.csv',
+            $this->uri->segment(5) === 'd'
+        );
+    }
+
+    public function ringkasan_tunai()
+    {
+        $this->_require_sales_report_access();
+        date_default_timezone_set('Asia/Jakarta');
+        $today = date('Y-m-d');
+        $month_start = date('Y-m-01');
+        $tomorrow = date('Y-m-d', strtotime($today.' +1 day'));
+        $next_month = date('Y-m-d', strtotime($month_start.' +1 month'));
+        $base_sql = $this->_cash_sales_base_sql();
+        $summary_sql = "
+            SELECT COUNT(*) AS jumlah_transaksi,
+                COALESCE(SUM(cash_sale.total_tunai), 0) AS total_tunai
+            FROM (".$base_sql.") cash_sale
+            WHERE cash_sale.tanggal_transaksi >= ? AND cash_sale.tanggal_transaksi < ?
+                AND LOWER(cash_sale.metode_pembayaran) IN ('tunai', 'cash')
+        ";
+        $today_summary = $this->db->query(
+            $summary_sql,
+            array(
+                $today.' 00:00:00', $tomorrow.' 00:00:00',
+                $today.' 00:00:00', $tomorrow.' 00:00:00'
+            )
+        )->row_array();
+        $month_summary = $this->db->query(
+            $summary_sql,
+            array(
+                $month_start.' 00:00:00', $next_month.' 00:00:00',
+                $month_start.' 00:00:00', $next_month.' 00:00:00'
+            )
+        )->row_array();
+
+        $this->output->set_content_type('application/json', 'utf-8')->set_output(json_encode(array(
+            'hari_ini' => array(
+                'jumlah_transaksi' => (int) $today_summary['jumlah_transaksi'],
+                'total_tunai' => (float) $today_summary['total_tunai']
+            ),
+            'bulan_ini' => array(
+                'jumlah_transaksi' => (int) $month_summary['jumlah_transaksi'],
+                'total_tunai' => (float) $month_summary['total_tunai']
+            )
+        )));
+    }
+
+    private function _cash_sales_base_sql()
+    {
+        return "
+            SELECT sale.nota,
+                COALESCE(MAX(payment.waktu_transaksi), MIN(sale.tgl)) AS tanggal_transaksi,
+                COALESCE(MAX(payment.id_karyawan), MAX(sale.id_karyawan)) AS npk,
+                MAX(employee.nama) AS nama,
+                MAX(COALESCE(NULLIF(CONCAT_WS(' ', cashier.first_name, cashier.last_name), ''),
+                    cashier.username, payment.id_user)) AS kasir,
+                COALESCE(MAX(payment.metode_pembayaran), MAX(sale.metode_pembayaran)) AS metode_pembayaran,
+                COALESCE(MAX(payment.total_tagihan),
+                    SUM(CASE WHEN sale.dpp_satuan IS NOT NULL THEN sale.jumlah
+                        ELSE sale.jumlah + sale.jumlah * COALESCE(sale.ppn, 0) END)) AS total_tunai
+            FROM penjualan sale
+            LEFT JOIN penjualan_pembayaran payment ON payment.nota = sale.nota
+            LEFT JOIN karyawan employee ON employee.npk = COALESCE(payment.id_karyawan, sale.id_karyawan)
+            LEFT JOIN users cashier ON cashier.id = payment.id_user
+            WHERE sale.tgl >= ? AND sale.tgl < ?
+            GROUP BY sale.nota
+        ";
     }
 
     public function data_perorangan()
@@ -341,7 +442,7 @@ class Ajax extends CI_Controller {
             show_error('Periode laporan tidak valid.', 400);
         }
         if (!is_string($npk) || $npk === '' || strlen($npk) > 10) {
-            $this->_sales_csv(array('tanggal', 'nota', 'npk', 'nama', 'total_transaksi', 'retur_disetujui', 'tertagih'), array(), 'data_perorangan.csv', $this->uri->segment(6) === 'd');
+            $this->_sales_csv(array('tanggal', 'nota', 'npk', 'nama', 'total_transaksi', 'retur_disetujui', 'tertagih', 'status_validasi'), array(), 'data_perorangan.csv', $this->uri->segment(6) === 'd');
             return;
         }
 
@@ -352,7 +453,12 @@ class Ajax extends CI_Controller {
                 ROUND(SUM(COALESCE(approved_return.amount, 0)), 2) AS retur_disetujui,
                 ROUND(SUM(CASE WHEN sale.dpp_satuan IS NOT NULL THEN sale.jumlah
                     ELSE sale.jumlah + sale.jumlah * COALESCE(sale.ppn, 0) END -
-                    COALESCE(approved_return.amount, 0)), 2) AS tertagih
+                    COALESCE(approved_return.amount, 0)), 2) AS tertagih,
+                CASE 
+                    WHEN EXISTS (SELECT 1 FROM sales_billing_items billing WHERE billing.nota = sale.nota) THEN 'Tertagih'
+                    WHEN EXISTS (SELECT 1 FROM sales_validation_items validation WHERE validation.nota = sale.nota AND validation.status = 'valid') THEN 'Validated'
+                    ELSE 'Not Validated'
+                END AS status_validasi
             FROM penjualan sale
             LEFT JOIN karyawan employee ON employee.npk = sale.id_karyawan
             LEFT JOIN (
@@ -368,7 +474,7 @@ class Ajax extends CI_Controller {
             ORDER BY MIN(sale.tgl) ASC, sale.nota ASC
         ", array($npk, $range['start'], $range['end']))->result_array();
         $this->_sales_csv(
-            array('tanggal', 'nota', 'npk', 'nama', 'total_transaksi', 'retur_disetujui', 'tertagih'),
+            array('tanggal', 'nota', 'npk', 'nama', 'total_transaksi', 'retur_disetujui', 'tertagih', 'status_validasi'),
             $rows,
             'data_perorangan_'.$period.'_'.$npk.'.csv',
             $this->uri->segment(6) === 'd'

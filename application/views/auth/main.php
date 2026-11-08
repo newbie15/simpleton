@@ -6,6 +6,19 @@
     <title>AdminLTE 2 | Dashboard</title>
     <!-- Tell the browser to be responsive to screen width -->
     <meta content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" name="viewport">
+    <script>
+      (function () {
+        try {
+          if (window.localStorage.getItem('simpleton.theme') === 'dark') {
+            document.documentElement.classList.add('theme-dark');
+          }
+        } catch (error) {
+          if (window.console && window.console.warn) {
+            window.console.warn('Preferensi tema tidak dapat dibaca dari penyimpanan browser.', error);
+          }
+        }
+      }());
+    </script>
     <!-- Bootstrap 3.3.5 -->
     <link rel="stylesheet" href="<?= base_url('assets/adminlte/bootstrap/css/bootstrap.min.css') ?>">
     <!-- Font Awesome -->
@@ -17,6 +30,8 @@
     <!-- AdminLTE Skins. Choose a skin from the css/skins
          folder instead of downloading all of them to reduce the load. -->
     <link rel="stylesheet" href="<?= base_url('assets/adminlte/dist/css/skins/_all-skins.min.css') ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/misc/theme-toggle.css') ?>?v=3">
+    <link rel="stylesheet" href="<?= base_url('assets/misc/approval-notifications.css') ?>">
     <!-- iCheck -->
     <link rel="stylesheet" href="<?= base_url('assets/adminlte/plugins/iCheck/flat/blue.css') ?>">
 
@@ -58,6 +73,22 @@
           <a href="#" class="sidebar-toggle" data-toggle="offcanvas" role="button">
             <span class="sr-only">Toggle navigation</span>
           </a>
+          <div class="navbar-custom-menu">
+            <ul class="nav navbar-nav">
+              <?php if ($this->ion_auth->logged_in()) { $this->load->view('main/approval_notifications'); } ?>
+              <li class="theme-toggle-menu">
+                <button type="button" class="theme-toggle-button" id="theme-toggle"
+                  aria-label="Aktifkan tema gelap" aria-pressed="false" title="Aktifkan tema gelap">
+                  <i class="fa fa-moon-o" aria-hidden="true"></i>
+                  <span class="hidden-xs theme-toggle-label">Gelap</span>
+                </button>
+              </li>
+              <?php if ($this->ion_auth->logged_in()) { ?>
+                <?php $auth_header_user = $this->ion_auth->user()->row(); ?>
+                <li><span class="auth-header-user"><?php echo html_escape($auth_header_user->username); ?></span></li>
+              <?php } ?>
+            </ul>
+          </div>
         </nav>
       </header>
       <!-- Left side column. contains the logo and sidebar -->
@@ -470,5 +501,7 @@
       });
     </script>
     <?php } ?>
+    <script src="<?= base_url('assets/misc/theme-toggle.js') ?>"></script>
+    <script src="<?= base_url('assets/misc/approval-notifications.js') ?>"></script>
   </body>
 </html>

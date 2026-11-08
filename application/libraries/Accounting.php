@@ -87,7 +87,8 @@ class Accounting
 			'SALES_RETURN' => 'RET',
 			'SUPPLIER_RETURN' => 'RTS',
 			'STOCK_OPNAME' => 'SO',
-			'PETTY_CASH' => 'KAS'
+			'PETTY_CASH' => 'KAS',
+			'SIMPANAN' => 'SIM'
 		);
 		$prefix = isset($reference_prefix[$reference_type]) ? $reference_prefix[$reference_type] : 'JRN';
 		$journal_number = $prefix.'-'.date('Ymd-His').'-'.strtoupper(substr(md5(uniqid((string) mt_rand(), TRUE)), 0, 8));

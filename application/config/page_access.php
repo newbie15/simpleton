@@ -22,4 +22,5 @@ $config['pages'] = array(
 	'update_data' => array('label' => 'Update Data', 'uri' => 'main/data_update', 'aliases' => array('main/examples/update_data')),
 	'rekap_penjualan' => array('label' => 'Rekap Penjualan', 'uri' => 'main/rekap_penjualan', 'aliases' => array('main/examples/rekap_penjualan')),
 	'bank_reconciliation' => array('label' => 'Rekonsiliasi Bank', 'uri' => 'main/bank_reconciliation'),
+	'simpanan' => array('label' => 'Manajemen Simpanan', 'uri' => 'main/simpanan'),
 );

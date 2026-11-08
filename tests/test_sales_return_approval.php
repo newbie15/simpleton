@@ -48,6 +48,38 @@ $assert(strpos($ajax, "return_header.status IN ('approved', 'completed')") !== F
 	strpos($ajax, 'AS tertagih') !== FALSE &&
 	strpos($ajax, 'AS retur_disetujui') !== FALSE,
 	'Personal and monthly billing reports deduct approved returns and show net billable totals.');
+$purchase_history_start = strpos($source, 'private function _purchase_history(');
+$purchase_history_end = strpos($source, 'public function returns_data()', $purchase_history_start);
+$purchase_history = substr($source, $purchase_history_start, $purchase_history_end - $purchase_history_start);
+$assert(strpos($purchase_history, 'WHERE sale.id_karyawan = ?') !== FALSE &&
+	strpos($purchase_history, 'GROUP BY sale.nota') !== FALSE &&
+	strpos($purchase_history, 'LIMIT 50') !== FALSE &&
+	strpos($purchase_history, 'AS qty_returned') !== FALSE,
+	'NPK purchase history lists recent receipts and includes quantities already reserved for return.');
+$assert(strpos($view, 'name="search_type"') !== FALSE &&
+	strpos($view, 'value="npk"') !== FALSE &&
+	strpos($view, 'id="npk-search-value"') !== FALSE &&
+	strpos($view, 'Lihat isi belanja nota ini') !== FALSE &&
+	strpos($view, 'Pilih nota ini untuk retur') !== FALSE,
+	'The return page lets staff find a member by NPK, inspect receipt contents, and select a receipt.');
+$assert(strpos($source, "CONCAT(nama, '-', npk) = ?") !== FALSE &&
+	strpos($view, 'data-npk-source=') !== FALSE &&
+	strpos($source, "jquery.easy-autocomplete.min.js") !== FALSE,
+	'NPK lookup supports the same name-or-NPK suggestions used on the sales page.');
+$return_script = file_get_contents(dirname(__DIR__).DIRECTORY_SEPARATOR.'assets'.DIRECTORY_SEPARATOR.
+	'purchasing'.DIRECTORY_SEPARATOR.'sales_return.js');
+$assert(strpos($return_script, 'deferLoading: 0') === FALSE &&
+	strpos($return_script, "url: table.data('source')") !== FALSE,
+	'Return history loads its records when the page opens, independently of receipt search.');
+$assert(strpos($source, "input->get('nota'") === FALSE &&
+	strpos($source, "redirect('main/sales_return?nota=") === FALSE,
+	'Receipt details only open from an explicit search and do not reopen automatically after a return action.');
+$assert(strpos($view, "if (\$sale && \$search_type === 'nota' && \$search_value !== ''") !== FALSE &&
+	strpos($view, '(string) $sale->nota === $search_value') !== FALSE,
+	'Receipt details are rendered only when the submitted search matches the receipt number.');
+$assert(strpos($save, 'Barang retur tidak berasal dari nota yang dipilih.') !== FALSE &&
+	strpos($save, 'melebihi sisa yang dapat diretur') !== FALSE,
+	'Selected receipt returns remain limited to items and quantities on that receipt.');
 
 $failures = 0;
 foreach ($tests as $test) {

@@ -56,6 +56,8 @@ $controller_source = file_get_contents(dirname(__DIR__).DIRECTORY_SEPARATOR.'app
 	'modules'.DIRECTORY_SEPARATOR.'main'.DIRECTORY_SEPARATOR.'controllers'.DIRECTORY_SEPARATOR.'Petty_cash.php');
 $view_source = file_get_contents(dirname(__DIR__).DIRECTORY_SEPARATOR.'application'.DIRECTORY_SEPARATOR.
 	'modules'.DIRECTORY_SEPARATOR.'main'.DIRECTORY_SEPARATOR.'views'.DIRECTORY_SEPARATOR.'petty_cash.php');
+$cashier_view_source = file_get_contents(dirname(__DIR__).DIRECTORY_SEPARATOR.'application'.DIRECTORY_SEPARATOR.
+	'modules'.DIRECTORY_SEPARATOR.'main'.DIRECTORY_SEPARATOR.'views'.DIRECTORY_SEPARATOR.'petty_cash_cashier.php');
 $assert(strpos($controller_source, 'journal.date < ?') !== FALSE &&
 	strpos($controller_source, 'journal.date = ?') !== FALSE, 'Daily cash report separates opening balance from dated movements.');
 $assert(strpos($controller_source, 'cash_tx.fund_id = ?') !== FALSE, 'Daily cash report filters ledger entries to the selected fund.');
@@ -65,6 +67,14 @@ $assert(strpos($view_source, 'Buku kas harian') !== FALSE &&
 	strpos($view_source, 'Saldo akhir sistem') !== FALSE, 'Daily cash view presents opening, running, and closing balances.');
 $assert(strpos($controller_source, 'if (!$supplier_receipt || $outstanding === FALSE') !== FALSE,
 	'Supplier-payment approval validates the locked goods receipt before posting.');
+$assert(strpos($controller_source, 'private function _cashier_register_preview') !== FALSE &&
+	strpos($controller_source, "array('code' => '1101')") !== FALSE &&
+	strpos($controller_source, "'expected_balance' => \$running_balance") !== FALSE,
+	'Cashier preview derives expected POS cash from posted account 1101 journal movements.');
+$assert(strpos($cashier_view_source, 'Preview & Hitung Uang Laci Kas POS') !== FALSE &&
+	strpos($cashier_view_source, 'cashier-count-input') !== FALSE &&
+	strpos($cashier_view_source, 'tidak menyimpan hitung fisik atau menutup kas') !== FALSE,
+	'Cashier can preview account balance, count denominations, and see an explicitly non-final variance.');
 
 $failures = 0;
 foreach ($tests as $test) {

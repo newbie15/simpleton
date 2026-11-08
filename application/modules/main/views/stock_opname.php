@@ -13,12 +13,20 @@
 			<h3 class="box-title">Daftar Stok Opname</h3>
 			<div class="box-tools">
 				<form method="post" action="<?php echo site_url('main/stock_opname/create'); ?>" style="display:inline">
-					<button class="btn btn-primary btn-sm" type="submit"><span class="glyphicon glyphicon-plus"></span> Mulai Stok Opname</button>
+					<button class="btn btn-primary btn-sm" type="submit"><span class="glyphicon glyphicon-plus"></span> Opname Semua Barang</button>
 				</form>
 			</div>
 		</div>
 		<div class="box-body table-responsive">
-			<p class="help-block">Buat draft berdasarkan jumlah sistem saat ini, isi qty fisik dan harga pokok, lalu selesaikan untuk menerapkan selisih stok.</p>
+			<p class="help-block">Pilih opname satu barang untuk memperbarui stok barcode tertentu, atau opname semua barang untuk pemeriksaan menyeluruh. HPP mengikuti nilai di sistem.</p>
+			<form method="post" action="<?php echo site_url('main/stock_opname/create'); ?>" class="form-inline" style="margin-bottom:15px;">
+				<div class="form-group">
+					<label for="opname-barcode">Opname satu barang:</label>
+					<input type="text" class="form-control" id="opname-barcode" name="barcode" maxlength="64" required placeholder="Masukkan atau scan barcode">
+				</div>
+				<button class="btn btn-default" type="submit">Mulai Opname Barcode</button>
+			</form>
+			<p class="help-block">HPP pada opname mengikuti HPP sistem. Untuk menetapkan atau memperbarui HPP, gunakan halaman Riwayat HPP. Perubahan stok baru diterapkan setelah opname diselesaikan.</p>
 			<table class="table table-striped table-bordered" id="opname-list-table">
 				<thead>
 					<tr><th>No. Opname</th><th>Dibuat</th><th>Status</th><th>Jumlah barang</th><th>Belum dihitung</th><th>Nilai persediaan</th><th>Aksi</th></tr>
@@ -28,11 +36,18 @@
 						<tr>
 							<td><?php echo html_escape($opname->opname_number); ?></td>
 							<td><?php echo html_escape($opname->created_at); ?></td>
-							<td><?php echo $opname->status === 'finalized' ? 'Selesai' : 'Draft'; ?></td>
+							<td><?php echo $opname->status === 'finalized' ? 'Selesai' : ($opname->status === 'cancelled' ? 'Dibatalkan' : 'Draft'); ?></td>
 							<td data-order="<?php echo (int) $opname->item_count; ?>"><?php echo number_format((int) $opname->item_count); ?></td>
 							<td data-order="<?php echo (int) $opname->uncounted_items; ?>"><?php echo number_format((int) $opname->uncounted_items); ?></td>
 							<td data-order="<?php echo (float) $opname->inventory_value; ?>"><?php echo 'Rp '.number_format((float) $opname->inventory_value, 0, ',', '.'); ?></td>
-							<td><a class="btn btn-xs btn-default" href="<?php echo site_url('main/stock_opname/edit/'.(int) $opname->id); ?>"><?php echo $opname->status === 'finalized' ? 'Lihat' : 'Lanjutkan'; ?></a></td>
+							<td>
+								<a class="btn btn-xs btn-default" href="<?php echo site_url('main/stock_opname/edit/'.(int) $opname->id); ?>"><?php echo $opname->status === 'draft' ? 'Lanjutkan' : 'Lihat'; ?></a>
+								<?php if ($opname->status === 'draft') { ?>
+									<form method="post" action="<?php echo site_url('main/stock_opname/cancel/'.(int) $opname->id); ?>" style="display:inline" onsubmit="return confirm('Batalkan draft opname ini? Data hitungannya akan disimpan sebagai riwayat, tetapi tidak dapat dilanjutkan.');">
+										<button class="btn btn-xs btn-danger" type="submit">Batalkan</button>
+									</form>
+								<?php } ?>
+							</td>
 						</tr>
 					<?php } ?>
 				</tbody>
@@ -64,12 +79,18 @@
 <?php } else { ?>
 	<div class="box box-primary">
 		<div class="box-header with-border">
-			<h3 class="box-title"><?php echo html_escape($opname->opname_number); ?><?php echo $opname->status === 'finalized' ? ' - Selesai' : ' - Draft'; ?></h3>
+			<h3 class="box-title"><?php echo html_escape($opname->opname_number); ?><?php echo $opname->status === 'finalized' ? ' - Selesai' : ($opname->status === 'cancelled' ? ' - Dibatalkan' : ' - Draft'); ?></h3>
 			<div class="pull-right">
 				<?php if ($opname->status === 'draft') { ?>
 					<button class="btn btn-primary btn-sm" type="submit" form="opname-save-form">Simpan Draft</button>
+					<form id="opname-sync-form" method="post" action="<?php echo site_url('main/stock_opname/sync/'.(int) $opname->id); ?>" style="display:inline">
+						<button class="btn btn-info btn-sm" type="submit">Sinkronkan Barang Baru</button>
+					</form>
 					<form id="opname-finalize-form" method="post" action="<?php echo site_url('main/stock_opname/finalize/'.(int) $opname->id); ?>" style="display:inline">
 						<button class="btn btn-success btn-sm" type="submit">Selesaikan Opname</button>
+					</form>
+					<form method="post" action="<?php echo site_url('main/stock_opname/cancel/'.(int) $opname->id); ?>" style="display:inline" onsubmit="return confirm('Batalkan draft opname ini? Data hitungannya disimpan sebagai riwayat, tetapi tidak dapat dilanjutkan.');">
+						<button class="btn btn-danger btn-sm" type="submit">Batalkan Draft</button>
 					</form>
 				<?php } ?>
 				<a class="btn btn-default btn-sm" href="<?php echo site_url('main/stock_opname'); ?>">Kembali ke daftar</a>
@@ -79,7 +100,7 @@
 			<p><strong>Dibuat:</strong> <?php echo html_escape($opname->created_at); ?>
 				<?php if ($opname->finalized_at) { ?>&nbsp; <strong>Diselesaikan:</strong> <?php echo html_escape($opname->finalized_at); ?><?php } ?></p>
 			<?php if ($opname->status === 'draft') { ?>
-				<p class="help-block">Hitung seluruh barang. Isi qty fisik dan estimasi harga pokok per unit untuk barang yang masih ada. Kosongkan kedua kolom qty/harga jika belum dihitung. Perubahan stok baru diterapkan saat opname diselesaikan. Selisih dihitung dari snapshot saat draft dibuat agar pergerakan stok berikutnya tidak tertimpa.</p>
+				<p class="help-block">Isi qty fisik setiap barang. HPP diambil dari sistem dan tidak dapat diubah dari halaman opname; perbarui HPP melalui halaman Riwayat HPP. Kosongkan qty fisik jika barang belum dihitung. Perubahan stok baru diterapkan saat opname diselesaikan. Selisih dihitung dari snapshot saat draft dibuat agar pergerakan stok berikutnya tidak tertimpa.</p>
 				<div class="form-group">
 					<label for="opname-search">Scan barcode / cari barang</label>
 					<input type="text" class="form-control" id="opname-search" placeholder="Scan barcode atau ketik nama barang">
@@ -88,13 +109,15 @@
 				<form id="opname-save-form" method="post" action="<?php echo site_url('main/stock_opname/save/'.(int) $opname->id); ?>">
 					<input type="hidden" id="items-json" name="items_json">
 				</form>
-			<?php } else { ?>
+			<?php } elseif ($opname->status === 'finalized') { ?>
 				<p class="help-block">Opname ini sudah diterapkan ke stok dan tidak dapat diubah.</p>
+			<?php } else { ?>
+				<p class="help-block">Draft ini dibatalkan. Data hitungannya disimpan sebagai riwayat dan tidak mengubah stok.</p>
 			<?php } ?>
 			<div class="row">
 				<div class="col-sm-4"><strong>Barang terhitung:</strong> <span id="counted-items">0</span> / <?php echo number_format(count($items)); ?></div>
 				<div class="col-sm-4"><strong>Nilai persediaan:</strong> <span id="inventory-value">Rp 0</span></div>
-				<div class="col-sm-4"><strong>Selisih qty bersih:</strong> <span id="net-adjustment">0</span></div>
+				<?php if ($can_see_system_stock) { ?><div class="col-sm-4"><strong>Selisih qty bersih:</strong> <span id="net-adjustment">0</span></div><?php } ?>
 			</div>
 			<br>
 			<div id="opname-grid"></div>
@@ -106,34 +129,48 @@
 		var rows = <?php
 			$grid_rows = array();
 			foreach ($items as $item) {
-				$unit_cost = $item->unit_cost === NULL
+				$cost = $opname->status === 'finalized' || $opname->status === 'cancelled'
+					? $item->unit_cost
+					: ($item->system_average_cost !== NULL && (float) $item->system_average_cost > 0
+						? $item->system_average_cost
+						: $item->unit_cost);
+				$unit_cost = $cost === NULL || (float) $cost <= 0
 					? ''
-					: rtrim(rtrim((string) $item->unit_cost, '0'), '.');
-				$grid_rows[] = array(
+					: rtrim(rtrim((string) $cost, '0'), '.');
+				$grid_row = array(
 					(int) $item->id,
 					$item->barcode,
-					$item->product_name,
-					(int) $item->system_qty,
-					$item->counted_qty === NULL ? '' : (int) $item->counted_qty,
-					$unit_cost
+					$item->product_name
 				);
+				if ($can_see_system_stock) {
+					$grid_row[] = (int) $item->system_qty;
+				}
+				$grid_row[] = $item->counted_qty === NULL ? '' : (int) $item->counted_qty;
+				$grid_row[] = $unit_cost;
+				$grid_rows[] = $grid_row;
 			}
 			echo json_encode($grid_rows, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
 		?>;
 		var initialRows = JSON.parse(JSON.stringify(rows));
 		var isDraft = <?php echo $opname->status === 'draft' ? 'true' : 'false'; ?>;
+		var canSeeSystemStock = <?php echo $can_see_system_stock ? 'true' : 'false'; ?>;
+		var quantityColumn = canSeeSystemStock ? 4 : 3;
+		var costColumn = quantityColumn + 1;
+		var columns = [
+			{ type: 'numeric', title: 'ID', width: 65, readOnly: true },
+			{ type: 'text', title: 'Barcode', width: 150, readOnly: true },
+			{ type: 'text', title: 'Nama Barang', width: 240, readOnly: true }
+		];
+		if (canSeeSystemStock) {
+			columns.push({ type: 'numeric', title: 'Qty Sistem (snapshot)', width: 140, readOnly: true });
+		}
+		columns.push({ type: 'numeric', title: 'Qty Fisik', width: 110, readOnly: !isDraft });
+		columns.push({ type: 'numeric', title: 'HPP Sistem / Unit', width: 150, readOnly: true });
 		var dirty = false;
 		var grid = jexcel(document.getElementById('opname-grid'), {
 			data: rows,
-			columns: [
-				{ type: 'numeric', title: 'ID', width: 65, readOnly: true },
-				{ type: 'text', title: 'Barcode', width: 150, readOnly: true },
-				{ type: 'text', title: 'Nama Barang', width: 240, readOnly: true },
-				{ type: 'numeric', title: 'Qty Sistem (snapshot)', width: 140, readOnly: true },
-				{ type: 'numeric', title: 'Qty Fisik', width: 110, readOnly: !isDraft },
-				{ type: 'numeric', title: 'Harga Pokok / Unit', width: 150, readOnly: !isDraft }
-			],
-			minDimensions: [6, 1],
+			columns: columns,
+			minDimensions: [columns.length, 1],
 			allowInsertRow: false,
 			allowDeleteRow: false,
 			tableOverflow: true,
@@ -158,12 +195,14 @@
 			var value = 0;
 			var adjustment = 0;
 			for (var i = 0; i < data.length; i++) {
-				var snapshotQty = parseInt(data[i][3], 10) || 0;
-				var physicalQty = data[i][4] === '' ? null : parseInt(data[i][4], 10);
-				var unitCost = data[i][5] === '' ? null : parseFloat(String(data[i][5]).replace(/,/g, ''));
+				var snapshotQty = canSeeSystemStock ? (parseInt(data[i][3], 10) || 0) : 0;
+				var physicalQty = data[i][quantityColumn] === '' ? null : parseInt(data[i][quantityColumn], 10);
+				var unitCost = data[i][costColumn] === '' ? null : parseFloat(String(data[i][costColumn]).replace(/,/g, ''));
 				if (physicalQty !== null && !isNaN(physicalQty)) {
 					counted++;
-					adjustment += physicalQty - snapshotQty;
+					if (canSeeSystemStock) {
+						adjustment += physicalQty - snapshotQty;
+					}
 					if (unitCost !== null && !isNaN(unitCost)) {
 						value += physicalQty * unitCost;
 					}
@@ -171,7 +210,9 @@
 			}
 			document.getElementById('counted-items').textContent = counted.toLocaleString('id-ID');
 			document.getElementById('inventory-value').textContent = formatMoney(value);
-			document.getElementById('net-adjustment').textContent = adjustment.toLocaleString('id-ID');
+			if (canSeeSystemStock) {
+				document.getElementById('net-adjustment').textContent = adjustment.toLocaleString('id-ID');
+			}
 		}
 
 		if (isDraft) {
@@ -191,8 +232,8 @@
 				for (var i = 0; i < rows.length; i++) {
 					if (String(rows[i][1]).trim() === barcode) {
 						grid.search(barcode);
-						grid.updateSelectionFromCoords(4, i, 4, i);
-						grid.openEditor(grid.records[i][4]);
+						grid.updateSelectionFromCoords(quantityColumn, i, quantityColumn, i);
+						grid.openEditor(grid.records[i][quantityColumn]);
 						return;
 					}
 				}
@@ -205,11 +246,17 @@
 				var data = grid.getData();
 				var payload = [];
 				for (var i = 0; i < data.length; i++) {
-					if (data[i][4] !== initialRows[i][4] || data[i][5] !== initialRows[i][5]) {
-						payload.push([data[i][0], data[i][4], data[i][5]]);
+					if (data[i][quantityColumn] !== initialRows[i][quantityColumn]) {
+						payload.push([data[i][0], data[i][quantityColumn]]);
 					}
 				}
 				document.getElementById('items-json').value = JSON.stringify(payload);
+			});
+			document.getElementById('opname-sync-form').addEventListener('submit', function (event) {
+				if (dirty) {
+					event.preventDefault();
+					alert('Simpan perubahan qty terlebih dahulu sebelum menyinkronkan barang baru.');
+				}
 			});
 			document.getElementById('opname-finalize-form').addEventListener('submit', function (event) {
 				if (dirty) {

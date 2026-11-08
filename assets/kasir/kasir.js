@@ -14,17 +14,27 @@ $(document).ready(function(){
                 console.log("Failed to load limit_belanja");
                 return;
             }
-            var rawLimit = parseInt(response);
-            if (!isNaN(rawLimit)) {
-                $("#limit").html(rawLimit.toLocaleString('id-ID')).data('raw', rawLimit);
+            if ($.trim($("#npk").val()) !== String(n)) {
+                return;
             }
-            var lb = parseInt($('#limit_belanja').data('raw') !== undefined ? $('#limit_belanja').data('raw') : $('#limit_belanja').html());
-            var l = parseInt($('#limit').data('raw') !== undefined ? $('#limit').data('raw') : $('#limit').html());
-
-            if (!isNaN(l) && !isNaN(lb) && l > lb){
-                alert("belanja anda telah melebihi limit bulanan\n silahkan berbelanja bulan depan");
-                location.reload();
+            var rawLimit = $.trim(response) === "" ? 0 : parseInt($.trim(response), 10);
+            if (isNaN(rawLimit)) {
+                console.log("Invalid limit_belanja response");
+                return;
             }
+            $("#limit").html(rawLimit.toLocaleString('id-ID')).data('raw', rawLimit);
+            
+            var spent = rawLimit;
+            var monthlyLimit = Number($("#limit_belanja").data("raw")) || 0;
+            console.log("spent=" + spent + ", monthlyLimit=" + monthlyLimit);
+            
+            if (spent >= monthlyLimit && monthlyLimit > 0) {
+                alert("Limit belanja bulanan sudah tercapai. Silakan gunakan metode pembayaran tunai/cash.");
+                setPayrollAvailability(true);
+                $("#metode_pembayaran").val("tunai").trigger("change");
+            }
+            
+            checklimit();
         });
     }
 
@@ -84,24 +94,25 @@ $(document).ready(function(){
     }
 
     function checklimit(){
-        var lbEl = $('#limit_belanja');
-        var lEl = $('#limit');
-        var lb = parseInt(lbEl.data('raw') !== undefined ? lbEl.data('raw') : lbEl.html());
-        var l = parseInt(lEl.data('raw') !== undefined ? lEl.data('raw') : lEl.html());
+        var lb = Number($('#limit_belanja').data('raw'));
+        var l = Number($('#limit').data('raw'));
 
-        lb = lb || 0;
-        l = l || 0;
+        if (!isFinite(lb) || !isFinite(l)) {
+            return;
+        }
 
-        var b = (l+totl);
+        var transactionTotal = checkoutGrandTotal();
+        var b = l + transactionTotal;
 
         console.log("lb :",lb);
         console.log("l :",l);
         console.log("totl :",totl);
         console.log("b :",b);
 
+        updatePayrollAvailability(transactionTotal);
         if(b>lb){
             if(show){
-                alert("total belanja anda akan melebihi limit bulanan\nmohon kurangi jumlah belanja anda kali ini");
+                alert("total belanja akan melebihi limit bulanan\nsilakan gunakan metode pembayaran selain potong gaji");
                 $("#ttx").css("color","red");
             }
             show = false;
@@ -162,6 +173,24 @@ $(document).ready(function(){
             edc: "EDC (Debit/Kredit)",
             transfer: "Transfer Bank"
         }[method] || "-";
+    }
+
+    function setPayrollAvailability(blocked) {
+        var option = $("#metode_pembayaran option[value='potong_gaji']");
+        option.prop("disabled", blocked);
+        $("#limit-payment-notice").toggle(blocked);
+        if (blocked && currentPaymentMethod() === "potong_gaji") {
+            $("#metode_pembayaran").val("tunai").trigger("change");
+        }
+    }
+
+    function updatePayrollAvailability(total) {
+        var spent = Number($("#limit").data("raw"));
+        var monthlyLimit = Number($("#limit_belanja").data("raw"));
+        if (!isFinite(spent) || !isFinite(monthlyLimit)) {
+            return;
+        }
+        setPayrollAvailability(spent + total > monthlyLimit);
     }
 
     // Nilai pembayaran voucher gift card dari server (0 jika belum/ tidak valid) — gift card sebagai alat bayar, PPN tetap.
@@ -340,6 +369,8 @@ $(document).ready(function(){
                         check_limit_belanja($("#npk").val());
                         check_jadwal_belanja($("#npk").val());
                         tampilkan_foto(npk);
+                        // Reset potong_gaji enabled when NPK changes
+                        setPayrollAvailability(false);
 
                         console.log(elapsedTime);
                         if (elapsedTime > 100000 && npk != '1'){
@@ -429,11 +460,12 @@ $(document).ready(function(){
     }
 
     function updatePaymentDisplay() {
-        var method = currentPaymentMethod();
-        var cash = isCashMethod(method);
         var diskon = activeVoucher ? activeVoucher.diskon : 0;
         var finalTotl = checkoutGrandTotal();
 
+        updatePayrollAvailability(finalTotl);
+        var method = currentPaymentMethod();
+        var cash = isCashMethod(method);
         // Ringkasan nilai: total belanja utuh (sudah PPN), dibayar voucher gift card, sisa bayar.
         $("#payment-total-display").html("Rp " + formatRupiah(Math.round(totl)));
         if (diskon > 0) {
@@ -562,6 +594,8 @@ $(document).ready(function(){
 		}
 	});
 	$("#npk").on("input", function () {
+	    $("#limit, #limit_belanja").removeData("raw");
+	    setPayrollAvailability(false);
 		if (activeVoucher) {
 			clearVoucher("NPK berubah, pilih ulang voucher.", false);
 		}
@@ -615,6 +649,17 @@ $(document).ready(function(){
         );
         updatePaymentFields();
         loadEligibleVouchers(npk);
+        
+        // Auto-switch to cash if limit exceeded and potong_gaji selected
+        var spent = Number($("#limit").data("raw")) || 0;
+        var monthlyLimit = Number($("#limit_belanja").data("raw")) || 0;
+        var cartTotal = checkoutGrandTotal();
+        if (isFinite(spent) && isFinite(monthlyLimit) && spent + cartTotal > monthlyLimit) {
+            if (currentPaymentMethod() === "potong_gaji") {
+                $("#metode_pembayaran").val("tunai").trigger("change");
+            }
+        }
+        
         $("#checkout-modal").modal("show");
         updatePaymentDisplay();
     }

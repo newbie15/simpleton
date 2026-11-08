@@ -59,3 +59,17 @@ CREATE TABLE IF NOT EXISTS `sales_billing_items` (
 	UNIQUE KEY `uq_sales_billing_period_nota` (`period_id`,`nota`),
 	KEY `idx_sales_billing_period_npk` (`period_id`,`npk`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+CREATE TABLE IF NOT EXISTS `sales_billing_scans` (
+	`id` int(11) NOT NULL AUTO_INCREMENT,
+	`period_id` int(11) NOT NULL,
+	`nota` varchar(64) NOT NULL,
+	`scan_time` datetime NOT NULL,
+	`scanned_by` varchar(32) NOT NULL,
+	`system_total` decimal(15,2) NOT NULL DEFAULT '0.00',
+	`nota_total` decimal(15,2) DEFAULT NULL,
+	`status` enum('match','mismatch') NOT NULL DEFAULT 'match',
+	PRIMARY KEY (`id`),
+	UNIQUE KEY `uq_sales_billing_scan_period_nota` (`period_id`,`nota`),
+	KEY `idx_sales_billing_scan_period` (`period_id`,`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;

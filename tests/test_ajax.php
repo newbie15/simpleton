@@ -161,6 +161,88 @@ check(count(explode(':', $broken_barcode_response)) < 3,
     'Barcode: respons cacat terdeteksi < 3 field');
 
 // ---------------------------------------------------------------------------
+// 5. Proteksi dan konsistensi endpoint rekap penjualan
+// ---------------------------------------------------------------------------
+$ajax_source = file_get_contents(dirname(__DIR__).'/application/modules/main/controllers/Ajax.php');
+$rekap_source = file_get_contents(dirname(__DIR__).'/application/modules/main/controllers/Rekap_penjualan.php');
+$rekap_script = file_get_contents(dirname(__DIR__).'/assets/kasir/rekap.js');
+$rekap_view = file_get_contents(dirname(__DIR__).'/application/modules/main/views/rekap_penjualan.php');
+$report_endpoints = array(
+    'data_harian', 'data_tunai', 'ringkasan_tunai', 'data_perorangan', 'data_bulanan', 'data_tahunan',
+    'rekap_harian', 'rekap_perorangan'
+);
+foreach ($report_endpoints as $endpoint) {
+    $endpoint_start = strpos($ajax_source, 'public function '.$endpoint.'(');
+    $next_method = $endpoint_start === FALSE ? FALSE :
+        strpos($ajax_source, 'public function ', $endpoint_start + 1);
+    $endpoint_source = $endpoint_start === FALSE ? '' :
+        substr($ajax_source, $endpoint_start, $next_method === FALSE ? NULL : $next_method - $endpoint_start);
+    check(strpos($endpoint_source, '$this->_require_sales_report_access();') !== FALSE,
+        'Endpoint '.$endpoint.' memeriksa hak akses rekap');
+}
+check(strpos($rekap_source, "can_access('rekap_penjualan')") !== FALSE,
+    'Halaman Rekap Penjualan memeriksa hak akses');
+check(strpos($ajax_source, "return_header.status IN ('approved', 'completed')") !== FALSE &&
+    strpos($ajax_source, 'ROUND(SUM(COALESCE(approved_return.amount, 0)), 2) AS retur_disetujui') !== FALSE &&
+    strpos($ajax_source, 'AS jumlah_penjualan') !== FALSE &&
+    strpos($ajax_source, 'AS retur_disetujui') !== FALSE &&
+    strpos($ajax_source, 'AS tertagih') !== FALSE,
+    'Laporan tahunan mengurangi retur yang disetujui dari nilai transaksi');
+$daily_start = strpos($ajax_source, 'public function data_harian()');
+$daily_end = strpos($ajax_source, 'public function data_perorangan()', $daily_start);
+$daily_source = $daily_start === FALSE ? '' :
+    substr($ajax_source, $daily_start, $daily_end - $daily_start);
+check(strpos($daily_source, 'AS retur_disetujui') !== FALSE &&
+    strpos($daily_source, 'AS tertagih') !== FALSE &&
+    strpos($daily_source, "'retur_disetujui', 'tertagih'") !== FALSE,
+    'Laporan harian menampilkan nilai retur disetujui dan nilai setelah retur');
+$personal_start = strpos($ajax_source, 'public function data_perorangan()');
+$personal_end = strpos($ajax_source, 'public function data_bulanan()', $personal_start);
+$personal_source = $personal_start === FALSE ? '' :
+    substr($ajax_source, $personal_start, $personal_end - $personal_start);
+check(strpos($personal_source, 'AS retur_disetujui') !== FALSE &&
+    strpos($personal_source, 'AS tertagih') !== FALSE,
+    'Laporan perorangan menampilkan nilai retur disetujui dan nilai setelah retur');
+$monthly_start = strpos($ajax_source, 'public function data_bulanan()');
+$monthly_end = strpos($ajax_source, 'public function data_tahunan()', $monthly_start);
+$monthly_source = $monthly_start === FALSE ? '' :
+    substr($ajax_source, $monthly_start, $monthly_end - $monthly_start);
+check(strpos($monthly_source, 'AS retur_disetujui') !== FALSE &&
+    strpos($monthly_source, 'AS tertagih') !== FALSE,
+    'Laporan bulanan menampilkan nilai retur disetujui dan nilai setelah retur');
+$annual_loader = strpos($rekap_script, "loadSheet('tahunan-sheet'");
+$annual_loader_end = strpos($rekap_script, '], 12);', $annual_loader);
+$annual_loader_source = $annual_loader === FALSE ? '' :
+    substr($rekap_script, $annual_loader, $annual_loader_end - $annual_loader);
+check(substr_count($annual_loader_source, 'moneyColumn(') === 3 &&
+    substr_count($annual_loader_source, "{ type: 'numeric'") === 2,
+    'Tampilan tahunan menyediakan kolom transaksi, qty, nilai bruto, retur, dan tertagih');
+$daily_columns_start = strpos($rekap_script, 'function dateColumns()');
+$daily_columns_end = strpos($rekap_script, 'function periodValue(', $daily_columns_start);
+$daily_columns_source = $daily_columns_start === FALSE ? '' :
+    substr($rekap_script, $daily_columns_start, $daily_columns_end - $daily_columns_start);
+check(substr_count($daily_columns_source, "{ type: 'text'") +
+    substr_count($daily_columns_source, 'moneyColumn(') === 12 &&
+    substr_count($daily_columns_source, 'moneyColumn(') === 4,
+    'Tampilan laporan harian memiliki kolom yang sejajar dengan ekspor CSV, termasuk retur dan nilai bersih');
+check(strpos($rekap_script, "mask: '#.##,##'") !== FALSE &&
+    strpos($rekap_script, 'amount.toFixed(2)') !== FALSE &&
+    strpos($rekap_script, 'money: true') !== FALSE,
+    'Semua kolom nominal ditampilkan dengan pemisah ribuan Indonesia dan presisi rupiah stabil');
+check(strpos($rekap_view, 'id="tunai"') !== FALSE &&
+    strpos($rekap_view, 'id="tunai-hari-total"') !== FALSE &&
+    strpos($rekap_view, 'id="tunai-bulan-total"') !== FALSE &&
+    strpos($rekap_script, "reportUrl('data_tunai'") !== FALSE &&
+    strpos($ajax_source, "IN ('tunai', 'cash')") !== FALSE,
+    'Rekap tunai menampilkan ringkasan hari/bulan dan hanya transaksi pembayaran tunai');
+check(strpos($rekap_view, '#exTab2 .jexcel_container') !== FALSE &&
+    strpos($rekap_view, '#exTab2 .jexcel_content') !== FALSE &&
+    strpos($rekap_view, 'width: auto !important;') !== FALSE &&
+    strpos($rekap_script, 'function fitColumnsToWidth(') !== FALSE &&
+    strpos($rekap_script, 'fitColumnsToWidth(container, reportColumns)') !== FALSE,
+    'Kolom tabel rekap dilebarkan untuk mengisi area tanpa memperlebar tabel menjadi bidang putih kosong');
+
+// ---------------------------------------------------------------------------
 // 5. Kontrak data karyawan() "nama:bagian:limit"
 // ---------------------------------------------------------------------------
 $raw_karyawan_response = 'Budi Santoso:Gudang:500000';
