@@ -158,11 +158,29 @@ $is_low_balance = ($total_limit > 0 && ($total_balance / $total_limit) <= 0.25);
 							<div class="cashier-count-total" id="cashier-count-variance" data-expected="<?php echo (float) $cashier_cash['today_net']; ?>" style="font-size: 28px; margin: 8px 0; font-weight: bold;">
 								Rp 0
 							</div>
-							<div id="cashier-count-status" class="help-block" style="font-size: 13px; margin-bottom: 15px;">
+							<div id="cashier-count-status" class="help-block" style="font-size: 13px; margin-bottom: 12px;">
 								Isi jumlah lembar / koin pada tabel di sebelah kiri.
 							</div>
-							<hr style="margin: 12px 0;">
-							<button type="button" class="btn btn-primary btn-block" id="btn-print-cash-count">
+
+							<form method="post" action="<?php echo site_url('main/petty_cash/save_cash_count'); ?>" id="form-save-cash-count" style="margin-bottom: 10px;">
+								<input type="hidden" name="form_token" value="<?php echo html_escape($form_token); ?>">
+								<input type="hidden" name="return_to" value="main/petty_cash/cashier">
+								<input type="hidden" name="initial_float" id="save-initial-float" value="0">
+								<input type="hidden" name="system_target" id="save-system-target" value="<?php echo (float) $cashier_cash['today_net']; ?>">
+								<input type="hidden" name="counted_total" id="save-counted-total" value="0">
+								<input type="hidden" name="variance" id="save-variance" value="0">
+								<input type="hidden" name="target_mode" id="save-target-mode" value="laci">
+								<div id="save-denominations-container"></div>
+								<div class="form-group text-left" style="margin-bottom: 8px;">
+									<label for="save-cash-notes" style="font-size: 12px; font-weight: 600; color: #555;">Catatan Opname (Opsional):</label>
+									<textarea class="form-control input-sm" id="save-cash-notes" name="notes" rows="2" placeholder="Contoh: Kas fisik cocok, serah terima shift kasir"></textarea>
+								</div>
+								<button type="submit" class="btn btn-success btn-block" id="btn-submit-save-cash">
+									<i class="fa fa-save"></i> <strong>Simpan Hasil Opname Kas</strong>
+								</button>
+							</form>
+
+							<button type="button" class="btn btn-default btn-block" id="btn-print-cash-count">
 								<i class="fa fa-print"></i> Cetak Slip Opname Kasir
 							</button>
 							<small class="text-muted" style="display: block; margin-top: 6px;">Format struk termal / tanda terima rekap kasir</small>
@@ -180,6 +198,44 @@ $is_low_balance = ($total_limit > 0 && ($total_balance / $total_limit) <= 0.25);
 					</div>
 				</div>
 			</div>
+
+			<?php if (!empty($today_cash_counts)) { ?>
+			<div style="margin-top: 25px;">
+				<h4 style="margin-bottom: 8px;"><i class="fa fa-check-square-o text-green"></i> Riwayat Opname Kas Laci Hari Ini <small>(<?php echo count($today_cash_counts); ?> kali hitung tersimpan)</small></h4>
+				<div class="table-responsive">
+					<table class="table table-bordered table-striped table-condensed" style="font-size: 13px;">
+						<thead>
+							<tr class="bg-gray-light">
+								<th>Waktu Simpan</th>
+								<th>Kasir</th>
+								<th class="text-right">Modal Awal</th>
+								<th class="text-right">Target Laci</th>
+								<th class="text-right">Fisik Terhitung</th>
+								<th class="text-right">Selisih</th>
+								<th>Catatan</th>
+							</tr>
+						</thead>
+						<tbody>
+							<?php foreach ($today_cash_counts as $cc) {
+								$var_amount = (float) $cc->variance;
+								$var_class = abs($var_amount) < 1 ? 'text-green' : ($var_amount < 0 ? 'text-red' : 'text-yellow');
+								$var_text = abs($var_amount) < 1 ? 'PAS' : ($var_amount < 0 ? '-Rp '.number_format(abs($var_amount), 0, ',', '.') : '+Rp '.number_format($var_amount, 0, ',', '.'));
+							?>
+							<tr>
+								<td><?php echo html_escape(date('H:i', strtotime($cc->count_time))); ?> WIB</td>
+								<td><strong><?php echo html_escape($cc->cashier_name); ?></strong></td>
+								<td class="text-right"><?php echo $format_rupiah($cc->initial_float); ?></td>
+								<td class="text-right"><?php echo $format_rupiah($cc->system_target); ?></td>
+								<td class="text-right" style="font-weight: bold;"><?php echo $format_rupiah($cc->counted_total); ?></td>
+								<td class="text-right <?php echo $var_class; ?>" style="font-weight: bold;"><?php echo $var_text; ?></td>
+								<td><?php echo html_escape($cc->notes ? $cc->notes : '-'); ?></td>
+							</tr>
+							<?php } ?>
+						</tbody>
+					</table>
+				</div>
+			</div>
+			<?php } ?>
 
 			<h4 style="margin-top: 20px;"><i class="fa fa-history"></i> Pergerakan kas yang tercatat hari ini <small>(<?php echo count($cashier_cash['movements']); ?> baris jurnal)</small></h4>
 			<div class="table-responsive">
@@ -484,6 +540,8 @@ $is_low_balance = ($total_limit > 0 && ($total_balance / $total_limit) <= 0.25);
 	<div class="modal-dialog modal-sm" role="document">
 		<div class="modal-content">
 			<form method="post" action="<?php echo site_url('main/petty_cash/request_topup'); ?>">
+				<input type="hidden" name="form_token" value="<?php echo html_escape($form_token); ?>">
+				<input type="hidden" name="return_to" value="main/petty_cash/cashier">
 				<div class="modal-header bg-yellow text-white">
 					<button type="button" class="close text-white" data-dismiss="modal">&times;</button>
 					<h4 class="modal-title"><i class="fa fa-refresh"></i> Pengisian Kas Kecil</h4>
@@ -758,7 +816,13 @@ $is_low_balance = ($total_limit > 0 && ($total_balance / $total_limit) <= 0.25);
 	var submitButton = document.getElementById('cashier-submit');
 	if (form && submitButton) {
 		form.addEventListener('submit', function (e) {
-			var rawAmount = parseFloat(amountInput.value.replace(/\./g, '').replace(/,/g, '.')) || 0;
+			var rawVal = amountInput.value.replace(/\./g, '').replace(/,/g, '.');
+			var rawAmount = parseFloat(rawVal) || 0;
+			if (rawAmount <= 0) {
+				alert('Nominal pengeluaran harus lebih besar dari Rp 0.');
+				e.preventDefault();
+				return;
+			}
 			if (rawAmount > 1000000) {
 				if (!confirm('Jumlah pengeluaran sebesar Rp ' + rawAmount.toLocaleString('id-ID') + ' cukup besar untuk kas kecil kasir. Apakah Anda yakin data ini sudah benar?')) {
 					e.preventDefault();
@@ -768,6 +832,50 @@ $is_low_balance = ($total_limit > 0 && ($total_balance / $total_limit) <= 0.25);
 			amountInput.value = rawAmount.toString();
 			submitButton.disabled = true;
 			submitButton.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Mengirim...';
+		});
+	}
+
+	var formSaveCash = document.getElementById('form-save-cash-count');
+	if (formSaveCash) {
+		formSaveCash.addEventListener('submit', function (e) {
+			var isLedger = radioLedger && radioLedger.checked;
+			var floatVal = parseMoneyVal(floatInput ? floatInput.value : 0);
+			var targetAmount = getTargetAmount();
+			var totalFisik = 0;
+			var denomContainer = document.getElementById('save-denominations-container');
+			denomContainer.innerHTML = '';
+
+			Array.prototype.forEach.call(countInputs, function (input) {
+				var count = parseInt(input.value, 10) || 0;
+				var denom = parseInt(input.getAttribute('data-denomination'), 10);
+				totalFisik += count * denom;
+				var hidden = document.createElement('input');
+				hidden.type = 'hidden';
+				hidden.name = 'denominations[' + denom + ']';
+				hidden.value = count;
+				denomContainer.appendChild(hidden);
+			});
+
+			var variance = totalFisik - targetAmount;
+
+			document.getElementById('save-initial-float').value = floatVal;
+			document.getElementById('save-system-target').value = targetAmount;
+			document.getElementById('save-counted-total').value = totalFisik;
+			document.getElementById('save-variance').value = variance;
+			document.getElementById('save-target-mode').value = isLedger ? 'ledger' : 'laci';
+
+			if (totalFisik <= 0) {
+				if (!confirm('Total uang fisik yang dihitung masih Rp 0. Apakah Anda yakin ingin menyimpan hasil opname ini?')) {
+					e.preventDefault();
+					return;
+				}
+			}
+
+			var btnSubmitSave = document.getElementById('btn-submit-save-cash');
+			if (btnSubmitSave) {
+				btnSubmitSave.disabled = true;
+				btnSubmitSave.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Menyimpan...';
+			}
 		});
 	}
 }());

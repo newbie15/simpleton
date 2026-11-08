@@ -248,10 +248,18 @@ class Petty_cash extends CI_Controller
 			}
 		}
 
+		$this->_ensure_cash_count_table();
+		$today_cash_counts = $this->db->query("
+			SELECT * FROM cashier_cash_counts
+			WHERE count_date = ?
+			ORDER BY id DESC
+		", array($today))->result();
+
 		$data = array(
 			'cashier_cash' => $cashier_cash,
 			'cashier_closing' => $cashier_closing,
 			'cashier_name' => $cashier_name,
+			'today_cash_counts' => $today_cash_counts,
 			'funds' => $funds,
 			'total_balance' => $total_balance,
 			'has_balance_issue' => $has_balance_issue,
@@ -375,12 +383,15 @@ class Petty_cash extends CI_Controller
 		$tx_number = 'PC-REQ-'.date('Ymd-His').'-'.strtoupper(substr(md5(uniqid((string) mt_rand(), TRUE)), 0, 4));
 		$desc = 'Permintaan Pengisian Kembali Kas Kecil: ' . $fund->name . ($notes !== '' ? ' (' . $notes . ')' : '');
 
+		$main_account = $this->db->get_where('acc_accounts', array('code' => '1106'))->row();
+		$source_account_id = $main_account ? (int) $main_account->id : 21;
+
 		$this->db->insert('acc_cash_transactions', array(
 			'transaction_number' => $tx_number,
 			'fund_id' => $fund_id,
 			'transaction_date' => date('Y-m-d'),
 			'transaction_type' => 'funding',
-			'funding_source_account_id' => 21, // Kas Utama 1106
+			'funding_source_account_id' => $source_account_id,
 			'amount' => $needed_amount,
 			'description' => $desc,
 			'counterparty' => 'Kasir Toko',
@@ -391,6 +402,82 @@ class Petty_cash extends CI_Controller
 		));
 
 		$this->_message('Permintaan pengisian kas kecil sebesar Rp ' . number_format($needed_amount, 0, ',', '.') . ' telah diajukan ke pengurus.', TRUE, 'main/petty_cash/cashier');
+	}
+
+	public function save_cash_count()
+	{
+		$this->_require_post();
+		if (!$this->ion_auth->in_group('kasir') && !$this->_is_approver()) {
+			show_error('Akses ditolak.', 403);
+		}
+		$user_id = (string) $this->ion_auth->get_user_id();
+		$current_user = $this->ion_auth->user()->row();
+		$cashier_name = $current_user ? (trim($current_user->first_name.' '.$current_user->last_name) ? trim($current_user->first_name.' '.$current_user->last_name) : $current_user->username) : 'Kasir';
+
+		$clean_num = function ($val) {
+			if (!is_string($val) && !is_numeric($val)) return 0.0;
+			$clean = str_replace('.', '', (string) $val);
+			$clean = str_replace(',', '.', $clean);
+			return (float) $clean;
+		};
+
+		$initial_float = $clean_num($this->input->post('initial_float', TRUE));
+		$system_target = $clean_num($this->input->post('system_target', TRUE));
+		$counted_total = $clean_num($this->input->post('counted_total', TRUE));
+		$variance = $clean_num($this->input->post('variance', TRUE));
+		$target_mode = trim((string) $this->input->post('target_mode', TRUE));
+		$denominations = $this->input->post('denominations', TRUE);
+		$notes = trim((string) $this->input->post('notes', TRUE));
+
+		$denominations_json = is_array($denominations) ? json_encode($denominations) : NULL;
+
+		$this->_ensure_cash_count_table();
+		$inserted = $this->db->insert('cashier_cash_counts', array(
+			'count_date' => date('Y-m-d'),
+			'count_time' => date('Y-m-d H:i:s'),
+			'user_id' => $user_id,
+			'cashier_name' => $cashier_name,
+			'initial_float' => $initial_float,
+			'system_target' => $system_target,
+			'counted_total' => $counted_total,
+			'variance' => $variance,
+			'target_mode' => $target_mode === 'ledger' ? 'ledger' : 'laci',
+			'denominations_json' => $denominations_json,
+			'notes' => $notes === '' ? NULL : $notes,
+			'created_at' => date('Y-m-d H:i:s')
+		));
+
+		if (!$inserted) {
+			$this->_message('Gagal menyimpan hasil hitung fisik kas laci.', FALSE, 'main/petty_cash/cashier');
+			return;
+		}
+
+		$this->_message('Hasil opname fisik kasir sebesar Rp ' . number_format($counted_total, 0, ',', '.') . ' berhasil disimpan ke sistem.', TRUE, 'main/petty_cash/cashier');
+	}
+
+	private function _ensure_cash_count_table()
+	{
+		if (!$this->db->table_exists('cashier_cash_counts')) {
+			$this->db->query("
+				CREATE TABLE IF NOT EXISTS `cashier_cash_counts` (
+					`id` int(11) NOT NULL AUTO_INCREMENT,
+					`count_date` date NOT NULL,
+					`count_time` datetime NOT NULL,
+					`user_id` varchar(32) NOT NULL,
+					`cashier_name` varchar(128) NOT NULL,
+					`initial_float` decimal(15,2) NOT NULL DEFAULT '0.00',
+					`system_target` decimal(15,2) NOT NULL DEFAULT '0.00',
+					`counted_total` decimal(15,2) NOT NULL DEFAULT '0.00',
+					`variance` decimal(15,2) NOT NULL DEFAULT '0.00',
+					`target_mode` varchar(32) NOT NULL DEFAULT 'laci',
+					`denominations_json` text DEFAULT NULL,
+					`notes` varchar(500) DEFAULT NULL,
+					`created_at` datetime NOT NULL,
+					PRIMARY KEY (`id`),
+					KEY `idx_cashier_count_date` (`count_date`)
+				) ENGINE=InnoDB DEFAULT CHARSET=utf8
+			");
+		}
 	}
 
 	public function create_fund()
@@ -453,7 +540,20 @@ class Petty_cash extends CI_Controller
 		$fund_id = $this->_positive_id($this->input->post('fund_id', TRUE));
 		$type = trim((string) $this->input->post('transaction_type', TRUE));
 		$date = trim((string) $this->input->post('transaction_date', TRUE));
-		$amount = $this->_parse_amount($this->input->post('amount', TRUE));
+
+		$raw_amount = $this->input->post('amount', TRUE);
+		if (is_string($raw_amount)) {
+			$raw_amount = trim($raw_amount);
+			if (strpos($raw_amount, '.') !== FALSE && strpos($raw_amount, ',') === FALSE && preg_match('/\.\d{3}(\.|$)/', $raw_amount)) {
+				$raw_amount = str_replace('.', '', $raw_amount);
+			} elseif (strpos($raw_amount, '.') !== FALSE && strpos($raw_amount, ',') !== FALSE) {
+				$raw_amount = str_replace('.', '', $raw_amount);
+				$raw_amount = str_replace(',', '.', $raw_amount);
+			} elseif (strpos($raw_amount, ',') !== FALSE) {
+				$raw_amount = str_replace(',', '.', $raw_amount);
+			}
+		}
+		$amount = $this->_parse_amount($raw_amount);
 		$description = trim((string) $this->input->post('description', TRUE));
 		$counterparty = trim((string) $this->input->post('counterparty', TRUE));
 		$evidence = trim((string) $this->input->post('evidence_reference', TRUE));
