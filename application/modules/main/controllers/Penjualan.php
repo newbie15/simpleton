@@ -25,12 +25,16 @@ class Penjualan extends CI_Controller
 			base_url('assets/jexcel/js/excel-formula.min.js'),
 			base_url('assets/jexcel/js/numeral.min.js'),
 			base_url('assets/easyautocomplete/jquery.easy-autocomplete.min.js'),
-			base_url('assets/kasir/kasir.js?v=20261101-limit-payment-change')
+			base_url('assets/kasir/kasir.js?v=20261109-same-origin-urls')
 		);
+		$main_url = site_url('main');
 		$receipt_url = site_url('main/kasir/reprint');
+		$employee_photo_url = base_url('assets/uploads/karyawan/');
 		$data['m_penjualan'] = TRUE;
 		$data['output'] = '
 		<main role="main" class="col-md-9 ml-sm-auto col-lg-10 px-4">
+		  <input type="hidden" id="kasir-main-url" value="'.html_escape($main_url).'">
+		  <input type="hidden" id="employee-photo-base-url" value="'.html_escape($employee_photo_url).'">
 		  <input type="hidden" id="receipt-reprint-url" value="'.html_escape($receipt_url).'">
 		  <input type="hidden" id="ppn-rate" value="'.html_escape((string) $tax_rate).'">
 		  <br>

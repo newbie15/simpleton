@@ -7,9 +7,18 @@ $(document).ready(function(){
     var limit;
     var totl;
     var show;
+    function sameOriginUrl(url) {
+        var parsedUrl = document.createElement("a");
+        parsedUrl.href = url;
+        return window.location.protocol + "//" + window.location.host
+            + parsedUrl.pathname + parsedUrl.search + parsedUrl.hash;
+    }
+
+    var mainUrl = sameOriginUrl($("#kasir-main-url").val());
+    var employeePhotoBaseUrl = sameOriginUrl($("#employee-photo-base-url").val());
 
     function check_limit_belanja(n){
-        $("#limit").load("http://localhost/simpleton/index.php/main/ajax/limit_belanja/" + n, function(response, status, xhr) {
+        $("#limit").load(mainUrl + "/ajax/limit_belanja/" + n, function(response, status, xhr) {
             if (status !== "success") {
                 console.log("Failed to load limit_belanja");
                 return;
@@ -41,7 +50,7 @@ $(document).ready(function(){
     function check_jadwal_belanja(n) {
         $.ajax({
             method: "GET",
-            url: "http://localhost/simpleton/index.php/main/ajax/jadwal_belanja/" + n,
+            url: mainUrl + "/ajax/jadwal_belanja/" + n,
         }).done(function (msg) {
             // alert("Data Saved: " + msg);
             setTimeout(function () {
@@ -129,7 +138,7 @@ $(document).ready(function(){
     }
 
     var options1 = {
-        url: "http://localhost/simpleton/index.php/main/ajax/karyawan_list",
+        url: mainUrl + "/ajax/karyawan_list",
         getValue: "nama",
         list: {
             match: {
@@ -138,7 +147,7 @@ $(document).ready(function(){
         }
     };
     var options2 = {
-        url: "http://localhost/simpleton/index.php/main/ajax/produk_list",
+        url: mainUrl + "/ajax/produk_list",
         getValue: "produk",
         requestDelay: 500,
         list: {
@@ -227,7 +236,7 @@ $(document).ready(function(){
     // Modal tidak menyediakan pilihan metode; perubahan tetap ikut select di halaman.
     $("#metode_pembayaran").on("change", updatePaymentFields);
 
-    $("#nkasir").load("http://localhost/simpleton/index.php/main/ajax/daftar_kasir", function (response, status) {
+    $("#nkasir").load(mainUrl + "/ajax/daftar_kasir", function (response, status) {
         if (status !== "success") {
             $(this).html('<option value="0">Gagal memuat daftar kasir</option>');
             return;
@@ -260,7 +269,7 @@ $(document).ready(function(){
         });
         if(sama==0){
             $.ajax({
-                url: 'http://localhost/simpleton/index.php/main/ajax/barcode/' + kode,
+                url: mainUrl + '/ajax/barcode/' + kode,
                 // dataType: 'json',
                 success: function (resp) {
                     // $( '#target').html( resp.people[0].name );
@@ -332,7 +341,7 @@ $(document).ready(function(){
             image.style.display = "none";
             placeholder.style.display = "flex";
         };
-        image.setAttribute('src', "http://localhost/simpleton/assets/uploads/karyawan/" + encodeURIComponent(npk) + ".png?v=" + new Date().getTime());
+        image.setAttribute('src', employeePhotoBaseUrl + encodeURIComponent(npk) + ".png?v=" + new Date().getTime());
     }
 
     $("#npk").on("change blur", function(){
@@ -351,7 +360,7 @@ $(document).ready(function(){
             $("#foto-karyawan-placeholder").text("Memuat foto...").show();
 
             $.ajax({
-                url: 'http://localhost/simpleton/index.php/main/ajax/karyawan/' + encodeURIComponent(npk),
+                url: mainUrl + '/ajax/karyawan/' + encodeURIComponent(npk),
                 // dataType: 'json',
                 success: function( resp ) {
                     var scanEndTime = performance.now();
@@ -529,7 +538,7 @@ $(document).ready(function(){
 
         $.ajax({
             method: "GET",
-            url: "http://localhost/simpleton/index.php/main/kasir/validate_voucher/"
+            url: mainUrl + "/kasir/validate_voucher/"
                 + encodeURIComponent(kode) + "/" + Math.round(totl),
             data: { npk: $.trim($("#npk").val()) },
             dataType: "json"
@@ -555,7 +564,7 @@ $(document).ready(function(){
         }
         $.ajax({
             method: "GET",
-            url: "http://localhost/simpleton/index.php/main/kasir/eligible_vouchers",
+            url: mainUrl + "/kasir/eligible_vouchers",
             data: { npk: npk },
             dataType: "json"
         }).done(function (result) {
@@ -839,7 +848,7 @@ $(document).ready(function(){
         $("#confirm-checkout").prop("disabled", true).text("Menyimpan...");
         $.ajax({
             method: "POST",
-            url: "http://localhost/simpleton/index.php/main/kasir/checkout",
+            url: mainUrl + "/kasir/checkout",
             dataType: "json",
             data: pendingCheckout.payload
         }).done(function (response) {
