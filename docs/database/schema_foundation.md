@@ -2,6 +2,21 @@
 
 Dokumen ini mencatat skema tabel baru dan perluasan tabel eksisting yang diterapkan melalui berkas migrasi **[application/sql/phase3_foundation.sql](file:///g:/xampp/htdocs/simpleton/application/sql/phase3_foundation.sql)**.
 
+## Menjalankan migrasi lewat web
+
+- Login sebagai **admin**, buka **Back End > Akuntansi & Kas > Migrasi Database** (`main/migrate`).
+- Database dasar Simpleton (`users`, `groups`, `users_groups`, `stok`, `karyawan`, `penjualan`) dan akun admin harus tersedia. Halaman bukan installer database kosong.
+- Buat backup yang dapat dipulihkan dan hentikan transaksi selama maintenance. Konfirmasikan checkbox, lalu klik **Jalankan migrasi berikutnya** sampai semua file berstatus `applied`. Satu file dijalankan per request untuk membatasi durasi HTTP.
+- Runner membaca otomatis file SQL pada [application/schema_migrations](../../application/schema_migrations) dan mengurutkannya secara leksikografis. Nama menggunakan format sequential `NNN_nama_perubahan.sql` dengan nomor tiga digit unik (001–999), nama huruf kecil/angka/underscore, dan ID maksimal 64 karakter. Purchasing `001` mendahului fondasi `002` karena fondasi memperluas tabel penerimaan.
+- Untuk tambahan, cukup buat `023_nama_perubahan.sql` (berikutnya `024`, dst.) di folder tersebut lalu muat ulang halaman. Jangan menyisipkan nomor lebih kecil setelah migrasi berikutnya sudah diterapkan. File SQL bernama tidak valid atau nomor duplikat memblokir runner, bukan diabaikan diam-diam.
+- ID 001–022 dipertahankan dari runner sebelumnya dan isi SQL tidak berubah saat dipindahkan, sehingga checksum/riwayat lama tetap cocok. Daftar konfigurasi manual tidak dipakai lagi. Folder `application/sql` tetap menyimpan skrip legacy untuk referensi/pemasangan manual; runner **tidak membaca** folder itu. Untuk perubahan baru, sumber yang dijalankan adalah folder migrasi khusus; jangan mengedit snapshot legacy dengan harapan runner menjalankannya.
+- Riwayat disimpan dalam `schema_migrations`, terpisah dari migration library CodeIgniter yang lama: ID, checksum, status, waktu, admin pelaksana, dan error. Lock database mencegah dua runner berjalan bersamaan.
+- File selesai dilewati. Database lama tanpa riwayat runner dilengkapi dengan SQL repeat-safe; status tidak di-baseline secara otomatis hanya dari keberadaan tabel.
+- Kegagalan menghentikan urutan. Setelah penyebab diperbaiki, file gagal dapat dicoba ulang. Jika proses timeout, baris bisa tetap `running`; setelah request lama berakhir dan lock terlepas, jalankan ulang. DDL MySQL dapat tersimpan sebagian: **tidak ada rollback otomatis**.
+- Jangan mengedit file yang sudah dicatat; checksum menolak file berubah (perbedaan CRLF/LF diabaikan). Tambahkan migrasi baru setelah urutan terakhir untuk update berikutnya.
+- SQL demo, impor laporan dan migrasi PIN Telegram berisi data/default khusus sehingga tidak dimasukkan. Tidak ada CLI, SQL bebas, migrasi otomatis pada page load, atau tombol reset database.
+- Seed akun inti ikut fondasi; seed tidak menimpa akun existing. Tetap rekonsiliasi data dan akun yang sudah dikustomisasi sebelum go-live.
+
 ---
 
 ## 1. Tabel-Tabel Baru

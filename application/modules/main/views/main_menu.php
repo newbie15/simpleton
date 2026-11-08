@@ -27,6 +27,7 @@ $back_end_groups = array(
 		array('vouchers', 'Voucher', 'main/voucher', 'fa-ticket', isset($m_vouchers)),
 	)),
 	array('Akuntansi & Kas', 'fa-book', array(
+		array('users', 'Migrasi Database', 'main/migrate', 'fa-database', isset($m_migrate), array('admin')),
 		array('accounting', 'Setup Awal & Migrasi', 'main/starting_setup', 'fa-list-ol', isset($m_starting_setup)),
 		array('accounting', 'Akuntansi Terpadu (Utama)', 'main/accounting_unified', 'fa-star text-yellow', isset($m_accounting_unified)),
 		array('accounting', 'Buku Akun (Gnucash-style)', 'main/accounting_book', 'fa-sitemap', isset($m_accounting_book)),

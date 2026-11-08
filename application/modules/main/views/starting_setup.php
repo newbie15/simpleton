@@ -3,6 +3,7 @@
 	<div class="col-md-12">
 		<div class="callout callout-info">
 			<h4>Sebelum mulai input transaksi</h4>
+			<p>Administrator menjalankan pembaruan skema melalui <a href="<?php echo site_url('main/migrate'); ?>">Migrasi Database</a> sebelum mengikuti panduan ini.</p>
 			<p>Tetapkan satu tanggal cutover, lakukan backup database lama dan baru, lalu rekonsiliasi saldo pada tanggal tersebut. Uji proses migrasi di salinan database terlebih dahulu; jangan mengimpor data langsung ke database produksi tanpa pemeriksaan.</p>
 		</div>
 	</div>
@@ -47,7 +48,7 @@
 					<a class="btn btn-xs btn-default" href="<?php echo site_url('main/accounting_unified?tab=accounts'); ?>">Periksa bagan akun</a>
 					<a class="btn btn-xs btn-default" href="<?php echo site_url('main/accounting_unified?tab=input'); ?>">Input jurnal pembukaan</a>
 				</p>
-				<p class="text-muted">Bagan akun default disediakan melalui seed SQL <code>application/sql/phase3_foundation.sql</code>, bukan hardcode pada halaman ini. Jalankan skrip fondasi pada database target; <code>petty_cash.sql</code> tetap menambahkan akun 1106/1107 untuk instalasi lama dan membuat skema kas. Seed menggunakan <code>INSERT IGNORE</code>, jadi akun yang sudah ada tidak ditimpa—periksa tipe dan saldo normal bila database target pernah dikustomisasi. Impor stok hanya mengisi daftar stok, bukan membuat jurnal persediaan. Pastikan pemetaan akun sistem lama cocok sebelum membuat jurnal. Jangan mengimpor ulang transaksi historis sebagai jurnal baru tanpa rekonsiliasi dan rencana referensi yang jelas.</p>
+				<p class="text-muted">Bagan akun default disediakan melalui seed SQL <code>application/schema_migrations/002_foundation.sql</code>, bukan hardcode pada halaman ini. Administrator menjalankan migrasi melalui halaman Migrasi Database sesuai urutan file; <code>007_petty_cash.sql</code> tetap menambahkan akun 1106/1107 untuk instalasi lama dan membuat skema kas. Seed menggunakan <code>INSERT IGNORE</code>, jadi akun yang sudah ada tidak ditimpa—periksa tipe dan saldo normal bila database target pernah dikustomisasi. Impor stok hanya mengisi daftar stok, bukan membuat jurnal persediaan. Pastikan pemetaan akun sistem lama cocok sebelum membuat jurnal. Jangan mengimpor ulang transaksi historis sebagai jurnal baru tanpa rekonsiliasi dan rencana referensi yang jelas.</p>
 			</li>
 			<li>
 				<h4>Verifikasi stok fisik dan hutang supplier</h4>

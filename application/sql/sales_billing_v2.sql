@@ -1,12 +1,35 @@
 ALTER TABLE `sales_validation_runs`
 	MODIFY `validation_mode` enum('period','week','nota','cutoff') NOT NULL;
 
-ALTER TABLE `sales_validation_items`
-	ADD COLUMN `payment_method` varchar(20) NOT NULL DEFAULT '' AFTER `billable_total`;
+SET @billing_column_exists = (
+	SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+	WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sales_validation_items' AND COLUMN_NAME = 'payment_method'
+);
+SET @billing_upgrade_sql = IF(@billing_column_exists = 0,
+	'ALTER TABLE `sales_validation_items` ADD COLUMN `payment_method` varchar(20) NOT NULL DEFAULT '''' AFTER `billable_total`', 'SELECT 1');
+PREPARE billing_upgrade_stmt FROM @billing_upgrade_sql;
+EXECUTE billing_upgrade_stmt;
+DEALLOCATE PREPARE billing_upgrade_stmt;
 
-ALTER TABLE `sales_billing_items`
-	ADD COLUMN `payment_method` varchar(20) NOT NULL DEFAULT '' AFTER `billable_total`,
-	ADD COLUMN `adjustment_note` text AFTER `payment_method`;
+SET @billing_column_exists = (
+	SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+	WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sales_billing_items' AND COLUMN_NAME = 'payment_method'
+);
+SET @billing_upgrade_sql = IF(@billing_column_exists = 0,
+	'ALTER TABLE `sales_billing_items` ADD COLUMN `payment_method` varchar(20) NOT NULL DEFAULT '''' AFTER `billable_total`', 'SELECT 1');
+PREPARE billing_upgrade_stmt FROM @billing_upgrade_sql;
+EXECUTE billing_upgrade_stmt;
+DEALLOCATE PREPARE billing_upgrade_stmt;
+
+SET @billing_column_exists = (
+	SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+	WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sales_billing_items' AND COLUMN_NAME = 'adjustment_note'
+);
+SET @billing_upgrade_sql = IF(@billing_column_exists = 0,
+	'ALTER TABLE `sales_billing_items` ADD COLUMN `adjustment_note` text AFTER `payment_method`', 'SELECT 1');
+PREPARE billing_upgrade_stmt FROM @billing_upgrade_sql;
+EXECUTE billing_upgrade_stmt;
+DEALLOCATE PREPARE billing_upgrade_stmt;
 
 CREATE TABLE IF NOT EXISTS `sales_billing_adjustments` (
 	`id` int(11) NOT NULL AUTO_INCREMENT,
