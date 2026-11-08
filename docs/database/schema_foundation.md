@@ -147,8 +147,7 @@ Rekonsiliasi manual rekening koran bank hanya mendukung akun 1102 karena COA saa
 ---
 
 ### 1.9 Kas Utama, Petty Cash, dan Pembayaran Tunai Supplier
-Skrip **`application/sql/petty_cash.sql`** dijalankan setelah `phase3_foundation.sql` dan `purchasing.sql`. Skrip menambahkan:
-* Akun **1106 Kas Utama** dan **1107 Kas Kecil**.
+Skrip **`application/sql/petty_cash.sql`** dijalankan setelah `phase3_foundation.sql` dan `purchasing.sql`. Bagan akun standar inti (termasuk **1106 Kas Utama** dan **1107 Kas Kecil**) di-seed oleh `phase3_foundation.sql`; `petty_cash.sql` juga menyertakan `INSERT IGNORE` untuk kedua akun tersebut agar instalasi lama dapat dilengkapi. Skrip petty cash menambahkan:
 * **`acc_cash_funds`**: master dana dengan kode, nama/lokasi, tipe kas utama atau petty cash, pemegang, dan batas dana tetap per petty cash.
 * **`acc_cash_transactions`**: pengajuan penambahan dana, beban petty cash, dan pembayaran hutang supplier berdasarkan penerimaan barang. Pengajuan menyimpan tanggal, nominal, pihak terkait, referensi serta lampiran bukti, status, penginput, penyetuju, dan jurnal.
 * **`acc_cash_closings`**: saldo buku, hitungan kas fisik, selisih, catatan, pengguna, dan waktu tutup per dana/tanggal.

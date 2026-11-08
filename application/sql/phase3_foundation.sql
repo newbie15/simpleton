@@ -313,6 +313,8 @@ INSERT IGNORE INTO `acc_accounts` (`code`, `name`, `type`, `normal_balance`, `pa
 ('1103', 'Piutang Belanja Anggota (Potong Gaji)', 'asset', 'debit', NULL, 1),
 ('1104', 'Persediaan Barang Dagang', 'asset', 'debit', NULL, 1),
 ('1105', 'PPN Masukan', 'asset', 'debit', NULL, 1),
+('1106', 'Kas Utama', 'asset', 'debit', NULL, 1),
+('1107', 'Kas Kecil', 'asset', 'debit', NULL, 1),
 ('2101', 'Hutang Dagang Supplier', 'liability', 'credit', NULL, 1),
 ('2102', 'Simpanan Sukarela Anggota', 'liability', 'credit', NULL, 1),
 ('2103', 'PPN Keluaran', 'liability', 'credit', NULL, 1),
