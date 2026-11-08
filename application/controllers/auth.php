@@ -1479,23 +1479,45 @@ class Auth extends CI_Controller {
 		$this->load->helper('string');
 		$key   = random_string('alnum', 8);
 		$value = random_string('alnum', 20);
-		$this->session->set_flashdata('csrfkey', $key);
-		$this->session->set_flashdata('csrfvalue', $value);
+		$nonces = $this->session->userdata('auth_csrf_nonces');
+		if (!is_array($nonces))
+		{
+			$nonces = array();
+		}
+		$nonces[$key] = $value;
+		$this->session->set_userdata('auth_csrf_nonces', $nonces);
 
 		return array($key => $value);
 	}
 
 	function _valid_csrf_nonce()
 	{
-		if ($this->input->post($this->session->flashdata('csrfkey')) !== FALSE &&
-			$this->input->post($this->session->flashdata('csrfkey')) == $this->session->flashdata('csrfvalue'))
-		{
-			return TRUE;
-		}
-		else
+		$nonces = $this->session->userdata('auth_csrf_nonces');
+		if (!is_array($nonces))
 		{
 			return FALSE;
 		}
+
+		foreach ($nonces as $key => $value)
+		{
+			$posted_value = $this->input->post($key);
+			if (is_string($value) && is_string($posted_value) && $posted_value === $value)
+			{
+				unset($nonces[$key]);
+				if (empty($nonces))
+				{
+					$this->session->unset_userdata('auth_csrf_nonces');
+				}
+				else
+				{
+					$this->session->set_userdata('auth_csrf_nonces', $nonces);
+				}
+
+				return TRUE;
+			}
+		}
+
+		return FALSE;
 	}
 
 	private function _sync_karyawan_token()
