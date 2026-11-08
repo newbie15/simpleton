@@ -13,6 +13,7 @@ $petty = file_get_contents($base.DIRECTORY_SEPARATOR.'controllers'.DIRECTORY_SEP
 $view = file_get_contents($base.DIRECTORY_SEPARATOR.'views'.DIRECTORY_SEPARATOR.'purchasing.php');
 $payment_view = file_get_contents($base.DIRECTORY_SEPARATOR.'views'.DIRECTORY_SEPARATOR.'petty_cash_new.php');
 $management_payment_view = file_get_contents($base.DIRECTORY_SEPARATOR.'views'.DIRECTORY_SEPARATOR.'management_payments.php');
+$management_payment_js = file_get_contents(dirname(__DIR__).DIRECTORY_SEPARATOR.'assets'.DIRECTORY_SEPARATOR.'purchasing'.DIRECTORY_SEPARATOR.'management_payments.js');
 $adhoc_search = file_get_contents(dirname(__DIR__).DIRECTORY_SEPARATOR.'assets'.DIRECTORY_SEPARATOR.'purchasing'.DIRECTORY_SEPARATOR.'adhoc_product_search.js');
 $migration = file_get_contents(dirname(__DIR__).DIRECTORY_SEPARATOR.'application'.DIRECTORY_SEPARATOR.'sql'.DIRECTORY_SEPARATOR.'purchasing_workflow.sql');
 $payment_status_view = file_get_contents(dirname(__DIR__).DIRECTORY_SEPARATOR.'application'.DIRECTORY_SEPARATOR.'sql'.DIRECTORY_SEPARATOR.'purchasing_payment_status.sql');
@@ -48,10 +49,14 @@ $assert(strpos($adhoc_search, "event.key === 'Enter'") !== FALSE &&
 	'Ad-hoc search supports Enter selection and manual new-barcode entry.');
 $assert(strpos($payments, 'cash_tx.transaction_type = \'supplier_payment\'') !== FALSE &&
 	strpos($payments, 'outstanding_after_requests') !== FALSE &&
-	strpos($payments, 'main/petty_cash/approve/') === FALSE,
-	'Management queue filters existing supplier payments and calculates outstanding balance.');
-$assert(strpos($payments, 'cash_tx.proof_filename') !== FALSE && strpos($management_payment_view, '$payment->proof_filename') !== FALSE,
-	'Management payment rows include the proof filename used by the view.');
+	strpos($payments, 'main/petty_cash/approve/') !== FALSE &&
+	strpos($payments, 'main/petty_cash/reject/') !== FALSE &&
+	strpos($payments, '_account_balance') !== FALSE,
+	'Management queue filters existing supplier payments, checks source balance, and calculates outstanding balance.');
+$assert(strpos($payments, 'cash_tx.proof_filename') !== FALSE &&
+	strpos($management_payment_view, 'data-proof-url=') !== FALSE &&
+	strpos($management_payment_js, 'row.proof_filename') !== FALSE,
+	'Management payment rows include the proof filename used by the DataTables view.');
 $assert(strpos($payment_status_view, "payment.status = 'posted'") !== FALSE &&
 	strpos($payment_status_view, "payment.status = 'pending'") !== FALSE &&
 	strpos($payment_status_view, "THEN 'Lunas'") !== FALSE &&

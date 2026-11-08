@@ -46,8 +46,6 @@ class Management_payments extends CI_Controller
 		}
 
 		$data = array(
-			'payments' => array(),
-			'closed_po_receipts' => array(),
 			'filters' => array('status' => $status, 'supplier' => $supplier, 'receipt' => $receipt_number,
 				'start_date' => $start, 'end_date' => $end),
 			'form_token' => $this->_form_token(),
@@ -292,15 +290,20 @@ class Management_payments extends CI_Controller
 			$amount === FALSE || $amount <= 0 ||
 			$description === '' || strlen($description) > 500 ||
 			$evidence === '' || strlen($evidence) > 128) {
-			$this->_payment_message('Nota terima, akun sumber, tanggal, nominal, keterangan, atau referensi bukti tidak valid.', FALSE);
+			$this->_payment_message('Nota terima, akun sumber, tanggal, nominal, keterangan, atau referensi bukti tidak valid.', FALSE, $receipt_id);
 			return;
 		}
 		if ($this->_fund_is_closed((int) $fund->id, $date)) {
-			$this->_payment_message('Tanggal pembayaran berada pada atau sebelum tanggal tutup dana yang dipilih.', FALSE);
+			$this->_payment_message('Tanggal pembayaran berada pada atau sebelum tanggal tutup dana yang dipilih.', FALSE, $receipt_id);
+			return;
+		}
+		$source_balance = $this->_account_balance((int) $source_account->id, $date);
+		if ($source_balance === FALSE || $source_balance + 0.0001 < $amount) {
+			$this->_payment_message('Saldo akun sumber kas/bank tidak mencukupi pada tanggal pembayaran.', FALSE, $receipt_id);
 			return;
 		}
 
-		$proof_filename = $this->_save_payment_proof();
+		$proof_filename = $this->_save_payment_proof($receipt_id);
 		if ($proof_filename === FALSE) {
 			return;
 		}
@@ -311,7 +314,7 @@ class Management_payments extends CI_Controller
 		if (!$this->db->trans_begin()) {
 			$this->db->db_debug = $previous_db_debug;
 			$this->_discard_payment_proof($proof_filename);
-			$this->_payment_message('Database tidak dapat memulai pengajuan pembayaran.', FALSE);
+			$this->_payment_message('Database tidak dapat memulai pengajuan pembayaran.', FALSE, $receipt_id);
 			return;
 		}
 		$locked_receipt = $this->db->query(
@@ -327,13 +330,16 @@ class Management_payments extends CI_Controller
 			array((int) $fund->id)
 		)->row();
 		$outstanding = $locked_receipt ? $this->_receipt_outstanding($receipt_id) : FALSE;
+		$locked_source_balance = $locked_source ? $this->_account_balance((int) $locked_source->id, $date) : FALSE;
 		if (!$locked_source || !in_array($locked_source->code, $allowed_source_codes, TRUE) ||
 			!$locked_fund || !$locked_receipt || $outstanding === FALSE ||
-			$outstanding + 0.0001 < $amount || $this->_fund_is_closed((int) $fund->id, $date)) {
+			$outstanding + 0.0001 < $amount || $locked_source_balance === FALSE ||
+			$locked_source_balance + 0.0001 < $amount ||
+			$this->_fund_is_closed((int) $fund->id, $date)) {
 			$this->db->trans_rollback();
 			$this->db->db_debug = $previous_db_debug;
 			$this->_discard_payment_proof($proof_filename);
-			$this->_payment_message('Sisa hutang berubah, akun sumber tidak aktif, atau tanggal pembayaran sudah ditutup. Periksa kembali sebelum mengajukan.', FALSE);
+			$this->_payment_message('Sisa hutang berubah, saldo akun sumber tidak mencukupi, akun sumber tidak aktif, atau tanggal pembayaran sudah ditutup. Periksa kembali sebelum mengajukan.', FALSE, $receipt_id);
 			return;
 		}
 
@@ -365,7 +371,7 @@ class Management_payments extends CI_Controller
 			$this->db->db_debug = $previous_db_debug;
 			$this->_discard_payment_proof($proof_filename);
 			log_message('error', 'Gagal menyimpan pengajuan pembayaran supplier '.$transaction_number.': '.$error['code'].' '.$error['message']);
-			$this->_payment_message('Pengajuan pembayaran gagal disimpan.', FALSE);
+			$this->_payment_message('Pengajuan pembayaran gagal disimpan.', FALSE, $receipt_id);
 			return;
 		}
 		$this->db->db_debug = $previous_db_debug;
@@ -379,12 +385,18 @@ class Management_payments extends CI_Controller
 		$receipt = $this->input->get('receipt', TRUE);
 		$start = $this->input->get('start_date', TRUE);
 		$end = $this->input->get('end_date', TRUE);
+		$start_date = $this->_is_date($start) ? $start : '';
+		$end_date = $this->_is_date($end) ? $end : '';
+		if ($start_date !== '' && $end_date !== '' && $start_date > $end_date) {
+			$start_date = '';
+			$end_date = '';
+		}
 		return array(
 			'status' => is_string($status) && in_array($status, array('pending', 'posted', 'rejected'), TRUE) ? $status : '',
 			'supplier' => is_string($supplier) ? substr(trim($supplier), 0, 64) : '',
 			'receipt' => is_string($receipt) ? substr(trim($receipt), 0, 32) : '',
-			'start_date' => $this->_is_date($start) ? $start : '',
-			'end_date' => $this->_is_date($end) ? $end : ''
+			'start_date' => $start_date,
+			'end_date' => $end_date
 		);
 	}
 
@@ -641,6 +653,17 @@ class Management_payments extends CI_Controller
 		return round((float) $receipt->amount - (float) $returns->amount - (float) $payments->amount, 2);
 	}
 
+	private function _account_balance($account_id, $date)
+	{
+		$row = $this->db->query("
+			SELECT COALESCE(SUM(item.debit - item.credit), 0) AS balance
+			FROM acc_journal_items item
+			JOIN acc_journals journal ON journal.id = item.journal_id
+			WHERE journal.is_posted = 1 AND journal.date <= ? AND item.account_id = ?
+		", array($date, (int) $account_id))->row();
+		return $row ? (float) $row->balance : FALSE;
+	}
+
 	private function _fund_is_closed($fund_id, $date)
 	{
 		$closing = $this->db->where('fund_id', (int) $fund_id)
@@ -650,18 +673,18 @@ class Management_payments extends CI_Controller
 		return $closing && $date <= $closing->closing_date;
 	}
 
-	private function _save_payment_proof()
+	private function _save_payment_proof($receipt_id = FALSE)
 	{
 		if (!isset($_FILES['proof_file']) || !is_array($_FILES['proof_file']) ||
 			!isset($_FILES['proof_file']['error']) ||
 			(int) $_FILES['proof_file']['error'] !== UPLOAD_ERR_OK) {
-			$this->_payment_message('Lampirkan bukti berupa PDF, JPG, JPEG, atau PNG (maksimal 5 MB).', FALSE);
+			$this->_payment_message('Lampirkan bukti berupa PDF, JPG, JPEG, atau PNG (maksimal 5 MB).', FALSE, $receipt_id);
 			return FALSE;
 		}
 		$directory = APPPATH.'cache'.DIRECTORY_SEPARATOR.'petty_cash_proofs'.DIRECTORY_SEPARATOR;
 		if (!is_dir($directory) && !mkdir($directory, 0700, TRUE) && !is_dir($directory)) {
 			log_message('error', 'Direktori bukti pembayaran tidak dapat dibuat: '.$directory);
-			$this->_payment_message('Penyimpanan bukti pembayaran tidak tersedia. Hubungi administrator.', FALSE);
+			$this->_payment_message('Penyimpanan bukti pembayaran tidak tersedia. Hubungi administrator.', FALSE, $receipt_id);
 			return FALSE;
 		}
 		$this->load->library('upload');
@@ -676,7 +699,7 @@ class Management_payments extends CI_Controller
 		), TRUE);
 		if (!$this->upload->do_upload('proof_file')) {
 			$error = strip_tags($this->upload->display_errors('', ''));
-			$this->_payment_message($error, FALSE);
+			$this->_payment_message($error, FALSE, $receipt_id);
 			return FALSE;
 		}
 		$file = $this->upload->data();
@@ -694,9 +717,14 @@ class Management_payments extends CI_Controller
 		}
 	}
 
-	private function _payment_message($message, $success)
+	private function _payment_message($message, $success, $receipt_id = FALSE)
 	{
 		$this->session->set_flashdata($success ? 'cash_notice' : 'cash_error', $message);
+		if (!$success) {
+			$query = $receipt_id ? '?goods_receipt_id='.(int) $receipt_id : '';
+			redirect('main/management_payments/request'.$query);
+			return;
+		}
 		redirect('main/management_payments');
 	}
 
@@ -709,10 +737,18 @@ class Management_payments extends CI_Controller
 
 	private function _parse_amount($value)
 	{
-		if (!is_string($value) || !preg_match('/^\d{1,13}(?:\.\d{1,2})?$/', $value)) {
+		if (!is_string($value)) {
 			return FALSE;
 		}
-		$amount = round((float) $value, 2);
+		$normalized = trim($value);
+		if (preg_match('/^\d{1,3}(?:\.\d{3})+(?:,\d{1,2})?$/', $normalized) ||
+			preg_match('/^\d{1,13},\d{1,2}$/', $normalized)) {
+			$normalized = str_replace(array('.', ','), array('', '.'), $normalized);
+		}
+		if (!preg_match('/^\d{1,13}(?:\.\d{1,2})?$/', $normalized)) {
+			return FALSE;
+		}
+		$amount = round((float) $normalized, 2);
 		return $amount <= 9999999999999.99 ? $amount : FALSE;
 	}
 
