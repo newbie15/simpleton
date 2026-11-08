@@ -13,7 +13,7 @@ class Starting_setup extends CI_Controller
 			redirect('auth/login', 'refresh');
 			return;
 		}
-		if (!$this->page_access->can_access('accounting')) {
+		if (!$this->ion_auth->is_admin()) {
 			show_error('Anda tidak memiliki akses ke panduan setup awal.', 403);
 		}
 	}

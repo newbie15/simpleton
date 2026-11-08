@@ -27,8 +27,6 @@ $back_end_groups = array(
 		array('vouchers', 'Voucher', 'main/voucher', 'fa-ticket', isset($m_vouchers)),
 	)),
 	array('Akuntansi & Kas', 'fa-book', array(
-		array('users', 'Migrasi Database', 'main/migrate', 'fa-database', isset($m_migrate), array('admin')),
-		array('accounting', 'Setup Awal & Migrasi', 'main/starting_setup', 'fa-list-ol', isset($m_starting_setup)),
 		array('accounting', 'Akuntansi Terpadu (Utama)', 'main/accounting_unified', 'fa-star text-yellow', isset($m_accounting_unified)),
 		array('accounting', 'Buku Akun (Gnucash-style)', 'main/accounting_book', 'fa-sitemap', isset($m_accounting_book)),
 		array('accounting', 'Accounting V3 — Spreadsheet', 'main/accounting_grid', 'fa-table', isset($m_accounting_grid)),
@@ -47,6 +45,11 @@ $back_end_groups = array(
 		array('simpanan', 'Manajemen Simpanan', 'main/simpanan', 'fa-money', isset($m_simpanan)),
 		array('users', 'Manajemen User', 'auth/index', 'fa-user', isset($m_user) || isset($m_auth_index)),
 		array('update_data', 'Update Data', 'main/data_update', 'fa-upload', isset($m_update)),
+	)),
+	array('Administrasi Sistem', 'fa-cogs', array(
+		array('users', 'Setup Awal & Migrasi', 'main/starting_setup', 'fa-list-ol', isset($m_starting_setup), array('admin')),
+		array('users', 'Migrasi Database', 'main/migrate', 'fa-database', isset($m_migrate), array('admin')),
+		array('users', 'Backup & Restore Database', 'main/database_tools', 'fa-hdd-o', isset($m_database_tools), array('admin')),
 	)),
 );
 $back_end_items = array();

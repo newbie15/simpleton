@@ -4,7 +4,7 @@ Dokumen ini mencatat skema tabel baru dan perluasan tabel eksisting yang diterap
 
 ## Menjalankan migrasi lewat web
 
-- Login sebagai **admin**, buka **Back End > Akuntansi & Kas > Migrasi Database** (`main/migrate`).
+- Login sebagai **admin**, buka **Back End > Administrasi Sistem > Migrasi Database** (`main/migrate`).
 - Database dasar Simpleton (`users`, `groups`, `users_groups`, `stok`, `karyawan`, `penjualan`) dan akun admin harus tersedia. Halaman bukan installer database kosong.
 - Buat backup yang dapat dipulihkan dan hentikan transaksi selama maintenance. Konfirmasikan checkbox, lalu klik **Jalankan migrasi berikutnya** sampai semua file berstatus `applied`. Satu file dijalankan per request untuk membatasi durasi HTTP.
 - Runner membaca otomatis file SQL pada [application/schema_migrations](../../application/schema_migrations) dan mengurutkannya secara leksikografis. Nama menggunakan format sequential `NNN_nama_perubahan.sql` dengan nomor tiga digit unik (001–999), nama huruf kecil/angka/underscore, dan ID maksimal 64 karakter. Purchasing `001` mendahului fondasi `002` karena fondasi memperluas tabel penerimaan.
@@ -16,6 +16,19 @@ Dokumen ini mencatat skema tabel baru dan perluasan tabel eksisting yang diterap
 - Jangan mengedit file yang sudah dicatat; checksum menolak file berubah (perbedaan CRLF/LF diabaikan). Tambahkan migrasi baru setelah urutan terakhir untuk update berikutnya.
 - SQL demo, impor laporan dan migrasi PIN Telegram berisi data/default khusus sehingga tidak dimasukkan. Tidak ada CLI, SQL bebas, migrasi otomatis pada page load, atau tombol reset database.
 - Seed akun inti ikut fondasi; seed tidak menimpa akun existing. Tetap rekonsiliasi data dan akun yang sudah dikustomisasi sebelum go-live.
+
+### Backup dan restore dari browser
+
+Kategori **Administrasi Sistem** memuat Setup Awal, Migrasi Database, dan **Backup & Restore Database** (`main/database_tools`), semuanya khusus admin. Halaman migrasi menautkan langsung ke backup; centang backup tetap merupakan konfirmasi operator, bukan pemeriksaan bahwa ada salinan offsite.
+
+- Pengaturan tool `mysqldump`/`mysql` dan folder penyimpanan berada di [database_backup.php](../../application/config/database_backup.php). Default mengikuti tata letak XAMPP tanpa drive yang di-hardcode. Pada server lain, sesuaikan path binary dan folder **di luar semua document root/alias web**, serta batasi ACL folder ke akun layanan dan administrator.
+- Backup menggunakan koneksi database aplikasi dan `mysqldump --lock-all-tables`, termasuk tabel, view, routine, event, dan trigger. Akun database memerlukan izin yang sesuai; kesalahan tool dilaporkan, bukan dianggap sukses. Password koneksi menggunakan file opsi sementara, bukan argumen command line. File sementara dihapus setelah proses.
+- Hentikan transaksi pengguna selama backup/restore. Operasi ini sinkron melalui web; batas waktu PHP/Apache tetap berlaku. Untuk database besar, atur timeout server sebelum maintenance. Jangan mulai operasi kedua setelah timeout sebelum memastikan proses pertama sudah selesai.
+- SQL dan metadata checksum disimpan di folder privat; unduhan hanya melalui POST bertoken admin. File tidak dienkripsi: amankan penyimpanan dan salinan offsite. Backup **tidak** menyertakan lampiran, foto, konfigurasi aplikasi, atau file sumber.
+- Restore tidak menerima upload SQL. Hanya backup tercatat milik database aktif dengan checksum yang cocok diterima. Nama database, password admin, serta persetujuan maintenance wajib dikonfirmasi.
+- Daftar tabel/view/routine/event/trigger harus sama agar restore tidak meninggalkan objek tambahan yang tidak ada di snapshot. Restore lintas versi skema dengan objek berbeda diblokir; gunakan prosedur recovery terencana untuk kasus tersebut.
+- Sebelum menimpa, aplikasi membuat backup pengaman baru. Restore gagal dapat meninggalkan data parsial; nama backup pengaman ditampilkan dan error dicatat. Tidak ada rollback otomatis. Restore berhasil mengeluarkan admin dan mengharuskan login ulang.
+- Lock yang sama dengan runner migrasi mencegah backup/restore/migrasi bersamaan, tetapi bukan mode maintenance otomatis untuk seluruh pengguna. Tidak ada penghapusan/retensi otomatis; kelola salinan privat sesuai kebijakan organisasi.
 
 ---
 

@@ -3,6 +3,7 @@
 <?php if ($error) { ?><div class="alert alert-danger" role="alert"><?php echo html_escape($error); ?></div><?php } ?>
 <div class="callout callout-warning">
 	<h4>Backup dahulu, jalankan pada waktu maintenance</h4>
+	<p><a class="btn btn-default" href="<?php echo site_url('main/database_tools'); ?>">Buat / unduh backup database</a></p>
 	<p>Hentikan transaksi pengguna dan buat backup yang dapat dipulihkan. MySQL dapat menyimpan sebagian perubahan DDL sebelum error; runner tidak menyediakan rollback otomatis.</p>
 	<p>Database dasar Simpleton dan akun admin harus sudah terpasang. Migrasi modul dan seed akun baku dijalankan berurutan. SQL demo, impor laporan, dan PIN Telegram tidak dijalankan.</p>
 	<p>Database lama tanpa riwayat runner akan diperiksa/dilengkapi melalui SQL yang aman dijalankan ulang, bukan langsung dianggap selesai. Status selesai berarti SQL berhasil; bukan jaminan semua data lama sudah benar.</p>

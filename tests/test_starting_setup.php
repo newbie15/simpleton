@@ -13,9 +13,9 @@ $assert = function ($condition, $message) use (&$tests) {
 	$tests[] = array((bool) $condition, $message);
 };
 
-$assert(strpos($controller, "can_access('accounting')") !== FALSE &&
+$assert(strpos($controller, "ion_auth->is_admin()") !== FALSE &&
 	strpos($controller, "redirect('auth/login'") !== FALSE,
-	'Starting setup guide requires an authenticated accounting-authorized user.');
+	'Starting setup guide requires an authenticated administrator.');
 $assert(strpos($menu, 'main/starting_setup') !== FALSE &&
 	strpos($menu, 'Setup Awal & Migrasi') !== FALSE,
 	'Starting setup guide is reachable from the backend menu.');
