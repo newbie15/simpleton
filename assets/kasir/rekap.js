@@ -4,8 +4,16 @@ $(document).ready(function () {
         return;
     }
 
-    var ajaxBase = report.getAttribute('data-ajax-base').replace(/\/$/, '');
-    var rekapBase = (report.getAttribute('data-rekap-base') || '').replace(/\/$/, '');
+    function sameOriginUrl(url) {
+        var parsedUrl = document.createElement('a');
+        parsedUrl.href = url;
+        return window.location.protocol + '//' + window.location.host
+            + parsedUrl.pathname + parsedUrl.search + parsedUrl.hash;
+    }
+
+    var ajaxBase = sameOriginUrl(report.getAttribute('data-ajax-base')).replace(/\/$/, '');
+    var rekapBase = sameOriginUrl(report.getAttribute('data-rekap-base')).replace(/\/$/, '');
+    var reprintBase = sameOriginUrl(report.getAttribute('data-reprint-base')).replace(/\/$/, '');
     var currentDate = new Date();
     var currentYear = currentDate.getFullYear();
     var currentMonth = currentDate.getMonth() + 1;
@@ -94,7 +102,7 @@ $(document).ready(function () {
         var printBtn = $('#btn-print-receipt');
 
         body.html('<div class="text-center" style="padding: 30px;"><i class="fa fa-spinner fa-spin fa-2x text-primary"></i><p style="margin-top: 10px;">Mengambil data nota ' + nota + '...</p></div>');
-        printBtn.attr('href', ajaxBase.replace('/ajax', '/kasir/receipt?nota=' + encodeURIComponent(nota)));
+        printBtn.attr('href', reprintBase + '?nota=' + encodeURIComponent(nota));
         modal.modal('show');
 
         $.ajax({

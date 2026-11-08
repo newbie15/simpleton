@@ -25,6 +25,7 @@ class Rekap_penjualan extends CI_Controller
 		);
 		$data['ajax_base'] = site_url('main/ajax');
 		$data['rekap_base'] = site_url('main/rekap_penjualan');
+		$data['reprint_base'] = site_url('main/kasir/reprint');
 		$data['m_rekap'] = TRUE;
 		$data['output'] = $this->load->view('rekap_penjualan', $data, TRUE);
 		$this->load->view('welcome_message', $data);

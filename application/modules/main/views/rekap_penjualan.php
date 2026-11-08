@@ -24,6 +24,10 @@
 		table-layout: fixed;
 	}
 
+	#exTab2 .jexcel > thead > tr > td {
+		z-index: 1;
+	}
+
 	#exTab2 .easy-autocomplete {
 		width: 100% !important;
 	}
@@ -74,7 +78,7 @@
 				</div>
 			</div>
 			<div class="box-body" style="padding-top: 5px;">
-				<div id="exTab2" data-ajax-base="<?php echo html_escape($ajax_base); ?>" data-rekap-base="<?php echo html_escape($rekap_base); ?>">
+				<div id="exTab2" data-ajax-base="<?php echo html_escape($ajax_base); ?>" data-rekap-base="<?php echo html_escape($rekap_base); ?>" data-reprint-base="<?php echo html_escape($reprint_base); ?>">
 					<ul class="nav nav-tabs" style="margin-bottom: 15px;">
 						<li class="active"><a id="h" href="#harian"><i class="fa fa-calendar"></i> Harian</a></li>
 						<li><a id="u" href="#tunai"><i class="fa fa-money"></i> Penjualan Tunai</a></li>
