@@ -46,15 +46,32 @@ try {
 	$service = new Database_backup();
 	$record = $service->backup('test');
 	$assert($record['bytes'] > 0 && count($service->records()) === 1, 'Backup dump and metadata persist.');
+	$assert($record['format'] === 'zip' && $record['bytes'] < $record['sql_bytes'], 'ZIP backup is smaller than original SQL.');
+	$assert(!is_file($service->path($record['id'])), 'Uncompressed SQL is removed after ZIP creation.');
+	$zip = new ZipArchive();
+	$assert($zip->open($service->archive_path($record)) === TRUE && $zip->numFiles === 1, 'ZIP contains exactly one SQL entry.');
+	$sql = $zip->getFromIndex(0);
+	$zip->close();
+	$assert(hash('sha256', $sql) === $record['sql_checksum'], 'Archived SQL content checksum is preserved.');
 	$service->record($record['id']);
 	$adapter->query("UPDATE test_values SET value = 'after backup'");
 	$safety = $service->restore($record['id'], 'test');
 	$assert($adapter->query('SELECT value FROM test_values')->row()->value === 'before restore', 'Restore recovers original data.');
 	$assert(count($service->records()) === 2 && $safety['id'] !== $record['id'], 'Restore creates a separate safety backup.');
 	$assert($adapter->query('SELECT value FROM test_view')->row()->value === 'before restore', 'Views are restored.');
+	$legacy = $record;
+	$legacy['id'] = 'backup_20000101_000000_abcdef123456';
+	unset($legacy['format'], $legacy['sql_bytes'], $legacy['sql_checksum']);
+	$legacy['checksum'] = hash('sha256', $sql);
+	$legacy['bytes'] = strlen($sql);
+	file_put_contents($service->path($legacy['id']), $sql);
+	file_put_contents($service->path($legacy['id'], 'json'), json_encode($legacy));
+	$adapter->query("UPDATE test_values SET value = 'legacy restore test'");
+	$service->restore($legacy['id'], 'test');
+	$assert($adapter->query('SELECT value FROM test_values')->row()->value === 'before restore', 'Legacy SQL backups still restore correctly.');
 	$adapter->query('CREATE TABLE added_table (id int)');
 	$reject(function () use ($service, $record) { $service->restore($record['id'], 'test'); });
-	file_put_contents($service->path($record['id']), '-- corruption', FILE_APPEND);
+	file_put_contents($service->archive_path($record), '-- corruption', FILE_APPEND);
 	$reject(function () use ($service, $record) { $service->record($record['id']); });
 } finally {
 	if (isset($adapter)) { $adapter->close(); }

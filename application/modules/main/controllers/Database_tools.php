@@ -31,6 +31,7 @@ class Database_tools extends CI_Controller
 			$data['error'] = $exception->getMessage();
 		}
 		$data['output'] = $this->load->view('database_tools', $data, TRUE);
+		$data['js_file'] = array(base_url('assets/misc/database_tools.js'));
 		$this->load->view('welcome_message', $data);
 	}
 
@@ -60,10 +61,10 @@ class Database_tools extends CI_Controller
 		$this->require_post();
 		try {
 			$id = $this->input->post('backup_id');
-			$this->database_backup->record($id);
-			$path = $this->database_backup->path($id);
+			$record = $this->database_backup->record($id);
+			$path = $this->database_backup->archive_path($record);
 			header('Content-Type: application/octet-stream');
-			header('Content-Disposition: attachment; filename="'.$id.'.sql"');
+			header('Content-Disposition: attachment; filename="'.basename($path).'"');
 			header('Cache-Control: no-store, private');
 			header('Content-Length: '.filesize($path));
 			if (readfile($path) === FALSE) { log_message('error', 'Download backup gagal: '.$id); }

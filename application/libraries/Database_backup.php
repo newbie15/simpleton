@@ -70,11 +70,17 @@ class Database_backup
 			}
 			$safety = $this->create($user_id);
 			log_message('error', 'Restore database dimulai oleh admin '.$user_id.' dari '.$id.'; backup pengaman '.$safety['id']);
+			$input = NULL;
 			try {
+				$input = $this->restore_input($record);
 				$this->process($this->settings['restore_binary'], array('--binary-mode', '--default-character-set=utf8'),
-					$this->path($id, 'sql'));
+					$input);
 			} catch (RuntimeException $exception) {
 				throw new RuntimeException('Restore gagal dan database mungkin sudah berubah sebagian. Backup pengaman: '.$safety['id'].'. '.$exception->getMessage());
+			} finally {
+				if ($input !== NULL && $input !== $this->path($id, 'sql') && is_file($input) && !unlink($input)) {
+					log_message('error', 'SQL sementara restore tidak dapat dihapus.');
+				}
 			}
 			log_message('info', 'Restore database selesai oleh admin '.$user_id.' dari '.$id);
 			return $safety;
@@ -89,11 +95,62 @@ class Database_backup
 			throw new RuntimeException('Backup tidak ditemukan untuk database ini.');
 		}
 		$record = $rows[$id];
-		$path = $this->path($id, 'sql');
+		$path = $this->archive_path($record);
 		if (!is_file($path) || is_link($path) || !hash_equals($record['checksum'], hash_file('sha256', $path))) {
 			throw new RuntimeException('File backup hilang atau checksum tidak sesuai.');
 		}
 		return $record;
+	}
+
+	public function archive_path($record)
+	{
+		$format = isset($record['format']) ? $record['format'] : 'sql';
+		if (!in_array($format, array('sql', 'zip'), TRUE)) {
+			throw new RuntimeException('Format backup tidak didukung.');
+		}
+		return $this->path($record['id'], $format);
+	}
+
+	private function restore_input($record)
+	{
+		if (!isset($record['format']) || $record['format'] === 'sql') {
+			return $this->archive_path($record);
+		}
+		if (!class_exists('ZipArchive')) { throw new RuntimeException('Ekstensi PHP ZIP tidak tersedia.'); }
+		$zip = new ZipArchive();
+		if ($zip->open($this->archive_path($record)) !== TRUE) { throw new RuntimeException('ZIP backup gagal dibuka.'); }
+		$temporary = NULL;
+		$source = FALSE;
+		$target = FALSE;
+		try {
+			$entry = $record['id'].'.sql';
+			if ($zip->numFiles !== 1 || $zip->getNameIndex(0) !== $entry || !isset($record['sql_checksum'])) {
+				throw new RuntimeException('Isi ZIP backup tidak valid.');
+			}
+			$temporary = tempnam($this->directory(), 'restore_');
+			if ($temporary === FALSE) { throw new RuntimeException('SQL sementara restore gagal dibuat.'); }
+			$source = $zip->getStream($entry);
+			$target = fopen($temporary, 'wb');
+			if ($source === FALSE || $target === FALSE || stream_copy_to_stream($source, $target) === FALSE) {
+				throw new RuntimeException('Ekstraksi SQL backup gagal.');
+			}
+			fclose($target);
+			$target = FALSE;
+			if (!hash_equals($record['sql_checksum'], hash_file('sha256', $temporary))) {
+				throw new RuntimeException('Checksum SQL dalam ZIP tidak sesuai.');
+			}
+			return $temporary;
+		} catch (RuntimeException $exception) {
+			if (is_resource($target)) { fclose($target); $target = FALSE; }
+			if ($temporary !== NULL && is_file($temporary) && !unlink($temporary)) {
+				log_message('error', 'Ekstraksi gagal tidak dapat dibersihkan.');
+			}
+			throw $exception;
+		} finally {
+			if (is_resource($source)) { fclose($source); }
+			if (is_resource($target)) { fclose($target); }
+			$zip->close();
+		}
 	}
 
 	public function path($id, $extension = 'sql')
@@ -119,6 +176,9 @@ class Database_backup
 
 	private function create($user_id)
 	{
+		if (!class_exists('ZipArchive')) {
+			throw new RuntimeException('Backup ZIP memerlukan ekstensi PHP ZIP.');
+		}
 		$id = 'backup_'.date('Ymd_His').'_'.substr(md5(uniqid('', TRUE)), 0, 12);
 		$path = $this->path($id);
 		$objects = $this->objects();
@@ -130,16 +190,32 @@ class Database_backup
 			if (!is_file($path) || filesize($path) === 0) {
 				throw new RuntimeException('File hasil backup kosong.');
 			}
+			$sql_bytes = filesize($path);
+			$sql_checksum = hash_file('sha256', $path);
+			$archive = $this->path($id, 'zip');
+			$zip = new ZipArchive();
+			if ($zip->open($archive, ZipArchive::CREATE | ZipArchive::EXCL) !== TRUE) {
+				throw new RuntimeException('ZIP backup tidak dapat dibuat.');
+			}
+			$added = $zip->addFile($path, $id.'.sql');
+			$closed = $zip->close();
+			if (!$added || !$closed || !is_file($archive) || filesize($archive) === 0) {
+				throw new RuntimeException('Kompresi ZIP backup gagal.');
+			}
 			$record = array('id' => $id, 'database' => $this->CI->db->database, 'objects' => $objects,
-				'checksum' => hash_file('sha256', $path), 'bytes' => filesize($path),
+				'format' => 'zip', 'sql_bytes' => $sql_bytes, 'sql_checksum' => $sql_checksum,
+				'checksum' => hash_file('sha256', $archive), 'bytes' => filesize($archive),
 				'created_at' => date('Y-m-d H:i:s'), 'created_by' => (string) $user_id);
+			if (!unlink($path)) { throw new RuntimeException('SQL mentah backup gagal dihapus setelah kompresi.'); }
 			if (file_put_contents($this->path($id, 'json'), json_encode($record), LOCK_EX) === FALSE) {
 				throw new RuntimeException('Metadata backup gagal disimpan.');
 			}
 			log_message('info', 'Backup database dibuat oleh admin '.$user_id.': '.$id);
 			return $record;
 		} catch (RuntimeException $exception) {
-			if (is_file($path) && !unlink($path)) { log_message('error', 'Backup gagal tidak dapat dibersihkan: '.$id); }
+			foreach (array($path, $this->path($id, 'zip')) as $failed_path) {
+				if (is_file($failed_path) && !unlink($failed_path)) { log_message('error', 'Backup gagal tidak dapat dibersihkan: '.$id); }
+			}
 			throw $exception;
 		}
 	}
